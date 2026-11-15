@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "KongDaily",
+    "slug": "kongdaily",
+    "version": "0.1.0",
+    "platforms": ["ios"],
+    "scheme": "kongdaily",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.lennystudio.kongdaily"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": {
+            "ios": ["en", "zh-HK"]
+          }
+        }
+      ],
+      "expo-sqlite"
+    ]
+  }
+}
