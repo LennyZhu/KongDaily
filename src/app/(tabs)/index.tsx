@@ -1,8 +1,13 @@
 import type { Href } from 'expo-router';
+import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { loadBusFavorites, useBusFavorites, useUnavailableFavorites } from '@/bus-favorite-hooks';
+import { pinnedBuses } from '@/bus-favorites';
+import { BusAction } from '@/components/bus-ui';
 import { FeaturedCard, HomeHero, HomeLink, HomeSection, QuickLinkCard, WeatherCard } from '@/components/home-ui';
-import { AppText, Icon, Screen, type IconName } from '@/components/ui';
+import { HomeFavoriteBus } from '@/components/saved-bus-ui';
+import { AppText, EmptyState, Icon, Screen, type IconName } from '@/components/ui';
 import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
 import { colors, homeColors, homeLayout, radius, space, touchTarget } from '@/theme';
@@ -34,6 +39,9 @@ const quickLinkRows = [
 export default function HomeScreen() {
   const { copy } = useLanguage();
   const { home } = copy;
+  const { items, status } = useBusFavorites();
+  const pins = useMemo(() => pinnedBuses(items), [items]);
+  const unavailable = useUnavailableFavorites(pins);
 
   return (
     <Screen contentStyle={styles.screenContent} topBackgroundColor={homeColors.harbourSky}>
@@ -46,28 +54,34 @@ export default function HomeScreen() {
           weatherStatus={home.weatherStatus}
         />
 
-        <HomeSection title={home.buses} icon="bus" action={{ label: home.viewAll, href: '/saved?category=buses' }}>
-          <View style={styles.busCard}>
-            <View style={styles.busSummary}>
-              <Icon name="bus" color={colors.muted} size={34} />
-              <View style={styles.busCopy}>
-                <AppText variant="homeCardTitle">{home.busEmpty}</AppText>
-                <AppText variant="detail" tone="muted">{home.busDetail}</AppText>
+        <HomeSection title={home.buses} icon="bus"
+          action={{ label: items.length ? copy.busFavorites.manage : home.viewAll, href: '/saved?category=buses' }}>
+          {status === 'loading' ? (
+            <EmptyState icon="clock" title={copy.busFavorites.loading} />
+          ) : status === 'error' ? (
+            <>
+              <EmptyState icon="exclamationmark.circle" title={copy.busFavorites.loadError} />
+              <BusAction label={copy.bus.retry} onPress={() => void loadBusFavorites()} />
+            </>
+          ) : pins.length > 0 ? (
+            <>
+              {pins.map((favorite) => <HomeFavoriteBus key={favorite.id} favorite={favorite} unavailable={unavailable.has(favorite.id)} />)}
+              <HomeAddBus label={home.addBus} />
+            </>
+          ) : items.length > 0 ? (
+            <EmptyState icon="pin" title={copy.busFavorites.noPins} detail={copy.busFavorites.noPinsDetail} />
+          ) : (
+            <View style={styles.busCard}>
+              <View style={styles.busSummary}>
+                <Icon name="bus" color={colors.muted} size={34} />
+                <View style={styles.busCopy}>
+                  <AppText variant="homeCardTitle">{home.busEmpty}</AppText>
+                  <AppText variant="detail" tone="muted">{home.busDetail}</AppText>
+                </View>
               </View>
+              <HomeAddBus label={home.addBus} />
             </View>
-            <HomeLink href={busSearch} label={home.addBus} style={styles.addBus}>
-              <Icon name="plus" size={16} />
-              <AppText
-                variant="detail"
-                numberOfLines={1}
-                maxFontSizeMultiplier={1.4}
-                tone="primary"
-                style={styles.buttonLabel}
-              >
-                {home.addBus}
-              </AppText>
-            </HomeLink>
-          </View>
+          )}
         </HomeSection>
 
         <HomeSection title={home.shortcuts} icon="safari">
@@ -107,6 +121,17 @@ export default function HomeScreen() {
         </HomeSection>
       </View>
     </Screen>
+  );
+}
+
+function HomeAddBus({ label }: { label: string }) {
+  return (
+    <HomeLink href={busSearch} label={label} style={styles.addBus}>
+      <Icon name="plus" size={16} />
+      <AppText variant="detail" numberOfLines={1} maxFontSizeMultiplier={1.4} tone="primary" style={styles.buttonLabel}>
+        {label}
+      </AppText>
+    </HomeLink>
   );
 }
 

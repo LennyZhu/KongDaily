@@ -35,6 +35,11 @@ function RootStack() {
         headerStyle: { backgroundColor: colors.tintedBackground },
         headerShadowVisible: false,
       }} />
+      <Stack.Screen name="bus/eta" options={{
+        title: copy.busEta.title,
+        headerStyle: { backgroundColor: colors.tintedBackground },
+        headerShadowVisible: false,
+      }} />
     </Stack>
   );
 }

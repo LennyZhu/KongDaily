@@ -61,6 +61,7 @@ function RouteLoader({ id }: { id: string }) {
 
 function RouteDetails({ family }: { family: RouteFamily }) {
   const { copy, locale } = useLanguage();
+  const router = useRouter();
   const detail = copy.busDetail;
   const bus = copy.bus;
   const base = family.selected;
@@ -154,6 +155,29 @@ function RouteDetails({ family }: { family: RouteFamily }) {
   const missingNames = stopIds.map((id) => names[id]?.error).filter(Boolean);
   const showSaved = sequence && sequence.stops.length > 0 && (current.state?.fromCache || current.state?.error);
   const picked = current && sequence?.stops.find((stop) => stopVisitKey(current.identity, stop) === selectedVisit);
+
+  function openEta() {
+    if (!current || !picked || !sequence) return;
+    const { identity } = current;
+    const station = picked.name ?? names[picked.id]?.snapshot?.stop.name;
+    const last = sequence.stops.at(-1);
+    const to = current.catalogueRoute?.destination ?? (last && names[last.id]?.snapshot?.stop.name);
+    router.push({ pathname: '/bus/eta', params: {
+      source: identity.source,
+      number: identity.number,
+      stopId: picked.id,
+      stopSeq: String(picked.seq),
+      ...(identity.source === 'nlb'
+        ? { nlbRouteId: identity.routeId, repeatedStop: sequence.stops.some((stop) => stop.id === picked.id && stop.seq !== picked.seq) ? '1' : '0' }
+        : { direction: identity.direction }),
+      ...(identity.source === 'kmbLwb' && { serviceType: identity.serviceType }),
+      stationZh: station?.zh ?? '',
+      stationEn: station?.en ?? '',
+      destinationZh: to?.zh || nlbRoute?.routeName.zh || '',
+      destinationEn: to?.en || nlbRoute?.routeName.en || '',
+      ...(identity.source === 'citybus' && last && { destinationStopId: last.id }),
+    } });
+  }
 
   return (
     <SafeAreaView style={styles.screen} edges={['left', 'right', 'bottom']}>
@@ -281,7 +305,11 @@ function RouteDetails({ family }: { family: RouteFamily }) {
           <View style={styles.grow}>
             <AppText variant="caption" tone="primary">{detail.stopOrder(picked.seq)}</AppText>
             <AppText variant="homeCardTitle">{stopName(picked)}</AppText>
-            <AppText variant="brandSubtitle" tone="muted">{detail.etaLater}</AppText>
+            <Pressable accessibilityRole="button" onPress={openEta}
+              style={({ pressed }) => [styles.etaLink, pressed && styles.pressed]}>
+              <AppText variant="detail" tone="primary" style={styles.grow}>{copy.busEta.open}</AppText>
+              <Icon name="chevron.right" size={13} />
+            </Pressable>
           </View>
         </View>
       )}
@@ -384,4 +412,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, marginHorizontal: homeLayout.gutter,
     marginBottom: space.sm, borderRadius: radius.card, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.tintedBackground,
   },
+  etaLink: { minHeight: touchTarget, flexDirection: 'row', alignItems: 'center', gap: space.sm },
 });

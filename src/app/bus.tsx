@@ -128,6 +128,10 @@ export default function BusScreen() {
                 historyLoading={loadingHistory}
                 routesById={routesById}
                 onFocus={() => input.current?.focus()}
+                onJumpToFavorites={(offset) => {
+                  Keyboard.dismiss();
+                  list.current?.scrollToOffset({ offset: Math.max(0, offset - space.sm), animated: true });
+                }}
                 onRecent={openRecent}
                 onClear={() => Alert.alert(bus.clearHistoryTitle, undefined, [
                   { text: bus.cancel, style: 'cancel' },

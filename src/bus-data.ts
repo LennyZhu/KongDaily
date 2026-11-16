@@ -104,9 +104,12 @@ export function refreshBusFeed(source: BusSource) {
   return request;
 }
 
-export async function requestBusJson(source: BusSource, url: string): Promise<unknown> {
+export async function requestBusJson(source: BusSource, url: string, signal?: AbortSignal): Promise<unknown> {
   const startedAt = Date.now();
   const controller = new AbortController();
+  const cancel = () => controller.abort();
+  if (signal?.aborted) cancel();
+  else signal?.addEventListener('abort', cancel);
   const timeout = setTimeout(() => controller.abort(), requestTimeout);
   logFeed(source, 'request', { outcome: 'start', url, timeoutMs: requestTimeout });
 
@@ -119,7 +122,7 @@ export async function requestBusJson(source: BusSource, url: string): Promise<un
     if (!response.ok) throw new BusFeedError('http', status);
     body = await response.text();
   } catch (error) {
-    if (error instanceof BusFeedError) throw error;
+    if (signal?.aborted || error instanceof BusFeedError) throw error;
     const stage = status === undefined ? 'request' : 'body';
     const message = error instanceof Error ? error.message : '';
     const tlsFailure = /\b(?:tls|ssl|certificate|secure connection)\b/i.test(message);
@@ -133,6 +136,7 @@ export async function requestBusJson(source: BusSource, url: string): Promise<un
     throw new BusFeedError(kind);
   } finally {
     clearTimeout(timeout);
+    signal?.removeEventListener('abort', cancel);
   }
 
   try {

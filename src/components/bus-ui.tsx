@@ -1,11 +1,14 @@
-import type { RefObject } from 'react';
+import { useRef, type RefObject } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import type { BusHistoryItem } from '@/bus-data';
+import { loadBusFavorites, useBusFavorites } from '@/bus-favorite-hooks';
 import { routePlaceName, type BusRoute } from '@/bus-routes';
 import { HarbourBackdrop } from '@/components/home-ui';
+import { FavoriteBusRow, savedBusStyles } from '@/components/saved-bus-ui';
 import { AppText, EmptyState, Icon, type IconName } from '@/components/ui';
 import type { Messages } from '@/i18n';
+import { useLanguage } from '@/language';
 import { colors, homeColors, homeLayout, radius, shadows, space, touchTarget, typography } from '@/theme';
 
 type BusCopy = Messages['bus'];
@@ -70,24 +73,29 @@ export function BusHero({ copy, inputRef, query, onChange, onSubmit, onBack }: {
   );
 }
 
-const upcomingShortcuts = [
+const landingShortcuts = [
   { key: 'nearby', icon: 'mappin' },
   { key: 'saved', icon: 'star' },
   { key: 'map', icon: 'map' },
 ] as const satisfies ReadonlyArray<{ key: keyof BusCopy['shortcuts']; icon: IconName }>;
 
-export function BusLanding({ copy, locale, history, historyLoading, routesById, onFocus, onClear, onRecent }: {
+export function BusLanding({ copy, locale, history, historyLoading, routesById, onFocus, onJumpToFavorites, onClear, onRecent }: {
   copy: BusCopy;
   locale: BusLocale;
   history: BusHistoryItem[];
   historyLoading: boolean;
   routesById: Map<string, BusRoute>;
   onFocus: () => void;
+  onJumpToFavorites: (offset: number) => void;
   onClear: () => void;
   onRecent: (entry: BusHistoryItem) => void;
 }) {
+  const { items, status } = useBusFavorites();
+  const { copy: { busFavorites } } = useLanguage();
+  const layoutOffsets = useRef({ landing: 0, favorites: 0 });
+
   return (
-    <View style={styles.sections}>
+    <View style={styles.sections} onLayout={({ nativeEvent }) => { layoutOffsets.current.landing = nativeEvent.layout.y; }}>
       <View style={styles.shortcuts}>
         <Pressable
           accessibilityRole="button"
@@ -97,7 +105,14 @@ export function BusLanding({ copy, locale, history, historyLoading, routesById, 
           <Icon name="magnifyingglass" size={23} />
           <AppText variant="caption" style={styles.centered}>{copy.shortcuts.search}</AppText>
         </Pressable>
-        {upcomingShortcuts.map(({ key, icon }) => (
+        {landingShortcuts.map(({ key, icon }) => key === 'saved' ? (
+          <Pressable key={key} accessibilityRole="button"
+            onPress={() => onJumpToFavorites(layoutOffsets.current.landing + layoutOffsets.current.favorites)}
+            style={({ pressed }) => [styles.shortcut, pressed && styles.pressed]}>
+            <Icon name={icon} size={23} />
+            <AppText variant="caption" style={styles.centered}>{copy.shortcuts.saved}</AppText>
+          </Pressable>
+        ) : (
           <View key={key} style={styles.shortcut}>
             <Icon name={icon} size={23} />
             <AppText variant="caption" style={styles.centered}>{copy.shortcuts[key]}</AppText>
@@ -106,13 +121,26 @@ export function BusLanding({ copy, locale, history, historyLoading, routesById, 
         ))}
       </View>
 
-      <View style={styles.section}>
+      <View style={styles.section} onLayout={({ nativeEvent }) => { layoutOffsets.current.favorites = nativeEvent.layout.y; }}>
         <AppText variant="homeHeading" accessibilityRole="header">{copy.shortcuts.saved}</AppText>
-        <View style={styles.favouriteEmpty}>
-          <Icon name="star" size={29} color={colors.muted} />
-          <AppText variant="homeCardTitle" style={styles.centered}>{copy.noFavourites}</AppText>
-          <AppText variant="detail" tone="muted" style={styles.centered}>{copy.favouritesDetail}</AppText>
-        </View>
+        {status === 'loading' ? (
+          <ActivityIndicator color={colors.primary} accessibilityLabel={busFavorites.loading} />
+        ) : status === 'error' ? (
+          <View style={styles.favouriteEmpty}>
+            <AppText variant="homeCardTitle" accessibilityRole="alert" style={styles.centered}>{busFavorites.loadError}</AppText>
+            <BusAction label={copy.retry} onPress={() => void loadBusFavorites()} />
+          </View>
+        ) : items.length > 0 ? items.map((favorite) => (
+          <View key={favorite.id} style={savedBusStyles.card}>
+            <FavoriteBusRow favorite={favorite} />
+          </View>
+        )) : (
+          <View style={styles.favouriteEmpty}>
+            <Icon name="star" size={29} color={colors.muted} />
+            <AppText variant="homeCardTitle" style={styles.centered}>{copy.noFavourites}</AppText>
+            <AppText variant="detail" tone="muted" style={styles.centered}>{copy.favouritesDetail}</AppText>
+          </View>
+        )}
       </View>
 
       <View style={styles.section}>
