@@ -41,7 +41,7 @@ function onePosition(signal: AbortSignal): Promise<LocationResult> {
   });
 }
 
-export async function locateNearbyBusStops(signal: AbortSignal): Promise<LocationResult> {
+export async function locateNearbyBusStops(signal: AbortSignal, allowPermissionPrompt = true): Promise<LocationResult> {
   try {
     const servicesEnabled = await Location.hasServicesEnabledAsync();
     if (signal.aborted) return { kind: 'cancelled' };
@@ -51,6 +51,7 @@ export async function locateNearbyBusStops(signal: AbortSignal): Promise<Locatio
     if (signal.aborted) return { kind: 'cancelled' };
     if (!permission.granted) {
       if (!permission.canAskAgain) return { kind: 'blocked' };
+      if (!allowPermissionPrompt) return { kind: 'denied' };
       permission = await Location.requestForegroundPermissionsAsync();
       if (signal.aborted) return { kind: 'cancelled' };
       if (!permission.granted) return { kind: 'denied' };

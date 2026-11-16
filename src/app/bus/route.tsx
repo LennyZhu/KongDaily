@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type Ref, type RefObject } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -15,11 +15,12 @@ import {
 import { BusAction } from '@/components/bus-ui';
 import { AppText, EmptyState, Icon, Screen } from '@/components/ui';
 import { useLanguage } from '@/language';
+import { useRouteStopRecommendation } from '@/route-stop-recommendation';
 import { colors, homeLayout, radius, space, touchTarget } from '@/theme';
 
 type RouteFamily = NonNullable<Awaited<ReturnType<typeof findBusRouteFamily>>>;
 type SequenceEntry = RouteSequenceChoice & { key: string; state?: SequenceState };
-type RouteSelection = { variant?: string; direction?: TravelDirection; visit?: string };
+type RouteSelection = { variant?: string; direction?: TravelDirection; stop?: { routeKey: string; visit?: string } };
 type BoardingParams = { stopId?: string; stopSeq?: string; direction?: string };
 const etaPreviewDelay = 350;
 
@@ -71,6 +72,10 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
   const detail = copy.busDetail;
   const bus = copy.bus;
   const base = family.selected;
+  const hasBoardingParams = boarding.stopId !== undefined || boarding.stopSeq !== undefined;
+  const scroll = useRef<ScrollView>(null);
+  const scrollContent = useRef<View>(null);
+  const recommendedRow = useRef<View>(null);
   const [etaCooldowns] = useState(() => new Map<string, number>());
   const [selection, setSelection] = useState<RouteSelection>(() => {
     const target = readEtaTarget({
@@ -82,7 +87,7 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
       return {
         variant: routeOptionKey(base),
         direction: target.source === 'nlb' ? undefined : target.direction,
-        visit: stopVisitKey(target, { id: target.stopId, seq: target.stopSeq }),
+        stop: { routeKey: routeStopKey(target), visit: stopVisitKey(target, { id: target.stopId, seq: target.stopSeq }) },
       };
     }
     const remembered = lastRouteSelection;
@@ -95,7 +100,7 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
       direction: base.source === 'nlb' ? undefined : base.direction === 'inbound' ? 'inbound' : 'outbound',
     };
   });
-  const { variant, direction, visit: selectedVisit } = selection;
+  const { variant, direction, stop: explicitStop } = selection;
 
   useEffect(() => {
     lastRouteSelection = { id: base.id, locale, value: selection };
@@ -120,10 +125,23 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
   const available = entries.filter(({ state }) => (state?.snapshot?.stops.length ?? 0) > 0);
   const preferred = entries.find(({ identity }) => identity.source === 'nlb' || identity.direction === direction);
   const pending = ({ state }: SequenceEntry) => !state || state.loading;
-  const current = preferred && (selectedVisit || pending(preferred) || available.includes(preferred))
+  const explicitPreferred = explicitStop?.visit && explicitStop.routeKey === preferred?.key;
+  const current = preferred && (explicitPreferred || pending(preferred) || available.includes(preferred))
     ? preferred
     : available[0] ?? entries.find(pending) ?? preferred ?? entries[0];
   const sequence = current?.state?.snapshot;
+  const explicitForCurrent = explicitStop?.routeKey === current?.key ? explicitStop : undefined;
+  const recommendationIdentity = current?.identity;
+  const recommendationStops = sequence?.stops;
+  const canRecommend = !hasBoardingParams && !explicitForCurrent && current?.state?.loading === false;
+  const recommendationTarget = useMemo(() => {
+    if (canRecommend && recommendationIdentity && recommendationStops && recommendationStops.length > 1) {
+      return { identity: recommendationIdentity, stops: recommendationStops };
+    }
+  }, [canRecommend, recommendationIdentity, recommendationStops]);
+  const { recommendation, requestLocation } = useRouteStopRecommendation(recommendationTarget);
+  const automatic = recommendation?.kind === 'found' ? recommendation : undefined;
+  const selectedVisit = explicitForCurrent?.visit ?? automatic?.visit;
   const nlbRoute = current?.catalogueRoute?.source === 'nlb' ? current.catalogueRoute : undefined;
   const nlbNameOnly = nlbRoute && (!routePlaceName(nlbRoute.origin, locale) || !routePlaceName(nlbRoute.destination, locale));
 
@@ -182,6 +200,15 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
     repeatedStop: current.identity.source === 'nlb' && sequence.stops.some((stop) => stop.id === picked.id && stop.seq !== picked.seq),
   } : undefined;
 
+  function scrollToRecommendation() {
+    const row = recommendedRow.current;
+    const content = scrollContent.current;
+    if (!row || !content) return;
+    row.measureLayout(content, (_, y) => {
+      if (recommendedRow.current === row) scroll.current?.scrollTo({ y: Math.max(0, y - space.sm), animated: true });
+    });
+  }
+
   function openEta() {
     if (!etaTarget || !current || !picked || !sequence) return;
     const station = picked.name ?? names[picked.id]?.snapshot?.stop.name;
@@ -206,7 +233,8 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
 
   return (
     <SafeAreaView style={styles.screen} edges={['left', 'right', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="never">
+      <ScrollView ref={scroll} innerViewRef={scrollContent as RefObject<View>}
+        contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="never">
         <View style={styles.card}>
           <View style={styles.routeHeader}>
             <View style={styles.busBadge}><Icon name="bus" color={colors.onPrimary} size={25} /></View>
@@ -244,7 +272,8 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
             <View style={styles.variants} accessibilityRole="radiogroup" accessibilityLabel={optionHeading}>
               {options.map(([value, label]) => (
                 <RouteOption key={value} label={label} selected={value === variant}
-                  onPress={() => setSelection((previous) => ({ ...previous, variant: value }))} compact />
+                  onPress={() => setSelection((previous) => previous.variant === value
+                    ? previous : { ...previous, variant: value, stop: undefined })} compact />
               ))}
             </View>
           </View>
@@ -256,7 +285,11 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
               if (identity.source === 'nlb') return null;
               return (
                 <RouteOption key={entry.key} label={directionLabel(entry)} selected={entry.key === current?.key}
-                  onPress={() => setSelection((previous) => ({ ...previous, direction: identity.direction }))} />
+                  onPress={() => {
+                    if (entry.key !== current?.key) {
+                      setSelection((previous) => ({ ...previous, direction: identity.direction, stop: undefined }));
+                    }
+                  }} />
               );
             })}
           </View>
@@ -298,6 +331,10 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
               <AppText variant="brandSubtitle" tone="muted" style={styles.grow}>{detail.selectStopHint}</AppText>
             </View>
           )}
+          {recommendation && (
+            <RouteLocationHint recommendation={recommendation}
+              name={picked ? stopName(picked) : undefined} onRequest={requestLocation} onScroll={scrollToRecommendation} />
+          )}
           {current && sequence && sequence.stops.length > 0 ? (
             <View style={styles.timeline}>
               {sequence.stops.map((stop, index) => {
@@ -311,8 +348,16 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
                     key={key} number={stop.seq} name={stopName(stop)} terminal={label}
                     note={stop.someDeparturesOnly ? detail.someDeparturesOnly : undefined}
                     first={first} last={last} selected={selected}
+                    rowRef={automatic && selected ? recommendedRow : undefined}
                     accessibilityHint={selected ? detail.clearStopSelection : detail.previewStopHint}
-                    onPress={() => setSelection((previous) => ({ ...previous, visit: previous.visit === key ? undefined : key }))}
+                    onPress={() => setSelection((previous) => {
+                      const previousVisit = previous.stop?.routeKey === current.key ? previous.stop.visit : automatic?.visit;
+                      return {
+                        ...previous,
+                        direction: current.identity.source === 'nlb' ? undefined : current.identity.direction,
+                        stop: { routeKey: current.key, visit: previousVisit === key ? undefined : key },
+                      };
+                    })}
                   />
                 );
               })}
@@ -342,6 +387,41 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
         </View>
       ) : null}
     </SafeAreaView>
+  );
+}
+
+function RouteLocationHint({ recommendation, name, onRequest, onScroll }: {
+  recommendation: NonNullable<ReturnType<typeof useRouteStopRecommendation>['recommendation']>;
+  name?: string;
+  onRequest: () => void;
+  onScroll: () => void;
+}) {
+  const { copy } = useLanguage();
+  const labels = copy.busDetail.nearbyStop;
+  if (recommendation.kind === 'permission' || recommendation.kind === 'found') {
+    const found = recommendation.kind === 'found';
+    return (
+      <Pressable accessibilityRole="button" onPress={found ? onScroll : onRequest}
+        accessibilityHint={found ? labels.showOnList : undefined}
+        style={({ pressed }) => [styles.locationHint, pressed && styles.pressed]}>
+        <Icon name={found ? 'mappin' : 'location'} size={16} />
+        <View style={styles.grow}>
+          <AppText variant="caption" tone="primary">{found ? labels.selected : labels.find}</AppText>
+          <AppText variant="brandSubtitle" tone="muted">
+            {found ? labels.distance(name ?? copy.busDetail.unavailableName, Math.round(recommendation.distance)) : labels.description}
+          </AppText>
+        </View>
+        <Icon name={found ? 'chevron.down' : 'chevron.right'} size={12} />
+      </Pressable>
+    );
+  }
+
+  const loading = recommendation.kind === 'loading';
+  return (
+    <View style={styles.locationHint} accessibilityLiveRegion="polite">
+      {loading ? <ActivityIndicator size="small" color={colors.primary} /> : <Icon name="info.circle" size={15} color={colors.muted} />}
+      <AppText variant="brandSubtitle" tone="muted" style={styles.grow}>{labels.status[recommendation.kind]}</AppText>
+    </View>
   );
 }
 
@@ -424,12 +504,13 @@ function RouteLoading({ label }: { label: string }) {
   );
 }
 
-function TimelineRow({ number, name, terminal, note, first, last, selected, accessibilityHint, onPress }: {
+function TimelineRow({ number, name, terminal, note, first, last, selected, rowRef, accessibilityHint, onPress }: {
   number: number; name: string; terminal?: string; note?: string; first: boolean; last: boolean; selected: boolean;
-  accessibilityHint: string; onPress: () => void;
+  rowRef?: Ref<View>; accessibilityHint: string; onPress: () => void;
 }) {
   return (
     <Pressable
+      ref={rowRef}
       accessibilityRole="button" accessibilityState={{ selected }} accessibilityHint={accessibilityHint} onPress={onPress}
       style={({ pressed }) => [styles.stopRow, !last && styles.separator, selected && styles.selectedRow, pressed && styles.pressed]}
     >
@@ -475,6 +556,10 @@ const styles = StyleSheet.create({
   activeOption: { backgroundColor: colors.primary, borderColor: colors.primary },
   listHeading: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   stopHint: { flexDirection: 'row', alignItems: 'flex-start', gap: space.xs },
+  locationHint: {
+    minHeight: touchTarget, flexDirection: 'row', alignItems: 'center', gap: space.sm,
+    borderRadius: radius.control, backgroundColor: colors.tintedBackground, padding: space.sm,
+  },
   timeline: {
     overflow: 'hidden', borderRadius: radius.card, borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border, backgroundColor: colors.surface,

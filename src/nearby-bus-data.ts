@@ -157,3 +157,14 @@ export async function readNearbyBusStop(source: BusSource, stopId: string) {
   const db = await getDatabase();
   return db.getFirstAsync<StopRow>('SELECT * FROM nearby_bus_stops WHERE source = ? AND stop_id = ?', source, stopId);
 }
+
+export async function readBusStopCoordinates(source: BusSource, stopIds: string[]) {
+  await prepareNearbyBusIndex();
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<Pick<StopRow, 'stop_id' | 'latitude' | 'longitude'>>(
+    `SELECT stop_id, latitude, longitude FROM nearby_bus_stops
+     WHERE source = ? AND stop_id IN (SELECT value FROM json_each(?))`,
+    source, JSON.stringify(stopIds),
+  );
+  return new Map<string, Coordinates>(rows.map(({ stop_id, latitude, longitude }) => [stop_id, { latitude, longitude }]));
+}
