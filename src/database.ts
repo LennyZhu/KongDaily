@@ -2,7 +2,7 @@ import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
 import { type LanguagePreference } from '@/i18n';
 
-const schemaVersion = 5;
+const schemaVersion = 6;
 let databasePromise: Promise<SQLiteDatabase> | undefined;
 
 async function openAppDatabase() {
@@ -104,6 +104,29 @@ async function openAppDatabase() {
             pin_order INTEGER UNIQUE CHECK (pin_order BETWEEN 1 AND 3)
           );
           PRAGMA user_version = 5;
+        `);
+      }
+
+      if (version.user_version < 6) {
+        await transaction.execAsync(`
+          CREATE TABLE nearby_bus_sources (
+            source TEXT PRIMARY KEY NOT NULL CHECK (source IN ('kmbLwb', 'citybus', 'nlb')),
+            origin TEXT NOT NULL,
+            fetched_at INTEGER NOT NULL
+          );
+          CREATE TABLE nearby_bus_stops (
+            source TEXT NOT NULL CHECK (source IN ('kmbLwb', 'citybus', 'nlb')),
+            stop_id TEXT NOT NULL,
+            name_zh TEXT NOT NULL,
+            name_en TEXT NOT NULL,
+            street_zh TEXT NOT NULL,
+            street_en TEXT NOT NULL,
+            latitude REAL NOT NULL CHECK (latitude BETWEEN 22.12 AND 22.59),
+            longitude REAL NOT NULL CHECK (longitude BETWEEN 113.82 AND 114.46),
+            PRIMARY KEY (source, stop_id)
+          );
+          CREATE INDEX nearby_bus_coordinates ON nearby_bus_stops (latitude, longitude);
+          PRAGMA user_version = 6;
         `);
       }
     });

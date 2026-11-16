@@ -1,0 +1,5 @@
+{
+  "ios": {
+    "NSLocationWhenInUseUsageDescription": "用於尋找你附近的巴士站，並按距離顯示候車位置。"
+  }
+}

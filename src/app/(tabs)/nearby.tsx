@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
+import { HomeLink } from '@/components/home-ui';
 import { AppText, Filters, Icon, PageHeading, Screen } from '@/components/ui';
 import { useLanguage } from '@/language';
 import { colors, radius, space } from '@/theme';
@@ -22,6 +23,13 @@ export default function NearbyScreen() {
         selected={category}
         onSelect={(key) => router.setParams({ category: key })}
       />
+      {(category === 'all' || category === 'transport') && (
+        <HomeLink href="/bus/nearby" style={styles.busLink}>
+          <Icon name="bus" size={20} />
+          <AppText variant="title" tone="primary" style={styles.busLabel}>{copy.nearbyBus.title}</AppText>
+          <Icon name="chevron.right" size={13} />
+        </HomeLink>
+      )}
       <View style={styles.map}>
         <Icon name="map" size={34} />
         <AppText variant="title" style={styles.centered}>{nearby.map}</AppText>
@@ -32,6 +40,11 @@ export default function NearbyScreen() {
 }
 
 const styles = StyleSheet.create({
+  busLink: {
+    flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md,
+    borderWidth: 1, borderColor: colors.border, borderRadius: radius.control, backgroundColor: colors.surface,
+  },
+  busLabel: { flex: 1 },
   map: {
     minHeight: 240,
     justifyContent: 'center',

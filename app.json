@@ -9,7 +9,12 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.lennystudio.kongdaily"
+      "bundleIdentifier": "com.lennystudio.kongdaily",
+      "infoPlist": { "CFBundleAllowMixedLocalizations": true }
+    },
+    "locales": {
+      "en": "./assets/locales/en.json",
+      "zh-HK": "./assets/locales/zh-HK.json"
     },
     "plugins": [
       "expo-router",
@@ -21,7 +26,16 @@
           }
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Used to find nearby bus stops and show their distance from your location.",
+          "locationAlwaysPermission": false,
+          "locationAlwaysAndWhenInUsePermission": false,
+          "motionUsagePermission": false
+        }
+      ]
     ]
   }
 }

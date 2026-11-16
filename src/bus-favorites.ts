@@ -70,19 +70,21 @@ function etaParams(target: EtaTarget) {
   };
 }
 
-export function favoriteEtaHref(favorite: BusFavorite) {
+export function busStopEtaHref(visit: BusVisitSummary) {
   return {
     pathname: '/bus/eta' as const,
     params: {
-      ...etaParams(favorite.target),
-      stationZh: favorite.station.zh,
-      stationEn: favorite.station.en,
-      destinationZh: favorite.destination.zh,
-      destinationEn: favorite.destination.en,
-      ...(favorite.destinationStopId && { destinationStopId: favorite.destinationStopId }),
+      ...etaParams(visit.target),
+      stationZh: visit.station.zh,
+      stationEn: visit.station.en,
+      destinationZh: visit.destination.zh,
+      destinationEn: visit.destination.en,
+      ...(visit.destinationStopId && { destinationStopId: visit.destinationStopId }),
     },
   };
 }
+
+export const favoriteEtaHref = busStopEtaHref;
 
 async function readRows(database: SQLiteDatabase): Promise<BusFavorite[]> {
   const rows = await database.getAllAsync<FavoriteRow>(

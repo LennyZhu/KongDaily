@@ -128,6 +128,7 @@ export default function BusScreen() {
                 historyLoading={loadingHistory}
                 routesById={routesById}
                 onFocus={() => input.current?.focus()}
+                onNearby={() => router.push('/bus/nearby')}
                 onJumpToFavorites={(offset) => {
                   Keyboard.dismiss();
                   list.current?.scrollToOffset({ offset: Math.max(0, offset - space.sm), animated: true });

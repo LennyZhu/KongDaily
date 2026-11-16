@@ -79,13 +79,14 @@ const landingShortcuts = [
   { key: 'map', icon: 'map' },
 ] as const satisfies ReadonlyArray<{ key: keyof BusCopy['shortcuts']; icon: IconName }>;
 
-export function BusLanding({ copy, locale, history, historyLoading, routesById, onFocus, onJumpToFavorites, onClear, onRecent }: {
+export function BusLanding({ copy, locale, history, historyLoading, routesById, onFocus, onNearby, onJumpToFavorites, onClear, onRecent }: {
   copy: BusCopy;
   locale: BusLocale;
   history: BusHistoryItem[];
   historyLoading: boolean;
   routesById: Map<string, BusRoute>;
   onFocus: () => void;
+  onNearby: () => void;
   onJumpToFavorites: (offset: number) => void;
   onClear: () => void;
   onRecent: (entry: BusHistoryItem) => void;
@@ -105,12 +106,12 @@ export function BusLanding({ copy, locale, history, historyLoading, routesById, 
           <Icon name="magnifyingglass" size={23} />
           <AppText variant="caption" style={styles.centered}>{copy.shortcuts.search}</AppText>
         </Pressable>
-        {landingShortcuts.map(({ key, icon }) => key === 'saved' ? (
+        {landingShortcuts.map(({ key, icon }) => key !== 'map' ? (
           <Pressable key={key} accessibilityRole="button"
-            onPress={() => onJumpToFavorites(layoutOffsets.current.landing + layoutOffsets.current.favorites)}
+            onPress={key === 'nearby' ? onNearby : () => onJumpToFavorites(layoutOffsets.current.landing + layoutOffsets.current.favorites)}
             style={({ pressed }) => [styles.shortcut, pressed && styles.pressed]}>
             <Icon name={icon} size={23} />
-            <AppText variant="caption" style={styles.centered}>{copy.shortcuts.saved}</AppText>
+            <AppText variant="caption" style={styles.centered}>{copy.shortcuts[key]}</AppText>
           </Pressable>
         ) : (
           <View key={key} style={styles.shortcut}>
@@ -177,13 +178,15 @@ export function BusLanding({ copy, locale, history, historyLoading, routesById, 
         })}
       </View>
 
-      <View style={styles.cardRow}>
+      <Pressable accessibilityRole="button" onPress={onNearby}
+        style={({ pressed }) => [styles.cardRow, pressed && styles.pressed]}>
         <View style={styles.iconTile}><Icon name="mappin.and.ellipse" size={24} /></View>
         <View style={styles.rowCopy}>
           <AppText variant="homeCardTitle">{copy.nearbyTitle}</AppText>
           <AppText variant="detail" tone="muted">{copy.nearbyDetail}</AppText>
         </View>
-      </View>
+        <Icon name="chevron.right" size={13} />
+      </Pressable>
     </View>
   );
 }

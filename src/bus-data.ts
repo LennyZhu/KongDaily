@@ -80,13 +80,17 @@ export async function readBusFeeds(): Promise<BusFeeds> {
 const pendingFeeds = new Map<BusSource, Promise<BusFeed>>();
 const downloadedFeeds: BusFeeds = {};
 
-export async function findBusRouteFamily(id: string) {
+export async function findBusRouteFamily(id: string, refreshMissing = false) {
   const source: BusSource | undefined = id.startsWith('CTB:') ? 'citybus'
     : id.startsWith('NLB:') ? 'nlb'
     : id.startsWith('KMB-LWB:') ? 'kmbLwb' : undefined;
   if (!source) return;
-  const feed = downloadedFeeds[source] ?? (await readBusFeeds())[source];
-  const selected = feed?.routes.find((route) => route.id === id);
+  let feed = downloadedFeeds[source] ?? (await readBusFeeds())[source];
+  let selected = feed?.routes.find((route) => route.id === id);
+  if (!selected && refreshMissing) {
+    feed = await refreshBusFeed(source);
+    selected = feed.routes.find((route) => route.id === id);
+  }
   if (selected && feed) {
     return { selected, routes: feed.routes.filter((route) => route.number === selected.number) };
   }

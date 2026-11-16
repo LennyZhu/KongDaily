@@ -5,8 +5,8 @@ import { AppState } from 'react-native';
 import { BusFeedError } from '@/bus-data';
 import { etaUrl, fallbackNlbEtaText, fetchEta, type EtaLocale, type EtaSnapshot, type EtaTarget } from '@/bus-eta';
 
-const pollInterval = 60_000;
-const manualInterval = 10_000;
+export const etaPollInterval = 60_000;
+export const etaManualInterval = 10_000;
 
 export function useBusEta(target: EtaTarget, locale: EtaLocale, enabled = true, cooldowns?: Map<string, number>) {
   const [result, setResult] = useState<{ url: string; snapshot: EtaSnapshot }>();
@@ -36,8 +36,8 @@ export function useBusEta(target: EtaTarget, locale: EtaLocale, enabled = true, 
     const controller = new AbortController();
     inFlight.current = controller;
     lastUrl.current = url;
-    nextManual.current = startedAt + manualInterval;
-    nextPoll.current = startedAt + pollInterval;
+    nextManual.current = startedAt + etaManualInterval;
+    nextPoll.current = startedAt + etaPollInterval;
     cooldowns?.set(url, nextManual.current);
     setRefreshAfter(nextManual.current);
     setNow(startedAt);
@@ -54,7 +54,7 @@ export function useBusEta(target: EtaTarget, locale: EtaLocale, enabled = true, 
         if (controller.signal.aborted) return;
         const nextError = failure instanceof BusFeedError ? failure : new BusFeedError('network');
         if (nextError.status === 429) {
-          rateLimitedUntil.current = Date.now() + pollInterval;
+          rateLimitedUntil.current = Date.now() + etaPollInterval;
           cooldowns?.set(target.source, rateLimitedUntil.current);
           setRefreshAfter(rateLimitedUntil.current);
         }

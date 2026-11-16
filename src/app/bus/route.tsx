@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { findBusRouteFamily } from '@/bus-data';
 import { useBusEta } from '@/bus-eta-hooks';
-import { describeEta, etaIsStale, type EtaTarget } from '@/bus-eta';
+import { describeEta, etaIsStale, readEtaTarget, type EtaTarget } from '@/bus-eta';
 import { routePlaceName } from '@/bus-routes';
 import { useRouteSequences, useRouteStopNames, type SequenceState } from '@/bus-stop-hooks';
 import {
@@ -20,30 +20,33 @@ import { colors, homeLayout, radius, space, touchTarget } from '@/theme';
 type RouteFamily = NonNullable<Awaited<ReturnType<typeof findBusRouteFamily>>>;
 type SequenceEntry = RouteSequenceChoice & { key: string; state?: SequenceState };
 type RouteSelection = { variant?: string; direction?: TravelDirection; visit?: string };
+type BoardingParams = { stopId?: string; stopSeq?: string; direction?: string };
 const etaPreviewDelay = 350;
 
 // Settings lives outside the bus stack. Remember the last route during a language change.
 let lastRouteSelection: { id: string; locale: string; value: RouteSelection } | undefined;
 
 export default function RouteDetailsScreen() {
-  const { routeId } = useLocalSearchParams<{ routeId?: string }>();
+  const { routeId, stopId, stopSeq, direction } = useLocalSearchParams<BoardingParams & { routeId?: string }>();
   const id = typeof routeId === 'string' ? routeId : '';
-  return <RouteLoader key={id} id={id} />;
+  const key = JSON.stringify([id, stopId, stopSeq, direction]);
+  return <RouteLoader key={key} id={id} boarding={{ stopId, stopSeq, direction }} />;
 }
 
-function RouteLoader({ id }: { id: string }) {
+function RouteLoader({ id, boarding }: { id: string; boarding: BoardingParams }) {
   const { copy } = useLanguage();
   const router = useRouter();
   const [family, setFamily] = useState<RouteFamily | null>();
+  const fromNearby = typeof boarding.stopId === 'string' && typeof boarding.stopSeq === 'string';
 
   useEffect(() => {
     let active = true;
-    void findBusRouteFamily(id).then(
+    void findBusRouteFamily(id, fromNearby).then(
       (result) => { if (active) setFamily(result ?? null); },
       () => { if (active) setFamily(null); },
     );
     return () => { active = false; };
-  }, [id]);
+  }, [id, fromNearby]);
 
   if (family === undefined) {
     return <Screen hasHeader><RouteLoading label={copy.busDetail.loadingSequence} /></Screen>;
@@ -59,10 +62,10 @@ function RouteLoader({ id }: { id: string }) {
       </Screen>
     );
   }
-  return <RouteDetails family={family} />;
+  return <RouteDetails family={family} boarding={boarding} />;
 }
 
-function RouteDetails({ family }: { family: RouteFamily }) {
+function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: BoardingParams }) {
   const { copy, locale } = useLanguage();
   const router = useRouter();
   const detail = copy.busDetail;
@@ -70,6 +73,18 @@ function RouteDetails({ family }: { family: RouteFamily }) {
   const base = family.selected;
   const [etaCooldowns] = useState(() => new Map<string, number>());
   const [selection, setSelection] = useState<RouteSelection>(() => {
+    const target = readEtaTarget({
+      ...boarding, source: base.source, number: base.number,
+      direction: base.source === 'kmbLwb' ? base.direction : boarding.direction,
+      serviceType: base.serviceType, nlbRouteId: base.source === 'nlb' ? base.routeId : undefined,
+    });
+    if (target) {
+      return {
+        variant: routeOptionKey(base),
+        direction: target.source === 'nlb' ? undefined : target.direction,
+        visit: stopVisitKey(target, { id: target.stopId, seq: target.stopSeq }),
+      };
+    }
     const remembered = lastRouteSelection;
     if (remembered?.id === base.id && remembered.locale !== locale
       && family.routes.some((route) => routeOptionKey(route) === remembered.value.variant)) {
@@ -105,7 +120,7 @@ function RouteDetails({ family }: { family: RouteFamily }) {
   const available = entries.filter(({ state }) => (state?.snapshot?.stops.length ?? 0) > 0);
   const preferred = entries.find(({ identity }) => identity.source === 'nlb' || identity.direction === direction);
   const pending = ({ state }: SequenceEntry) => !state || state.loading;
-  const current = preferred && (pending(preferred) || available.includes(preferred))
+  const current = preferred && (selectedVisit || pending(preferred) || available.includes(preferred))
     ? preferred
     : available[0] ?? entries.find(pending) ?? preferred ?? entries[0];
   const sequence = current?.state?.snapshot;
