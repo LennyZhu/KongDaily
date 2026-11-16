@@ -2,10 +2,10 @@ import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
 import { type LanguagePreference } from '@/i18n';
 
-const schemaVersion = 1;
+const schemaVersion = 2;
 let databasePromise: Promise<SQLiteDatabase> | undefined;
 
-async function openSettingsDatabase() {
+async function openAppDatabase() {
   const database = await openDatabaseAsync('kongdaily.db');
 
   try {
@@ -24,6 +24,30 @@ async function openSettingsDatabase() {
           PRAGMA user_version = 1;
         `);
       }
+
+      if (version.user_version < 2) {
+        await transaction.execAsync(`
+          CREATE TABLE bus_route_cache (
+            source TEXT PRIMARY KEY NOT NULL CHECK (source IN ('kmbLwb', 'citybus')),
+            fetched_at INTEGER NOT NULL,
+            payload TEXT NOT NULL
+          );
+          CREATE TABLE bus_search_history (
+            history_key TEXT PRIMARY KEY NOT NULL,
+            query TEXT NOT NULL,
+            route_id TEXT,
+            searched_at INTEGER NOT NULL
+          );
+          CREATE TRIGGER limit_bus_search_history AFTER INSERT ON bus_search_history BEGIN
+            DELETE FROM bus_search_history
+            WHERE history_key IN (
+              SELECT history_key FROM bus_search_history
+              ORDER BY searched_at DESC, rowid DESC LIMIT -1 OFFSET 8
+            );
+          END;
+          PRAGMA user_version = 2;
+        `);
+      }
     });
     return database;
   } catch (error) {
@@ -32,8 +56,8 @@ async function openSettingsDatabase() {
   }
 }
 
-function getDatabase() {
-  databasePromise ??= openSettingsDatabase().catch((error) => {
+export function getDatabase() {
+  databasePromise ??= openAppDatabase().catch((error) => {
     databasePromise = undefined;
     throw error;
   });

@@ -8,6 +8,7 @@ import { colors, radius, space, touchTarget, typography } from '@/theme';
 
 type LanguageContextValue = {
   preference: LanguagePreference;
+  locale: Exclude<LanguagePreference, 'system'>;
   copy: Messages;
   isSaving: boolean;
   saveFailed: boolean;
@@ -86,9 +87,10 @@ export function LanguageProvider({ children }: PropsWithChildren) {
     );
   }
 
-  const copy = messages[preference === 'system' ? systemPreference : preference];
+  const locale = preference === 'system' ? systemPreference : preference;
+  const copy = messages[locale];
   return (
-    <LanguageContext value={{ preference, copy, isSaving, saveFailed, changeLanguage }}>
+    <LanguageContext value={{ preference, locale, copy, isSaving, saveFailed, changeLanguage }}>
       {children}
     </LanguageContext>
   );

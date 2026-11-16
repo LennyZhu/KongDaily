@@ -29,6 +29,7 @@ function RootStack() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="settings" options={{ title: copy.settings.title }} />
       <Stack.Screen name="search" options={{ title: copy.search.title }} />
+      <Stack.Screen name="bus" options={{ headerShown: false }} />
     </Stack>
   );
 }

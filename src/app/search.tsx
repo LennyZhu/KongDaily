@@ -1,4 +1,3 @@
-import { useLocalSearchParams } from 'expo-router';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { EmptyState, Icon, Screen } from '@/components/ui';
@@ -7,8 +6,7 @@ import { colors, radius, space, touchTarget, typography } from '@/theme';
 
 export default function SearchScreen() {
   const { copy } = useLanguage();
-  const { scope } = useLocalSearchParams<{ scope?: string }>();
-  const prompt = scope === 'bus' ? copy.home.busSearch : copy.home.search;
+  const prompt = copy.home.search;
 
   return (
     <Screen hasHeader>

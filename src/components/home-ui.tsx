@@ -28,30 +28,35 @@ export function HomeLink({ href, style, label, children }: PropsWithChildren<{
   );
 }
 
+export function HarbourBackdrop() {
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <View style={styles.heroPhoto}>
+        <Image
+          source={require('../../assets/home/victoria-harbour.jpg')}
+          style={styles.photo}
+          resizeMode="cover"
+          accessible={false}
+        />
+      </View>
+      <LinearGradient
+        colors={[homeColors.harbourSky, homeColors.harbourVeil, homeColors.harbourWash]}
+        locations={[0, 0.34, 0.69]}
+        style={StyleSheet.absoluteFill}
+      />
+      <LinearGradient
+        colors={[homeColors.pageWash, homeColors.pageWash, colors.background]}
+        locations={[0, 0.66, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+    </View>
+  );
+}
+
 export function HomeHero({ name, subtitle, search }: Pick<HomeCopy, 'name' | 'subtitle' | 'search'>) {
   return (
     <View style={styles.hero}>
-      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-        <View style={styles.heroPhoto}>
-          <Image
-            source={require('../../assets/home/victoria-harbour.jpg')}
-            style={styles.photo}
-            resizeMode="cover"
-            accessible={false}
-          />
-        </View>
-        <LinearGradient
-          colors={[homeColors.harbourSky, homeColors.harbourVeil, homeColors.harbourWash]}
-          locations={[0, 0.34, 0.69]}
-          style={StyleSheet.absoluteFill}
-        />
-        <LinearGradient
-          colors={[homeColors.pageWash, homeColors.pageWash, colors.background]}
-          locations={[0, 0.66, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-      </View>
-
+      <HarbourBackdrop />
       <View style={styles.brand}>
         <LinearGradient
           colors={[colors.primarySoft, colors.primary, homeColors.weatherDeep]}

@@ -7,7 +7,7 @@ import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
 import { colors, homeColors, homeLayout, radius, space, touchTarget } from '@/theme';
 
-const busSearch = { pathname: '/search', params: { scope: 'bus' } } satisfies Href;
+const busSearch = '/bus' satisfies Href;
 const facilityMap = { pathname: '/nearby', params: { category: 'all' } } satisfies Href;
 
 type QuickLink = {

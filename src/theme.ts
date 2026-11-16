@@ -73,6 +73,7 @@ export const shadows = {
 export const typography = StyleSheet.create({
   display: { fontSize: 34, fontWeight: '700', letterSpacing: -0.8 },
   brand: { fontSize: 22, fontWeight: '700', letterSpacing: -0.4 },
+  moduleTitle: { fontSize: 27, fontWeight: '700', letterSpacing: -0.45 },
   brandSubtitle: { fontSize: 13 },
   homeHeading: { fontSize: 20, fontWeight: '700', letterSpacing: -0.25 },
   homeCardTitle: { fontSize: 16, fontWeight: '700' },
