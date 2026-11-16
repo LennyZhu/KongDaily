@@ -4,6 +4,8 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'reac
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { findBusRouteFamily } from '@/bus-data';
+import { useBusEta } from '@/bus-eta-hooks';
+import { describeEta, etaIsStale, type EtaTarget } from '@/bus-eta';
 import { routePlaceName } from '@/bus-routes';
 import { useRouteSequences, useRouteStopNames, type SequenceState } from '@/bus-stop-hooks';
 import {
@@ -18,6 +20,7 @@ import { colors, homeLayout, radius, space, touchTarget } from '@/theme';
 type RouteFamily = NonNullable<Awaited<ReturnType<typeof findBusRouteFamily>>>;
 type SequenceEntry = RouteSequenceChoice & { key: string; state?: SequenceState };
 type RouteSelection = { variant?: string; direction?: TravelDirection; visit?: string };
+const etaPreviewDelay = 350;
 
 // Settings lives outside the bus stack. Remember the last route during a language change.
 let lastRouteSelection: { id: string; locale: string; value: RouteSelection } | undefined;
@@ -65,6 +68,7 @@ function RouteDetails({ family }: { family: RouteFamily }) {
   const detail = copy.busDetail;
   const bus = copy.bus;
   const base = family.selected;
+  const [etaCooldowns] = useState(() => new Map<string, number>());
   const [selection, setSelection] = useState<RouteSelection>(() => {
     const remembered = lastRouteSelection;
     if (remembered?.id === base.id && remembered.locale !== locale
@@ -154,28 +158,34 @@ function RouteDetails({ family }: { family: RouteFamily }) {
   const partialFailureTitle = base.source === 'nlb' ? bus.updateFailed : detail.partialDirections;
   const missingNames = stopIds.map((id) => names[id]?.error).filter(Boolean);
   const showSaved = sequence && sequence.stops.length > 0 && (current.state?.fromCache || current.state?.error);
+  const hasStops = (sequence?.stops.length ?? 0) > 0;
   const picked = current && sequence?.stops.find((stop) => stopVisitKey(current.identity, stop) === selectedVisit);
+  const etaTarget: EtaTarget | undefined = current && picked && sequence ? {
+    ...current.identity,
+    stopId: picked.id,
+    stopSeq: picked.seq,
+    repeatedStop: current.identity.source === 'nlb' && sequence.stops.some((stop) => stop.id === picked.id && stop.seq !== picked.seq),
+  } : undefined;
 
   function openEta() {
-    if (!current || !picked || !sequence) return;
-    const { identity } = current;
+    if (!etaTarget || !current || !picked || !sequence) return;
     const station = picked.name ?? names[picked.id]?.snapshot?.stop.name;
     const last = sequence.stops.at(-1);
     const to = current.catalogueRoute?.destination ?? (last && names[last.id]?.snapshot?.stop.name);
     router.push({ pathname: '/bus/eta', params: {
-      source: identity.source,
-      number: identity.number,
-      stopId: picked.id,
-      stopSeq: String(picked.seq),
-      ...(identity.source === 'nlb'
-        ? { nlbRouteId: identity.routeId, repeatedStop: sequence.stops.some((stop) => stop.id === picked.id && stop.seq !== picked.seq) ? '1' : '0' }
-        : { direction: identity.direction }),
-      ...(identity.source === 'kmbLwb' && { serviceType: identity.serviceType }),
+      source: etaTarget.source,
+      number: etaTarget.number,
+      stopId: etaTarget.stopId,
+      stopSeq: String(etaTarget.stopSeq),
+      ...(etaTarget.source === 'nlb'
+        ? { nlbRouteId: etaTarget.routeId, repeatedStop: etaTarget.repeatedStop ? '1' : '0' }
+        : { direction: etaTarget.direction }),
+      ...(etaTarget.source === 'kmbLwb' && { serviceType: etaTarget.serviceType }),
       stationZh: station?.zh ?? '',
       stationEn: station?.en ?? '',
       destinationZh: to?.zh || nlbRoute?.routeName.zh || '',
       destinationEn: to?.en || nlbRoute?.routeName.en || '',
-      ...(identity.source === 'citybus' && last && { destinationStopId: last.id }),
+      ...(etaTarget.source === 'citybus' && last && { destinationStopId: last.id }),
     } });
   }
 
@@ -267,6 +277,12 @@ function RouteDetails({ family }: { family: RouteFamily }) {
               <AppText variant="caption" tone="muted">{detail.stopCount(sequence.stops.length)}</AppText>
             )}
           </View>
+          {hasStops && (
+            <View style={styles.stopHint}>
+              <Icon name="hand.tap" size={15} color={colors.muted} />
+              <AppText variant="brandSubtitle" tone="muted" style={styles.grow}>{detail.selectStopHint}</AppText>
+            </View>
+          )}
           {current && sequence && sequence.stops.length > 0 ? (
             <View style={styles.timeline}>
               {sequence.stops.map((stop, index) => {
@@ -274,11 +290,13 @@ function RouteDetails({ family }: { family: RouteFamily }) {
                 const first = index === 0;
                 const last = index === sequence.stops.length - 1;
                 const label = first ? detail.first : last ? detail.last : undefined;
+                const selected = selectedVisit === key;
                 return (
                   <TimelineRow
                     key={key} number={stop.seq} name={stopName(stop)} terminal={label}
                     note={stop.someDeparturesOnly ? detail.someDeparturesOnly : undefined}
-                    first={first} last={last} selected={selectedVisit === key}
+                    first={first} last={last} selected={selected}
+                    accessibilityHint={selected ? detail.clearStopSelection : detail.previewStopHint}
                     onPress={() => setSelection((previous) => ({ ...previous, visit: previous.visit === key ? undefined : key }))}
                   />
                 );
@@ -299,21 +317,72 @@ function RouteDetails({ family }: { family: RouteFamily }) {
           )}
         </View>
       </ScrollView>
-      {picked && (
-        <View style={styles.selection} accessibilityLiveRegion="polite">
-          <Icon name="mappin" size={22} />
-          <View style={styles.grow}>
-            <AppText variant="caption" tone="primary">{detail.stopOrder(picked.seq)}</AppText>
-            <AppText variant="homeCardTitle">{stopName(picked)}</AppText>
-            <Pressable accessibilityRole="button" onPress={openEta}
-              style={({ pressed }) => [styles.etaLink, pressed && styles.pressed]}>
-              <AppText variant="detail" tone="primary" style={styles.grow}>{copy.busEta.open}</AppText>
-              <Icon name="chevron.right" size={13} />
-            </Pressable>
-          </View>
+      {etaTarget && picked && current ? (
+        <SelectedStopCard key={selectedVisit} initialTarget={etaTarget} name={stopName(picked)}
+          direction={directionLabel(current)} cooldowns={etaCooldowns} onOpen={openEta} />
+      ) : hasStops ? (
+        <View style={[styles.selection, styles.selectionPrompt]}>
+          <Icon name="mappin" size={18} />
+          <AppText variant="detail" tone="muted" style={styles.grow}>{detail.selectStopPrompt}</AppText>
         </View>
-      )}
+      ) : null}
     </SafeAreaView>
+  );
+}
+
+function SelectedStopCard({ initialTarget, name, direction, cooldowns, onOpen }: {
+  initialTarget: EtaTarget;
+  name: string;
+  direction: string;
+  cooldowns: Map<string, number>;
+  onOpen: () => void;
+}) {
+  // The visit key remounts this card, including the delay and request state, when the selected stop changes.
+  const [target] = useState(initialTarget);
+  const [ready, setReady] = useState(false);
+  const { copy, locale } = useLanguage();
+  const eta = copy.busEta;
+  useEffect(() => {
+    const timer = setTimeout(() => setReady(true), etaPreviewDelay);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const { snapshot, error, now, loading } = useBusEta(target, locale, ready, cooldowns);
+  const view = describeEta(snapshot, error, now, loading, locale, eta);
+  const [next] = view.upcoming;
+  const stale = snapshot && etaIsStale(snapshot, now);
+  const status = stale || !snapshot ? view.status : loading ? eta.loading : eta.previewEmpty;
+  const updateText = stale || error ? view.updateText : undefined;
+
+  return (
+    <View style={styles.selection}>
+      <View style={styles.selectionHeading}>
+        <Icon name="mappin" size={22} />
+        <View style={styles.grow}>
+          <AppText variant="caption" tone="primary">{copy.busDetail.stopOrder(target.stopSeq)}</AppText>
+          <AppText variant="homeCardTitle">{name}</AppText>
+          <AppText variant="detail" tone="muted">{target.number} · {direction}</AppText>
+        </View>
+      </View>
+      <View style={styles.etaRow}>
+        <View style={styles.etaPreview} accessibilityLiveRegion="polite">
+          <AppText variant="caption" tone="muted">{eta.nextArrival}</AppText>
+          {!next ? <AppText variant="detail" tone="muted">{status}</AppText>
+            : next.minutes === 0 ? <AppText variant="title" tone="primary">{eta.due}</AppText> : (
+              <AppText variant="detail" tone="primary">
+                {eta.minutes.prefix}<AppText variant="section" tone="primary" style={styles.etaDigits}>{next.minutes}</AppText>{eta.minutes.suffix}
+              </AppText>
+            )}
+        </View>
+        <Pressable accessibilityRole="button" onPress={onOpen}
+          style={({ pressed }) => [styles.etaLink, pressed && styles.pressed]}>
+          <AppText variant="detail" tone="primary" style={styles.etaLinkText}>{eta.openAll}</AppText>
+          <Icon name="chevron.right" size={13} />
+        </Pressable>
+      </View>
+      {view.errorText && <AppText variant="brandSubtitle" tone="error">{view.errorText}</AppText>}
+      {updateText && <AppText variant="brandSubtitle" tone="muted">{updateText}</AppText>}
+    </View>
   );
 }
 
@@ -340,12 +409,13 @@ function RouteLoading({ label }: { label: string }) {
   );
 }
 
-function TimelineRow({ number, name, terminal, note, first, last, selected, onPress }: {
-  number: number; name: string; terminal?: string; note?: string; first: boolean; last: boolean; selected: boolean; onPress: () => void;
+function TimelineRow({ number, name, terminal, note, first, last, selected, accessibilityHint, onPress }: {
+  number: number; name: string; terminal?: string; note?: string; first: boolean; last: boolean; selected: boolean;
+  accessibilityHint: string; onPress: () => void;
 }) {
   return (
     <Pressable
-      accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress}
+      accessibilityRole="button" accessibilityState={{ selected }} accessibilityHint={accessibilityHint} onPress={onPress}
       style={({ pressed }) => [styles.stopRow, !last && styles.separator, selected && styles.selectedRow, pressed && styles.pressed]}
     >
       <View style={styles.track}>
@@ -389,6 +459,7 @@ const styles = StyleSheet.create({
   center: { textAlign: 'center' },
   activeOption: { backgroundColor: colors.primary, borderColor: colors.primary },
   listHeading: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  stopHint: { flexDirection: 'row', alignItems: 'flex-start', gap: space.xs },
   timeline: {
     overflow: 'hidden', borderRadius: radius.card, borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border, backgroundColor: colors.surface,
@@ -409,8 +480,20 @@ const styles = StyleSheet.create({
   notice: { padding: space.md, gap: space.xs, borderRadius: radius.card, backgroundColor: colors.tintedBackground },
   loading: { flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.md },
   selection: {
-    flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, marginHorizontal: homeLayout.gutter,
+    gap: space.sm, padding: space.md, marginHorizontal: homeLayout.gutter,
     marginBottom: space.sm, borderRadius: radius.card, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.tintedBackground,
   },
-  etaLink: { minHeight: touchTarget, flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  selectionPrompt: { flexDirection: 'row', alignItems: 'center', paddingVertical: space.sm },
+  selectionHeading: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  etaRow: {
+    flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm, paddingTop: space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border,
+  },
+  etaPreview: { flexBasis: 116, flexGrow: 1, minWidth: 0, gap: space.xs },
+  etaDigits: { fontVariant: ['tabular-nums'] },
+  etaLink: {
+    flexBasis: 126, flexGrow: 1, minWidth: 0, minHeight: touchTarget, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'flex-end', gap: space.sm,
+  },
+  etaLinkText: { flexShrink: 1, textAlign: 'right' },
 });

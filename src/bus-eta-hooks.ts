@@ -8,7 +8,7 @@ import { etaUrl, fallbackNlbEtaText, fetchEta, type EtaLocale, type EtaSnapshot,
 const pollInterval = 60_000;
 const manualInterval = 10_000;
 
-export function useBusEta(target: EtaTarget, locale: EtaLocale, enabled = true) {
+export function useBusEta(target: EtaTarget, locale: EtaLocale, enabled = true, cooldowns?: Map<string, number>) {
   const [result, setResult] = useState<{ url: string; snapshot: EtaSnapshot }>();
   const [error, setError] = useState<BusFeedError>();
   const [loading, setLoading] = useState(true);
@@ -25,14 +25,20 @@ export function useBusEta(target: EtaTarget, locale: EtaLocale, enabled = true) 
   const refresh = useCallback((manual = false) => {
     const startedAt = Date.now();
     if (!active.current || inFlight.current || startedAt < rateLimitedUntil.current) return;
+    if (startedAt < (cooldowns?.get(target.source) ?? 0)) {
+      setError((current) => current?.status === 429 ? current : new BusFeedError('http', 429));
+      setLoading(false);
+      return;
+    }
     const threshold = manual ? nextManual.current : nextPoll.current;
-    if (url === lastUrl.current && startedAt < threshold) return;
+    if ((url === lastUrl.current && startedAt < threshold) || startedAt < (cooldowns?.get(url) ?? 0)) return;
 
     const controller = new AbortController();
     inFlight.current = controller;
     lastUrl.current = url;
     nextManual.current = startedAt + manualInterval;
     nextPoll.current = startedAt + pollInterval;
+    cooldowns?.set(url, nextManual.current);
     setRefreshAfter(nextManual.current);
     setNow(startedAt);
     setLoading(true);
@@ -49,6 +55,7 @@ export function useBusEta(target: EtaTarget, locale: EtaLocale, enabled = true) 
         const nextError = failure instanceof BusFeedError ? failure : new BusFeedError('network');
         if (nextError.status === 429) {
           rateLimitedUntil.current = Date.now() + pollInterval;
+          cooldowns?.set(target.source, rateLimitedUntil.current);
           setRefreshAfter(rateLimitedUntil.current);
         }
         setError(nextError);
@@ -59,7 +66,7 @@ export function useBusEta(target: EtaTarget, locale: EtaLocale, enabled = true) 
       setNow(Date.now());
       setLoading(false);
     });
-  }, [target, url]);
+  }, [cooldowns, target, url]);
 
   useFocusEffect(useCallback(() => {
     if (!enabled) return;
