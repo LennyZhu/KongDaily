@@ -1,6 +1,5 @@
 import type { RefObject } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import type { BusHistoryItem } from '@/bus-data';
 import { routePlaceName, type BusRoute } from '@/bus-routes';
@@ -139,7 +138,8 @@ export function BusLanding({ copy, locale, history, historyLoading, routesById, 
                 <AppText variant="homeCardTitle">{item.query}</AppText>
                 {route && (
                   <AppText variant="brandSubtitle" tone="muted">
-                    {routePlaceName(route.origin, locale)} → {routePlaceName(route.destination, locale)}
+                    {route.source === 'nlb' ? routePlaceName(route.routeName, locale)
+                      : `${routePlaceName(route.origin, locale)} → ${routePlaceName(route.destination, locale)}`}
                   </AppText>
                 )}
               </View>
@@ -190,57 +190,23 @@ export function BusRouteRow({ copy, route, locale, onPress }: {
         </AppText>
       </View>
       <View style={styles.rowCopy}>
-        <AppText variant="caption" tone="muted">{copy.sources[route.source]} · {copy.directions[route.direction]}</AppText>
-        <AppText variant="homeCardTitle">{routePlaceName(route.destination, locale)}</AppText>
-        <AppText variant="brandSubtitle" tone="muted">{copy.origin} · {routePlaceName(route.origin, locale)}</AppText>
+        <AppText variant="caption" tone="muted">
+          {copy.sources[route.source]}{route.source !== 'nlb' && ` · ${copy.directions[route.direction]}`}
+        </AppText>
+        <AppText variant="homeCardTitle">
+          {routePlaceName(route.source === 'nlb' ? route.routeName : route.destination, locale)}
+        </AppText>
+        {route.source !== 'nlb' && (
+          <AppText variant="brandSubtitle" tone="muted">{copy.origin} · {routePlaceName(route.origin, locale)}</AppText>
+        )}
+        {route.source === 'nlb' && route.special && <AppText variant="caption" tone="primary">{copy.specialRoute}</AppText>}
+        {route.source === 'nlb' && route.overnight && <AppText variant="caption" tone="primary">{copy.overnightRoute}</AppText>}
         {route.serviceType && route.serviceType !== '1' && (
           <AppText variant="caption" tone="primary">{copy.service(route.serviceType)}</AppText>
         )}
       </View>
       <Icon name="chevron.right" color={colors.muted} size={13} />
     </Pressable>
-  );
-}
-
-export function BusRoutePreview({ copy, locale, route, onClose }: {
-  copy: BusCopy;
-  locale: BusLocale;
-  route: BusRoute;
-  onClose: () => void;
-}) {
-  const endpoints = [
-    [copy.origin, routePlaceName(route.origin, locale)],
-    [copy.destination, routePlaceName(route.destination, locale)],
-  ];
-
-  return (
-    <Modal animationType="slide" presentationStyle="pageSheet" allowSwipeDismissal onRequestClose={onClose}>
-      <SafeAreaView style={styles.preview} accessibilityViewIsModal>
-        <ScrollView contentContainerStyle={styles.previewContent}>
-          <View style={styles.sectionHeader}>
-            <AppText variant="homeHeading" accessibilityRole="header" style={styles.rowCopy}>{copy.preview}</AppText>
-            <BusAction label={copy.done} onPress={onClose} />
-          </View>
-          <View style={styles.previewCard}>
-            <View style={styles.brand}>
-              <View style={styles.iconTile}><Icon name="bus" size={24} /></View>
-              <View style={styles.rowCopy}>
-                <AppText variant="moduleTitle">{route.number}</AppText>
-                <AppText variant="detail" tone="muted">{copy.sources[route.source]} · {copy.directions[route.direction]}</AppText>
-              </View>
-            </View>
-            {endpoints.map(([label, name]) => (
-              <View key={label} style={styles.endpoint}>
-                <AppText variant="caption" tone="muted">{label}</AppText>
-                <AppText variant="title">{name}</AppText>
-              </View>
-            ))}
-            {route.serviceType && <AppText variant="caption" tone="primary">{copy.service(route.serviceType)}</AppText>}
-          </View>
-          <EmptyState icon="info.circle" title={copy.detailsSoon} />
-        </ScrollView>
-      </SafeAreaView>
-    </Modal>
   );
 }
 
@@ -350,15 +316,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.tintedBackground,
     borderRadius: radius.control,
   },
-  preview: { flex: 1, backgroundColor: colors.background },
-  previewContent: { gap: space.lg, padding: homeLayout.gutter },
-  previewCard: {
-    gap: space.md,
-    padding: space.lg,
-    borderRadius: radius.largeCard,
-    backgroundColor: colors.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-  },
-  endpoint: { gap: space.xs },
 });

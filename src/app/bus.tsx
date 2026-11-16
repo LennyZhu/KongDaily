@@ -6,7 +6,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { clearBusHistory, rememberBusSearch, type BusHistoryItem } from '@/bus-data';
 import { useBusCatalogue, useBusHistory } from '@/bus-hooks';
 import { busSources, matchBusRoutes, normalizeBusQuery, type BusRoute } from '@/bus-routes';
-import { BusAction, BusHero, BusLanding, BusRoutePreview, BusRouteRow } from '@/components/bus-ui';
+import { BusAction, BusHero, BusLanding, BusRouteRow } from '@/components/bus-ui';
 import { AppText, EmptyState, Icon } from '@/components/ui';
 import { useLanguage } from '@/language';
 import { colors, homeColors, homeLayout, radius, space } from '@/theme';
@@ -22,7 +22,6 @@ export default function BusScreen() {
   const input = useRef<TextInput>(null);
   const list = useRef<FlatList<BusRoute>>(null);
   const [query, setQuery] = useState(sessionQuery);
-  const [preview, setPreview] = useState<BusRoute>();
   const { feeds, failed, loading, retry } = useBusCatalogue();
   const { history, loadingHistory, historyFailed, changeHistory } = useBusHistory();
 
@@ -40,8 +39,8 @@ export default function BusScreen() {
 
   function selectRoute(route: BusRoute) {
     Keyboard.dismiss();
-    setPreview(route);
     changeHistory(() => rememberBusSearch(route.number, route));
+    router.push({ pathname: '/bus/route', params: { routeId: route.id } });
   }
 
   function openRecent(item: BusHistoryItem) {
@@ -144,7 +143,6 @@ export default function BusScreen() {
           </View>
         ) : null}
       />
-      {preview && <BusRoutePreview copy={bus} locale={locale} route={preview} onClose={() => setPreview(undefined)} />}
     </SafeAreaView>
   );
 }

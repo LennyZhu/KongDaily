@@ -30,6 +30,11 @@ function RootStack() {
       <Stack.Screen name="settings" options={{ title: copy.settings.title }} />
       <Stack.Screen name="search" options={{ title: copy.search.title }} />
       <Stack.Screen name="bus" options={{ headerShown: false }} />
+      <Stack.Screen name="bus/route" options={{
+        title: copy.busDetail.title,
+        headerStyle: { backgroundColor: colors.tintedBackground },
+        headerShadowVisible: false,
+      }} />
     </Stack>
   );
 }

@@ -4,6 +4,7 @@ import { getDatabase } from '@/database';
 const routeUrls: Record<BusSource, string> = {
   kmbLwb: 'https://data.etabus.gov.hk/v1/transport/kmb/route/',
   citybus: 'https://rt.data.gov.hk/v2/transport/citybus/route/CTB',
+  nlb: 'https://rt.data.gov.hk/v2/transport/nlb/route.php?action=list',
 };
 const maxCacheAge = 24 * 60 * 60 * 1_000;
 const requestTimeout = 20_000;
@@ -22,7 +23,7 @@ type CachedFeed = { source: BusSource; fetched_at: number; payload: string };
 export type BusFeedFailure = 'tls' | 'network' | 'timeout' | 'http' | 'json' | BusCatalogueError['kind'];
 
 export class BusFeedError extends Error {
-  constructor(readonly kind: BusFeedFailure) {
+  constructor(readonly kind: BusFeedFailure, readonly status?: number) {
     super(`Bus route load failed: ${kind}`);
   }
 }
@@ -77,18 +78,33 @@ export async function readBusFeeds(): Promise<BusFeeds> {
 }
 
 const pendingFeeds = new Map<BusSource, Promise<BusFeed>>();
+const downloadedFeeds: BusFeeds = {};
+
+export async function findBusRouteFamily(id: string) {
+  const source: BusSource | undefined = id.startsWith('CTB:') ? 'citybus'
+    : id.startsWith('NLB:') ? 'nlb'
+    : id.startsWith('KMB-LWB:') ? 'kmbLwb' : undefined;
+  if (!source) return;
+  const feed = downloadedFeeds[source] ?? (await readBusFeeds())[source];
+  const selected = feed?.routes.find((route) => route.id === id);
+  if (selected && feed) {
+    return { selected, routes: feed.routes.filter((route) => route.number === selected.number) };
+  }
+}
 
 export function refreshBusFeed(source: BusSource) {
   const pending = pendingFeeds.get(source);
   if (pending) return pending;
 
-  const request = downloadBusFeed(source).finally(() => pendingFeeds.delete(source));
+  const request = downloadBusFeed(source).then((feed) => {
+    downloadedFeeds[source] = feed;
+    return feed;
+  }).finally(() => pendingFeeds.delete(source));
   pendingFeeds.set(source, request);
   return request;
 }
 
-async function downloadBusFeed(source: BusSource): Promise<BusFeed> {
-  const url = routeUrls[source];
+export async function requestBusJson(source: BusSource, url: string): Promise<unknown> {
   const startedAt = Date.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), requestTimeout);
@@ -100,7 +116,7 @@ async function downloadBusFeed(source: BusSource): Promise<BusFeed> {
     const response = await fetch(url, { signal: controller.signal });
     status = response.status;
     logFeed(source, 'http', { outcome: response.ok ? 'ok' : 'error', status, elapsedMs: Date.now() - startedAt });
-    if (!response.ok) throw new BusFeedError('http');
+    if (!response.ok) throw new BusFeedError('http', status);
     body = await response.text();
   } catch (error) {
     if (error instanceof BusFeedError) throw error;
@@ -119,14 +135,16 @@ async function downloadBusFeed(source: BusSource): Promise<BusFeed> {
     clearTimeout(timeout);
   }
 
-  let payload: unknown;
   try {
-    payload = JSON.parse(body);
+    return JSON.parse(body);
   } catch (error) {
     logFeed(source, 'json', { outcome: 'invalid', status: status ?? null, errorType: errorType(error) });
     throw new BusFeedError('json');
   }
+}
 
+async function downloadBusFeed(source: BusSource): Promise<BusFeed> {
+  const payload = await requestBusJson(source, routeUrls[source]);
   let routes: BusRoute[];
   try {
     routes = parseBusCatalogue(source, payload);

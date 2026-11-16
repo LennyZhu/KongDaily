@@ -2,7 +2,7 @@ import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
 import { type LanguagePreference } from '@/i18n';
 
-const schemaVersion = 2;
+const schemaVersion = 4;
 let databasePromise: Promise<SQLiteDatabase> | undefined;
 
 async function openAppDatabase() {
@@ -46,6 +46,39 @@ async function openAppDatabase() {
             );
           END;
           PRAGMA user_version = 2;
+        `);
+      }
+
+      if (version.user_version < 3) {
+        await transaction.execAsync(`
+          CREATE TABLE bus_route_stop_cache (
+            route_key TEXT PRIMARY KEY NOT NULL,
+            fetched_at INTEGER NOT NULL,
+            payload TEXT NOT NULL
+          );
+          CREATE TABLE bus_stop_cache (
+            source TEXT NOT NULL CHECK (source IN ('kmbLwb', 'citybus')),
+            stop_id TEXT NOT NULL,
+            fetched_at INTEGER NOT NULL,
+            payload TEXT NOT NULL,
+            PRIMARY KEY (source, stop_id)
+          );
+          PRAGMA user_version = 3;
+        `);
+      }
+
+      if (version.user_version < 4) {
+        await transaction.execAsync(`
+          ALTER TABLE bus_route_cache RENAME TO bus_route_cache_v3;
+          CREATE TABLE bus_route_cache (
+            source TEXT PRIMARY KEY NOT NULL CHECK (source IN ('kmbLwb', 'citybus', 'nlb')),
+            fetched_at INTEGER NOT NULL,
+            payload TEXT NOT NULL
+          );
+          INSERT INTO bus_route_cache (source, fetched_at, payload)
+            SELECT source, fetched_at, payload FROM bus_route_cache_v3;
+          DROP TABLE bus_route_cache_v3;
+          PRAGMA user_version = 4;
         `);
       }
     });

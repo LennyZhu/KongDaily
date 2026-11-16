@@ -1,18 +1,26 @@
-export const busSources = ['kmbLwb', 'citybus'] as const;
+export const busSources = ['kmbLwb', 'citybus', 'nlb'] as const;
 export type BusSource = (typeof busSources)[number];
 export type BusDirection = 'outbound' | 'inbound' | 'listed';
 
-type RouteName = { zh: string; en: string };
+export type RouteName = { zh: string; en: string };
 
 export type BusRoute = {
   id: string;
-  source: BusSource;
   number: string;
-  direction: BusDirection;
-  serviceType?: string;
   origin: RouteName;
   destination: RouteName;
-};
+} & (
+  { source: 'kmbLwb'; direction: Exclude<BusDirection, 'listed'>; serviceType: string }
+  | { source: 'citybus'; direction: 'listed'; serviceType?: never }
+  | {
+      source: 'nlb';
+      serviceType?: never;
+      routeId: string;
+      routeName: RouteName;
+      overnight: boolean;
+      special: boolean;
+    }
+);
 
 export function normalizeBusQuery(query: string) {
   return query.normalize('NFKC').trim().replace(/\s+/g, ' ').toUpperCase();
@@ -28,9 +36,36 @@ function textField(value: unknown) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function splitNlbRouteName(name: string) {
+  const separator = name.indexOf('>');
+  if (separator < 0) return ['', ''];
+  return [name.slice(0, separator).trim(), name.slice(separator + 1).trim()];
+}
+
 function parseRoute(source: BusSource, value: unknown): BusRoute | undefined {
   const row = asRecord(value);
   if (!row) return;
+
+  if (source === 'nlb') {
+    const routeId = typeof row.routeId === 'number' && Number.isSafeInteger(row.routeId)
+      ? String(row.routeId) : textField(row.routeId);
+    const number = normalizeBusQuery(textField(row.routeNo));
+    const routeName = { zh: textField(row.routeName_c), en: textField(row.routeName_e) };
+    if (!/^\d+$/.test(routeId) || !number || !(routeName.zh || routeName.en)) return;
+    const [originZh, destinationZh] = splitNlbRouteName(routeName.zh);
+    const [originEn, destinationEn] = splitNlbRouteName(routeName.en);
+    return {
+      id: `NLB:${routeId}`,
+      source,
+      routeId,
+      number,
+      routeName,
+      origin: { zh: originZh, en: originEn },
+      destination: { zh: destinationZh, en: destinationEn },
+      overnight: row.overnightRoute === 1,
+      special: row.specialRoute === 1,
+    };
+  }
 
   const number = normalizeBusQuery(textField(row.route));
   const origin = { zh: textField(row.orig_tc), en: textField(row.orig_en) };
@@ -71,7 +106,8 @@ export class BusCatalogueError extends Error {
 }
 
 export function parseBusCatalogue(source: BusSource, response: unknown): BusRoute[] {
-  const data = asRecord(response)?.data;
+  const envelope = asRecord(response);
+  const data = source === 'nlb' ? envelope?.routes : envelope?.data;
   if (!Array.isArray(data)) throw new BusCatalogueError('invalid', null, 0);
   if (data.length === 0) throw new BusCatalogueError('empty', 0, 0);
 
@@ -89,6 +125,7 @@ export function parseBusCatalogue(source: BusSource, response: unknown): BusRout
 const sourceTerms: Record<BusSource, string[]> = {
   kmbLwb: ['九巴', '九龍巴士', '龍運', 'KMB', 'LWB', 'LONG WIN'],
   citybus: ['城巴', 'CITYBUS', 'CTB'],
+  nlb: ['新大嶼山巴士', '新大屿山巴士', '嶼巴', 'NLB', 'NEW LANTAO BUS'],
 };
 
 const routeOrder = new Intl.Collator('en', { numeric: true });
@@ -109,6 +146,7 @@ export function matchBusRoutes(routes: BusRoute[], input: string) {
       matches.push({ route, rank: 2 });
     } else if (matchNames && [
       route.origin.zh, route.origin.en, route.destination.zh, route.destination.en, ...sourceTerms[route.source],
+      ...(route.source === 'nlb' ? [route.routeName.zh, route.routeName.en] : []),
     ].some((term) => normalizeBusQuery(term).includes(query))) {
       matches.push({ route, rank: 3 });
     }
