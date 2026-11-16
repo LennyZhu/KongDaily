@@ -42,6 +42,12 @@ export const homeColors = {
   photoInk: 'rgba(13, 29, 24, 0.90)',
 };
 
+export const weatherColors = {
+  warningSurface: '#FFF6E5',
+  warningBorder: '#F0DFBC',
+  warningInk: '#664C26',
+};
+
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, section: 32 };
 export const radius = { control: 12, card: 16, media: 18, largeCard: 20, pill: 100 };
 export const touchTarget = 44;

@@ -2,7 +2,7 @@ import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
 import { type LanguagePreference } from '@/i18n';
 
-const schemaVersion = 6;
+const schemaVersion = 7;
 let databasePromise: Promise<SQLiteDatabase> | undefined;
 
 async function openAppDatabase() {
@@ -127,6 +127,20 @@ async function openAppDatabase() {
           );
           CREATE INDEX nearby_bus_coordinates ON nearby_bus_stops (latitude, longitude);
           PRAGMA user_version = 6;
+        `);
+      }
+
+      if (version.user_version < 7) {
+        await transaction.execAsync(`
+          CREATE TABLE weather_cache (
+            api_type TEXT NOT NULL,
+            language TEXT NOT NULL CHECK (language IN ('zh-HK', 'en')),
+            update_time INTEGER NOT NULL,
+            fetched_at INTEGER NOT NULL,
+            payload TEXT NOT NULL,
+            PRIMARY KEY (api_type, language)
+          );
+          PRAGMA user_version = 7;
         `);
       }
     });

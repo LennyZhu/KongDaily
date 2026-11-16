@@ -47,12 +47,7 @@ export default function HomeScreen() {
     <Screen contentStyle={styles.screenContent} topBackgroundColor={homeColors.harbourSky}>
       <HomeHero name={home.name} subtitle={home.subtitle} search={home.search} />
       <View style={styles.sections}>
-        <WeatherCard
-          weatherEmpty={home.weatherEmpty}
-          weatherDetail={home.weatherDetail}
-          weatherLocation={home.weatherLocation}
-          weatherStatus={home.weatherStatus}
-        />
+        <WeatherCard />
 
         <HomeSection title={home.buses} icon="bus"
           action={{ label: items.length ? copy.busFavorites.manage : home.viewAll, href: '/saved?category=buses' }}>
