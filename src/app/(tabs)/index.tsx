@@ -14,7 +14,7 @@ import { useLanguage } from '@/language';
 import { colors, homeColors, homeLayout, radius, space, touchTarget } from '@/theme';
 
 const busSearch = '/bus' satisfies Href;
-const facilityMap = { pathname: '/nearby', params: { category: 'all' } } satisfies Href;
+const facilityMap = { pathname: '/nearby', params: { category: 'all', view: 'map' } } satisfies Href;
 
 type QuickLink = {
   key: keyof Messages['home']['quickLinks'];
@@ -28,7 +28,7 @@ const quickLinkRows = [
   [
     { key: 'bus', icon: 'bus', href: busSearch, backgroundColor: colors.tintedBackground },
     { key: 'toilets', icon: 'figure.dress.line.vertical.figure', href: '/nearby?category=toilets', backgroundColor: homeColors.cream },
-    { key: 'pets', icon: 'pawprint', href: '/explore?category=pets', backgroundColor: homeColors.peach, iconColor: homeColors.rustInk },
+    { key: 'pets', icon: 'pawprint', href: '/nearby?category=pets', backgroundColor: homeColors.peach, iconColor: homeColors.rustInk },
   ],
   [
     { key: 'parks', icon: 'tree', href: '/nearby?category=parks', backgroundColor: homeColors.green, iconColor: homeColors.greenInk },

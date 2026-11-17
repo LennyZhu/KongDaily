@@ -1,5 +1,5 @@
 {
   "ios": {
-    "NSLocationWhenInUseUsageDescription": "Used to find nearby bus stops and show their distance from your location."
+    "NSLocationWhenInUseUsageDescription": "Used to find nearby facilities and bus stops and show their distance from your location."
   }
 }

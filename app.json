@@ -30,7 +30,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Used to find nearby bus stops and show their distance from your location.",
+          "locationWhenInUsePermission": "Used to find nearby facilities and bus stops and show their distance from your location.",
           "locationAlwaysPermission": false,
           "locationAlwaysAndWhenInUsePermission": false,
           "motionUsagePermission": false
