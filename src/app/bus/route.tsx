@@ -6,6 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { findBusRouteFamily } from '@/bus-data';
 import { useBusEta } from '@/bus-eta-hooks';
 import { describeEta, etaIsStale, readEtaTarget, type EtaTarget } from '@/bus-eta';
+import { useBusStopFavorite } from '@/bus-favorite-hooks';
+import { busStopEtaHref, type BusVisitSummary } from '@/bus-favorites';
 import { routePlaceName } from '@/bus-routes';
 import { useRouteSequences, useRouteStopNames, type SequenceState } from '@/bus-stop-hooks';
 import {
@@ -209,26 +211,17 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
     });
   }
 
-  function openEta() {
-    if (!etaTarget || !current || !picked || !sequence) return;
+  let visit: BusVisitSummary | undefined;
+  if (etaTarget && current && picked && sequence) {
     const station = picked.name ?? names[picked.id]?.snapshot?.stop.name;
     const last = sequence.stops.at(-1);
     const to = current.catalogueRoute?.destination ?? (last && names[last.id]?.snapshot?.stop.name);
-    router.push({ pathname: '/bus/eta', params: {
-      source: etaTarget.source,
-      number: etaTarget.number,
-      stopId: etaTarget.stopId,
-      stopSeq: String(etaTarget.stopSeq),
-      ...(etaTarget.source === 'nlb'
-        ? { nlbRouteId: etaTarget.routeId, repeatedStop: etaTarget.repeatedStop ? '1' : '0' }
-        : { direction: etaTarget.direction }),
-      ...(etaTarget.source === 'kmbLwb' && { serviceType: etaTarget.serviceType }),
-      stationZh: station?.zh ?? '',
-      stationEn: station?.en ?? '',
-      destinationZh: to?.zh || nlbRoute?.routeName.zh || '',
-      destinationEn: to?.en || nlbRoute?.routeName.en || '',
-      ...(etaTarget.source === 'citybus' && last && { destinationStopId: last.id }),
-    } });
+    visit = {
+      target: etaTarget,
+      station: { zh: station?.zh ?? '', en: station?.en ?? '' },
+      destination: { zh: to?.zh || nlbRoute?.routeName.zh || '', en: to?.en || nlbRoute?.routeName.en || '' },
+      destinationStopId: etaTarget.source === 'citybus' ? last?.id : undefined,
+    };
   }
 
   return (
@@ -377,9 +370,9 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
           )}
         </View>
       </ScrollView>
-      {etaTarget && picked && current ? (
-        <SelectedStopCard key={selectedVisit} initialTarget={etaTarget} name={stopName(picked)}
-          direction={directionLabel(current)} cooldowns={etaCooldowns} onOpen={openEta} />
+      {visit && picked && current ? (
+        <SelectedStopCard key={selectedVisit} visit={visit} name={stopName(picked)}
+          direction={directionLabel(current)} cooldowns={etaCooldowns} />
       ) : hasStops ? (
         <View style={[styles.selection, styles.selectionPrompt]}>
           <Icon name="mappin" size={18} />
@@ -425,18 +418,22 @@ function RouteLocationHint({ recommendation, name, onRequest, onScroll }: {
   );
 }
 
-function SelectedStopCard({ initialTarget, name, direction, cooldowns, onOpen }: {
-  initialTarget: EtaTarget;
+function SelectedStopCard({ visit, name, direction, cooldowns }: {
+  visit: BusVisitSummary;
   name: string;
   direction: string;
   cooldowns: Map<string, number>;
-  onOpen: () => void;
 }) {
   // The visit key remounts this card, including the delay and request state, when the selected stop changes.
-  const [target] = useState(initialTarget);
+  const [target] = useState(visit.target);
   const [ready, setReady] = useState(false);
   const { copy, locale } = useLanguage();
+  const router = useRouter();
   const eta = copy.busEta;
+  const labels = copy.busFavorites;
+  const favorite = useBusStopFavorite(visit);
+  const favoriteAction = favorite.loading ? labels.loading : favorite.loadFailed ? `${labels.loadError} · ${copy.bus.retry}`
+    : favorite.saved ? `${labels.saved} · ${labels.remove}` : `${labels.stopNotSaved} · ${labels.saveStop}`;
   useEffect(() => {
     const timer = setTimeout(() => setReady(true), etaPreviewDelay);
     return () => clearTimeout(timer);
@@ -458,7 +455,21 @@ function SelectedStopCard({ initialTarget, name, direction, cooldowns, onOpen }:
           <AppText variant="homeCardTitle">{name}</AppText>
           <AppText variant="detail" tone="muted">{target.number} · {direction}</AppText>
         </View>
+        <Pressable accessibilityRole="button" accessibilityLabel={`${name} · ${favoriteAction}`}
+          accessibilityState={{ selected: favorite.saved, busy: favorite.loading || favorite.saving, disabled: !favorite.onPress }}
+          disabled={!favorite.onPress} onPress={favorite.onPress}
+          style={({ pressed }) => [styles.stopFavorite, pressed && styles.pressed]}>
+          <View aria-hidden>
+            {favorite.loading || favorite.saving ? <ActivityIndicator color={colors.primary} size="small" />
+              : <Icon name={favorite.loadFailed ? 'arrow.clockwise' : favorite.saved ? 'bookmark.fill' : 'bookmark'} size={16} />}
+          </View>
+        </Pressable>
       </View>
+      {(favorite.loadFailed || favorite.saveFailed) && (
+        <AppText variant="caption" tone="error" accessibilityRole="alert">
+          {favorite.loadFailed ? labels.loadError : labels.saveError}
+        </AppText>
+      )}
       <View style={styles.etaRow}>
         <View style={styles.etaPreview} accessibilityLiveRegion="polite">
           <AppText variant="caption" tone="muted">{eta.nextArrival}</AppText>
@@ -469,7 +480,7 @@ function SelectedStopCard({ initialTarget, name, direction, cooldowns, onOpen }:
               </AppText>
             )}
         </View>
-        <Pressable accessibilityRole="button" onPress={onOpen}
+        <Pressable accessibilityRole="button" onPress={() => router.push(busStopEtaHref(visit))}
           style={({ pressed }) => [styles.etaLink, pressed && styles.pressed]}>
           <AppText variant="detail" tone="primary" style={styles.etaLinkText}>{eta.openAll}</AppText>
           <Icon name="chevron.right" size={13} />
@@ -585,6 +596,11 @@ const styles = StyleSheet.create({
   },
   selectionPrompt: { flexDirection: 'row', alignItems: 'center', paddingVertical: space.sm },
   selectionHeading: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  stopFavorite: {
+    alignSelf: 'flex-start', width: touchTarget, height: touchTarget, flexShrink: 0,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: colors.tint, borderRadius: radius.control, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.primarySoft,
+  },
   etaRow: {
     flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm, paddingTop: space.sm,
     borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border,

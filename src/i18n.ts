@@ -257,6 +257,9 @@ const zhHK = {
   },
   busFavorites: {
     save: '收藏此站路線',
+    saveStop: '收藏此站',
+    stopLoading: '讀取中',
+    stopNotSaved: '未收藏',
     saved: '已收藏',
     remove: '取消收藏',
     manage: '管理',
@@ -751,6 +754,9 @@ const en: typeof zhHK = {
   },
   busFavorites: {
     save: 'Save route at this stop',
+    saveStop: 'Save stop',
+    stopLoading: 'Loading…',
+    stopNotSaved: 'Not saved',
     saved: 'Saved',
     remove: 'Remove from saved',
     manage: 'Manage',

@@ -9,7 +9,7 @@ import { getDatabase } from '@/database';
 
 export const homeBusLimit = 3;
 
-type BusVisitSummary = {
+export type BusVisitSummary = {
   target: EtaTarget;
   station: RouteName;
   destination: RouteName;
@@ -43,7 +43,7 @@ type FavoriteRow = {
   pin_order: number | null;
 };
 
-export type FavoriteChange = { type: 'save'; visit: BusVisitSummary }
+export type FavoriteChange = { type: 'save'; visit: BusVisitSummary; pinOnSave?: boolean }
   | { type: 'remove' | 'pin' | 'unpin'; id: string }
   | { type: 'move'; id: string; step: -1 | 1 };
 
@@ -148,7 +148,7 @@ export async function writeBusFavorites(change: FavoriteChange) {
         target.source === 'kmbLwb' ? target.serviceType : null, target.source === 'nlb' ? target.routeId : null,
         target.stopId, target.stopSeq, target.repeatedStop ? 1 : 0,
         station.zh, station.en, destination.zh, destination.en, destinationStopId ?? null,
-        now, now, pins.length < homeBusLimit ? pins.length + 1 : null,
+        now, now, change.pinOnSave !== false && pins.length < homeBusLimit ? pins.length + 1 : null,
       );
     } else {
       const item = items.find(({ id }) => id === change.id);

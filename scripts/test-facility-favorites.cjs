@@ -68,13 +68,16 @@ function loadApp(file, { failAfterV8 = false, changeCatalog, registry, beforeQue
   }
   function load(name) {
     if (loaded.has(name)) return loaded.get(name).exports;
-    const isNearby = name === 'app/(tabs)/nearby';
-    const isSaved = name === 'app/(tabs)/saved';
-    const filename = join(root, 'src', name + (isNearby || isSaved ? '.tsx' : '.ts'));
+    const testExports = {
+      'app/(tabs)/nearby': 'FacilitySummary, FacilityListRow',
+      'app/(tabs)/saved': 'SavedBuses, SavedFacilities',
+      'app/bus/route': 'SelectedStopCard',
+      'app/bus/eta': 'EtaDetails',
+    }[name];
+    const filename = join(root, 'src', name + (testExports ? '.tsx' : '.ts'));
     const module = { exports: {} };
     loaded.set(name, module);
-    const source = readFileSync(filename, 'utf8') + (isNearby ? '\nexport { FacilitySummary, FacilityListRow };'
-      : isSaved ? '\nexport { SavedBuses, SavedFacilities };' : '');
+    const source = readFileSync(filename, 'utf8') + (testExports ? `\nexport { ${testExports} };` : '');
     const script = ts.transpileModule(source, {
       compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, esModuleInterop: true, jsx: ts.JsxEmit.ReactJSX },
     }).outputText;
@@ -821,7 +824,175 @@ async function testSavedFacilityIntegration() {
   }
 }
 
-test().then(testNearbyFavoriteButtons).then(testSavedFacilityIntegration)
-  .then(() => console.log('PASS: registry, SQLite v8, bus regression and facility favorites across Nearby and Saved'))
+async function testRouteStopQuickFavorite() {
+  const file = join(scratch, 'route-stop-favorites.db');
+  let locale = 'zh-HK';
+  let opened;
+  let holdInsert = false;
+  let failReads = false;
+  let inserts = 0;
+  let reads = 0;
+  let enterInsert;
+  let releaseInsert;
+  const insertStarted = new Promise((resolve) => { enterInsert = resolve; });
+  const blocked = new Promise((resolve) => { releaseInsert = resolve; });
+  const stubs = {
+    react: {
+      useState: (initial) => [typeof initial === 'function' ? initial() : initial, () => {}],
+      useRef: (initial) => ({ current: initial }),
+      useEffect: () => {},
+      useCallback: (fn) => fn,
+      useMemo: (fn) => fn(),
+      useSyncExternalStore: (_subscribe, read) => read(),
+    },
+    'expo-router': { useFocusEffect: () => {}, useRouter: () => ({ push: (href) => { opened = href; } }) },
+    'expo-linear-gradient': { LinearGradient: 'LinearGradient' },
+    'react-native': {
+      Pressable: 'Pressable', View: 'View', ActivityIndicator: 'ActivityIndicator',
+      StyleSheet: { create: (styles) => styles, hairlineWidth: 1 },
+    },
+    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+    '@/components/ui': { AppText: 'AppText', Icon: 'Icon', Screen: 'Screen' },
+    '@/components/bus-ui': { BusAction: 'BusAction' },
+    '@/components/nearby-facilities-map': {},
+    '@/components/saved-bus-ui': { FavoriteAction: 'FavoriteAction', FavoriteBusRow: 'FavoriteBusRow', savedBusStyles: { card: {} } },
+    '@/bus-stop-hooks': { useRouteStopNames: () => ({ names: {} }) },
+    '@/route-stop-recommendation': {},
+    '@/bus-eta-hooks': { useBusEta: () => ({ now: Date.now(), loading: false }) },
+    '@/language': { useLanguage: () => ({ locale, copy: app.load('i18n').messages[locale] }) },
+  };
+  const app = loadApp(file, { stubs, beforeQuery: (sql) => {
+    if (sql.startsWith('SELECT * FROM bus_favorites')) {
+      reads += 1;
+      if (failReads) throw new Error('Cannot read bus favorites');
+    }
+    if (sql.includes('INSERT INTO bus_favorites')) {
+      inserts += 1;
+      if (holdInsert) {
+        enterInsert();
+        return blocked;
+      }
+    }
+  } });
+  const bus = app.load('bus-favorites');
+  const { readEtaTarget } = app.load('bus-eta');
+  const { loadBusFavorites, useBusFavorites } = app.load('bus-favorite-hooks');
+  const { SelectedStopCard } = app.load('app/bus/route');
+  const { EtaDetails } = app.load('app/bus/eta');
+  const { SavedBuses } = app.load('app/(tabs)/saved');
+  const labels = () => app.load('i18n').messages[locale];
+  const visit = (target) => ({
+    target, station: { zh: '測試站', en: 'A long station name for Dynamic Type' }, destination: { zh: '總站', en: 'Terminus' },
+    destinationStopId: target.source === 'citybus' ? '000999' : undefined,
+  });
+  const a = visit({ source: 'citybus', number: '1', direction: 'outbound', stopId: '000123', stopSeq: 2 });
+  const b = visit({ ...a.target, direction: 'inbound' });
+  const legacy = visit({ ...a.target, stopId: '000456' });
+  const kmb = visit({ source: 'kmbLwb', number: '5', direction: 'inbound', serviceType: '2', stopId: '0123456789ABCDEF', stopSeq: 3 });
+  const nlb = visit({ source: 'nlb', number: 'B2', routeId: '413', stopId: '214', stopSeq: 4, repeatedStop: true });
+  const tree = (v) => elements(SelectedStopCard({ visit: v, name: v.station[locale === 'en' ? 'en' : 'zh'],
+    direction: 'Terminus', cooldowns: new Map() }));
+  const button = (v) => tree(v).find(({ type, props }) => type === 'Pressable' && props.accessibilityLabel);
+  const icon = (v) => elements(button(v)).find(({ type }) => type === 'Icon')?.props.name;
+  const etaButton = (v) => elements(EtaDetails({ initialTarget: v.target, station: v.station, destination: v.destination,
+    destinationStopId: v.destinationStopId })).find(({ type, props }) => type === 'Pressable'
+    && [labels().busFavorites.save, labels().busFavorites.remove].includes(props.accessibilityLabel));
+  const rows = () => elements(SavedBuses({ emptyTitle: '' })).filter(({ type }) => type === 'FavoriteBusRow')
+    .map(({ props }) => props.favorite);
+  const tick = () => new Promise(setImmediate);
+
+  try {
+    assert.equal(button(a).props.accessibilityState.selected, undefined);
+    assert.equal(button(a).props.disabled, true);
+    assert.ok(elements(button(a)).some(({ type }) => type === 'ActivityIndicator'));
+    await loadBusFavorites();
+    assert.equal(icon(a), 'bookmark');
+    assert.equal(button(a).props.accessibilityLabel, '測試站 · 未收藏 · 收藏此站');
+    assert.equal(button(a).props.accessibilityState.selected, false);
+    const buttonStyle = button(a).props.style({ pressed: false })[0];
+    assert.equal(buttonStyle.width, 44);
+    assert.equal(buttonStyle.height, 44);
+    assert.ok(elements(button(a)).every(({ type }) => type !== 'AppText'));
+    assert.ok(tree(a).some(({ type, props }) => type === 'AppText' && props.children === labels().busEta.nextArrival));
+    etaButton(legacy).props.onPress();
+    await tick();
+    assert.equal(rows()[0].pinOrder, 1);
+
+    holdInsert = true;
+    const firstPress = button(a).props.onPress;
+    const savingA = firstPress();
+    await insertStarted;
+    await firstPress();
+    assert.equal(button(b).props.accessibilityState.selected, false);
+    assert.equal(button(a).props.accessibilityState.busy, true);
+    assert.equal(button(a).props.onPress, undefined);
+    const savingB = button(b).props.onPress();
+    holdInsert = false;
+    releaseInsert();
+    await Promise.all([savingA, savingB]);
+    assert.equal(inserts, 3);
+    assert.equal(opened, undefined);
+    assert.equal(icon(a), 'bookmark.fill');
+    assert.equal(icon(b), 'bookmark.fill');
+    assert.equal(button(a).props.accessibilityLabel, '測試站 · 已收藏 · 取消收藏');
+    assert.equal(etaButton(a).props.accessibilityState.selected, true);
+    assert.ok(rows().filter(({ id }) => id !== bus.busFavoriteId(legacy.target)).every(({ pinOrder }) => pinOrder === null));
+
+    etaButton(a).props.onPress();
+    await tick();
+    assert.equal(button(a).props.accessibilityState.selected, false);
+    assert.equal(button(b).props.accessibilityState.selected, true);
+    assert.equal(rows().length, 2);
+    for (const v of [kmb, nlb]) {
+      await button(v).props.onPress();
+      const link = tree(v).find(({ type, props }) => type === 'Pressable' && !props.accessibilityLabel);
+      link.props.onPress();
+      assert.equal(opened.pathname, '/bus/eta');
+      assert.deepEqual(readEtaTarget(opened.params), v.target);
+      assert.equal(etaButton(v).props.accessibilityState.selected, true);
+    }
+
+    const sql = new DatabaseSync(file);
+    sql.exec(`CREATE TRIGGER reject_bus_delete BEFORE DELETE ON bus_favorites
+      BEGIN SELECT RAISE(ABORT, 'test rejected deletion'); END;`);
+    const readsBeforeFailure = reads;
+    await button(b).props.onPress();
+    assert.equal(reads - readsBeforeFailure, 2);
+    assert.equal(button(b).props.accessibilityState.selected, true);
+    assert.ok(tree(b).some(({ props }) => props?.children === labels().busFavorites.saveError));
+    assert.equal(tree(kmb).some(({ props }) => props?.accessibilityRole === 'alert'), false);
+    sql.exec('DROP TRIGGER reject_bus_delete');
+    sql.close();
+
+    failReads = true;
+    await button(b).props.onPress();
+    assert.equal(button(b).props.accessibilityState.selected, undefined);
+    assert.equal(icon(b), 'arrow.clockwise');
+    assert.match(button(b).props.accessibilityLabel, new RegExp(labels().bus.retry));
+    assert.equal(useBusFavorites().status, 'error');
+    failReads = false;
+    await button(b).props.onPress();
+    assert.equal(button(b).props.accessibilityState.selected, true);
+
+    locale = 'en';
+    assert.match(button(a).props.accessibilityLabel, /long station name.*Not saved.*Save stop/);
+    assert.match(button(b).props.accessibilityLabel, /long station name.*Saved.*Remove from saved/);
+    assert.ok(elements(button(b)).every(({ type }) => type !== 'AppText'));
+    await button(b).props.onPress();
+    assert.equal(etaButton(b).props.accessibilityState.selected, false);
+    app.close();
+
+    const reopened = loadApp(file, { stubs });
+    const current = await reopened.load('bus-favorites').readBusFavorites();
+    assert.deepEqual(new Set(current.map(({ id }) => id)), new Set([legacy, kmb, nlb].map(({ target }) => bus.busFavoriteId(target))));
+    assert.deepEqual(bus.pinnedBuses(current).map(({ id }) => id), [bus.busFavoriteId(legacy.target)]);
+    reopened.close();
+  } finally {
+    app.close();
+  }
+}
+
+test().then(testNearbyFavoriteButtons).then(testSavedFacilityIntegration).then(testRouteStopQuickFavorite)
+  .then(() => console.log('PASS: registry, SQLite v8, facility favorites, bus pins and route stop quick favorites'))
   .catch((error) => { console.error(error); process.exitCode = 1; })
   .finally(() => rmSync(scratch, { recursive: true, force: true }));
