@@ -434,6 +434,15 @@ const zhHK = {
     serviceNotice: '官方服務安排',
     originalLanguage: '部分資料顯示官方英文原文。',
     originalLanguageShort: '含官方英文原文',
+    facilityFavorites: {
+      add: '收藏設施',
+      remove: '取消收藏',
+      loading: '正在讀取收藏',
+      retry: '重試讀取收藏',
+      read: '未能確認收藏狀態，請點按重試。',
+      write: '未能更新收藏，請再試。',
+      unavailable: '此設施暫時無法收藏。',
+    },
     navigation: {
       directions: '導航前往',
       appleMaps: 'Apple 地圖',
@@ -911,6 +920,15 @@ const en: typeof zhHK = {
     serviceNotice: 'Official service notice',
     originalLanguage: 'Some details are shown in the official Chinese text.',
     originalLanguageShort: 'Includes official Chinese text',
+    facilityFavorites: {
+      add: 'Add to favorites',
+      remove: 'Remove from favorites',
+      loading: 'Loading favorites',
+      retry: 'Retry loading favorites',
+      read: 'Couldn’t verify favorites. Tap to retry.',
+      write: 'Couldn’t update favorites. Try again.',
+      unavailable: 'This facility can’t be saved right now.',
+    },
     navigation: {
       directions: 'Get directions',
       appleMaps: 'Apple Maps',

@@ -42,7 +42,7 @@ function matchesAnchor(facility: Facility, { anchor, category, source }: Registr
     && (category !== 'toilets' || Boolean(facility.serviceNotice) === Boolean(anchor.serviceNotice));
 }
 
-const stableKey = ({ source, stableFacilityId }: FacilityFavoriteIdentity) => JSON.stringify([source, stableFacilityId]);
+export const facilityFavoriteKey = ({ source, stableFacilityId }: FacilityFavoriteIdentity) => JSON.stringify([source, stableFacilityId]);
 
 // Null denotes a duplicate claim. Never choose one of several records by order.
 function uniqueBy<T>(rows: readonly T[], keyOf: (row: T) => string) {
@@ -56,12 +56,12 @@ function uniqueBy<T>(rows: readonly T[], keyOf: (row: T) => string) {
 
 export function createFacilityIdentityResolver(facilities: readonly Facility[], registrations: readonly Registration[]) {
   const catalog = uniqueBy(facilities, facilityId);
-  const registrationByStable = uniqueBy(registrations, stableKey);
+  const registrationByStable = uniqueBy(registrations, facilityFavoriteKey);
   const registrationByDisplay = uniqueBy(registrations.filter((row) => !row.retired),
     ({ source, displayId }) => facilityId({ source, officialId: displayId }));
 
   function resolveStable(identity: FacilityFavoriteIdentity): FacilityIdentityResolution {
-    const registration = registrationByStable.get(stableKey(identity));
+    const registration = registrationByStable.get(facilityFavoriteKey(identity));
     if (registration === null) return { status: 'needs_review' };
     if (!registration || registration.retired) return { status: 'unavailable' };
 

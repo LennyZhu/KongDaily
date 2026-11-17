@@ -19,7 +19,7 @@ const encodeIndex = (index) => JSON.stringify({ ...index, recordsSha256: digest(
   (_key, value) => value && typeof value === 'object' && !Array.isArray(value)
     ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]])) : value)) });
 
-function loadApp(file, { failAfterV8 = false, changeCatalog, registry } = {}) {
+function loadApp(file, { failAfterV8 = false, changeCatalog, registry, beforeQuery, stubs = {} } = {}) {
   const loaded = new Map();
   let connection;
   function databaseAdapter(db, afterExec) {
@@ -28,9 +28,18 @@ function loadApp(file, { failAfterV8 = false, changeCatalog, registry } = {}) {
         db.exec(sql);
         afterExec?.(sql);
       },
-      async getAllAsync(sql, ...params) { return db.prepare(sql).all(...params); },
-      async getFirstAsync(sql, ...params) { return db.prepare(sql).get(...params) ?? null; },
-      async runAsync(sql, ...params) { return db.prepare(sql).run(...params); },
+      async getAllAsync(sql, ...params) {
+        await beforeQuery?.(sql);
+        return db.prepare(sql).all(...params);
+      },
+      async getFirstAsync(sql, ...params) {
+        await beforeQuery?.(sql);
+        return db.prepare(sql).get(...params) ?? null;
+      },
+      async runAsync(sql, ...params) {
+        await beforeQuery?.(sql);
+        return db.prepare(sql).run(...params);
+      },
     };
   }
   async function openDatabaseAsync(name) {
@@ -58,15 +67,18 @@ function loadApp(file, { failAfterV8 = false, changeCatalog, registry } = {}) {
   }
   function load(name) {
     if (loaded.has(name)) return loaded.get(name).exports;
-    const filename = join(root, 'src', name + '.ts');
+    const isNearby = name === 'app/(tabs)/nearby';
+    const filename = join(root, 'src', name + (isNearby ? '.tsx' : '.ts'));
     const module = { exports: {} };
     loaded.set(name, module);
-    const script = ts.transpileModule(readFileSync(filename, 'utf8'), {
-      compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, esModuleInterop: true },
+    const source = readFileSync(filename, 'utf8') + (isNearby ? '\nexport { FacilitySummary, FacilityListRow };' : '');
+    const script = ts.transpileModule(source, {
+      compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, esModuleInterop: true, jsx: ts.JsxEmit.ReactJSX },
     }).outputText;
     new Function('module', 'exports', 'require', script)(module, module.exports, (id) => {
       if (id === 'expo-sqlite') return { openDatabaseAsync };
       if (id === registryRelPath && registry) return registry;
+      if (Object.hasOwn(stubs, id)) return stubs[id];
       if (id.startsWith('@/')) return load(id.slice(2));
       if (id.startsWith('.')) return json(resolve(dirname(filename), id));
       return require(id);
@@ -315,6 +327,219 @@ async function test() {
   assert.equal(retired.resolveStable(entry).status, 'unavailable');
 }
 
-test().then(() => console.log('PASS: registry review, identities, SQLite v8 rollback, migration, favorites and bus regression'))
+// Render the affected card components as element trees while exercising the real Repository.
+async function testNearbyFavoriteButtons() {
+  const file = join(scratch, 'nearby-controls.db');
+  let locale = 'zh-HK';
+  let fontScale = 1;
+  let notifications = 0;
+  let unsubscribe;
+  let listReads = 0;
+  let failReadback = false;
+  let releaseInitialRead;
+  let releaseFirstWrite;
+  let insertAttempts = 0;
+  let chooseDirection;
+  const openedUrls = [];
+  const initialRead = new Promise((resolve) => { releaseInitialRead = resolve; });
+  const firstWrite = new Promise((resolve) => { releaseFirstWrite = resolve; });
+  const react = require('react');
+  const stubs = {
+    react: {
+      ...react,
+      useSyncExternalStore(subscribe, getSnapshot) {
+        unsubscribe ??= subscribe(() => { notifications += 1; });
+        return getSnapshot();
+      },
+    },
+    'react-native': {
+      View: 'View', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator',
+      StyleSheet: { create: (styles) => styles, hairlineWidth: 1 },
+      useWindowDimensions: () => ({ width: 320, height: 710, fontScale }),
+      ActionSheetIOS: { showActionSheetWithOptions: (options, choose) => { chooseDirection = { options, choose }; } },
+      Alert: { alert: () => { assert.fail('Unexpected alert'); } },
+      Linking: { openURL: async (url) => { openedUrls.push(url); } },
+    },
+    'expo-router': {},
+    'react-native-safe-area-context': {},
+    '@/components/ui': { AppText: 'AppText', Icon: 'Icon' },
+    '@/components/nearby-facilities-map': { facilityVisuals: {
+      toilets: { icon: 'figure', color: '#246F69', surface: '#E6F3F1' },
+      parks: { icon: 'tree', color: '#246F69', surface: '#E6F3F1' },
+      pets: { icon: 'pawprint', color: '#246F69', surface: '#E6F3F1' },
+    } },
+    '@/components/nearby-search-sheet': {},
+    '@/nearby-bus-location': {},
+    '@/language': { useLanguage: () => ({ locale, copy: app.load('i18n').messages[locale] }) },
+  };
+  const app = loadApp(file, { stubs, beforeQuery: async (sql) => {
+    if (sql.includes('FROM facility_favorites ORDER BY') && ++listReads === 1) {
+      await initialRead;
+      throw new Error('Initial read interrupted');
+    }
+    if (sql.includes('INSERT INTO facility_favorites') && ++insertAttempts === 1) await firstWrite;
+    if (failReadback && sql.startsWith('SELECT 1 AS found FROM facility_favorites')) throw new Error('Readback unavailable');
+  } });
+
+  const sources = ['fehd', 'afcd', 'lcsd-parks', 'lcsd-pet-gardens', 'lcsd-inclusive-pet-parks'];
+  const sampleFacilities = sources.map((source) => app.load('facilities').nearbyFacilities.find((f) => f.source === source));
+  const [fehd, afcd] = sampleFacilities;
+  const { FacilitySummary, FacilityListRow } = app.load('app/(tabs)/nearby');
+  const { loadFacilityFavorites } = app.load('facility-favorite-hooks');
+  const { isFacilityFavorite } = app.load('facility-favorites');
+  const { resolveFacilityIdentity } = app.load('facility-identity');
+  const messages = () => app.load('i18n').messages[locale].nearby;
+  let cardChanges = 0;
+  const closeOrExpand = () => { cardChanges += 1; };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = () => { throw new Error('Network disabled during favorite tests'); };
+
+  function elements(node) {
+    if (!node || typeof node !== 'object') return [];
+    if (Array.isArray(node)) return node.flatMap(elements);
+    return [node, ...elements(node.props?.children)];
+  }
+  function row(facility, expanded) {
+    return FacilityListRow({ item: { facility, distance: 10 }, expanded, onPress: closeOrExpand });
+  }
+  function details(facility, mode = 'map') {
+    const card = mode === 'map' ? FacilitySummary({ facility, distance: 10, onClose: closeOrExpand }) : row(facility, true);
+    const component = elements(card).find((node) => node.type.name === 'FacilityDetails');
+    return component.type(component.props);
+  }
+  function bookmark(tree) {
+    return elements(tree).find((node) => node.type === 'Pressable' && node.props.accessibilityLabel);
+  }
+  function hasNotice(tree, text) {
+    return elements(tree).some((node) => node.type === 'AppText' && node.props.children === text);
+  }
+  function direction(tree) {
+    const component = elements(tree).find((node) => node.type.name === 'FacilityDirections');
+    return component?.type(component.props);
+  }
+
+  try {
+    assert.equal(elements(row(fehd, false)).some((node) => node.type.name === 'FacilityDetails'), false);
+    const initial = loadFacilityFavorites();
+    assert.equal(loadFacilityFavorites(), initial);
+    assert.equal(bookmark(details(fehd)).props.accessibilityLabel, messages().facilityFavorites.loading);
+    assert.equal(bookmark(details(fehd)).props.accessibilityState.selected, undefined);
+    assert.equal(bookmark(details(fehd)).props.disabled, true);
+    releaseInitialRead();
+    await initial;
+    const failedLoad = details(fehd);
+    assert.equal(bookmark(failedLoad).props.accessibilityLabel, messages().facilityFavorites.retry);
+    assert.ok(hasNotice(failedLoad, messages().facilityFavorites.read));
+    await bookmark(failedLoad).props.onPress();
+    assert.equal(listReads, 2);
+
+    const unselected = bookmark(details(fehd));
+    assert.equal(unselected.props.children.props.name, 'bookmark');
+    assert.equal(unselected.props.accessibilityLabel, '收藏設施');
+    assert.equal(unselected.props.style({ pressed: false })[0].width, 44);
+    assert.equal(unselected.props.style({ pressed: false })[0].height, 44);
+    const changesBeforeWrite = notifications;
+    const pending = unselected.props.onPress();
+    await unselected.props.onPress();
+    assert.equal(bookmark(details(fehd, 'list')).props.accessibilityState.busy, true);
+    assert.equal(bookmark(details(afcd)).props.accessibilityState.selected, false);
+    const second = bookmark(details(afcd)).props.onPress();
+    await loadFacilityFavorites(); // Same load function is reused when the App becomes active.
+    releaseFirstWrite();
+    await Promise.all([pending, second]);
+    assert.equal(insertAttempts, 2);
+    assert.equal(listReads, 2);
+    assert.ok(notifications > changesBeforeWrite);
+    assert.equal(bookmark(details(fehd, 'list')).props.children.props.name, 'bookmark.fill');
+    assert.equal(bookmark(details(fehd, 'list')).props.accessibilityLabel, '取消收藏');
+    await bookmark(details(fehd, 'list')).props.onPress();
+    assert.equal(bookmark(details(fehd)).props.accessibilityState.selected, false);
+    assert.equal(await isFacilityFavorite(resolveFacilityIdentity(fehd).identity), false);
+
+    for (const facility of sampleFacilities) {
+      const button = bookmark(details(facility));
+      if (!button.props.accessibilityState.selected) await button.props.onPress();
+      const { identity } = resolveFacilityIdentity(facility);
+      assert.equal(await isFacilityFavorite(identity), true);
+      assert.equal(bookmark(details(facility, 'list')).props.accessibilityState.selected, true);
+      if (['fehd', 'afcd'].includes(facility.source)) assert.notEqual(identity.stableFacilityId, facility.officialId);
+    }
+
+    const db = new DatabaseSync(file);
+    db.exec(`CREATE TRIGGER reject_nearby_remove BEFORE DELETE ON facility_favorites
+      BEGIN SELECT RAISE(ABORT,'simulated write failure'); END;`);
+    await bookmark(details(fehd)).props.onPress();
+    const failedWrite = details(fehd);
+    assert.equal(bookmark(failedWrite).props.accessibilityState.selected, true);
+    assert.ok(hasNotice(failedWrite, messages().facilityFavorites.write));
+    assert.equal(await isFacilityFavorite(resolveFacilityIdentity(fehd).identity), true);
+    failReadback = true;
+    await bookmark(failedWrite).props.onPress();
+    const failedReadback = details(fehd);
+    assert.equal(bookmark(failedReadback).props.accessibilityState.selected, undefined);
+    assert.equal(bookmark(failedReadback).props.children.props.name, 'arrow.clockwise');
+    failReadback = false;
+    db.exec('DROP TRIGGER reject_nearby_remove');
+    db.close();
+    await bookmark(failedReadback).props.onPress();
+    assert.equal(bookmark(details(fehd)).props.accessibilityState.selected, true);
+
+    locale = 'en';
+    fontScale = 2;
+    const largeText = details(fehd, 'list');
+    assert.equal(bookmark(largeText).props.accessibilityLabel, 'Remove from favorites');
+    assert.ok(elements(largeText).some((node) => node.props?.style?.flexWrap === 'wrap'));
+    assert.equal(cardChanges, 0);
+    assert.equal(chooseDirection, undefined);
+    const close = elements(FacilitySummary({ facility: fehd, distance: 10, onClose: closeOrExpand }))
+      .find((node) => node.type === 'Pressable' && node.props.accessibilityLabel === messages().closeFacility);
+    assert.equal(close.props.onPress, closeOrExpand);
+    for (const [i, host] of ['maps.apple.com', 'www.google.com'].entries()) {
+      direction(largeText).props.onPress();
+      assert.deepEqual(chooseDirection.options.options, ['Apple Maps', 'Google Maps', 'Cancel']);
+      chooseDirection.choose(i);
+      await new Promise(setImmediate);
+      const url = new URL(openedUrls.at(-1));
+      assert.equal(url.host, host);
+      assert.equal(url.searchParams.get(i === 0 ? 'daddr' : 'destination'),
+        `${fehd.coordinate.latitude},${fehd.coordinate.longitude}`);
+    }
+    await bookmark(details(fehd, 'list')).props.onPress();
+    assert.equal(bookmark(details(fehd)).props.accessibilityLabel, 'Add to favorites');
+    assert.equal(cardChanges, 0);
+    app.close();
+    unsubscribe?.();
+    unsubscribe = undefined;
+
+    const reopened = loadApp(file, { stubs });
+    await reopened.load('facility-favorite-hooks').loadFacilityFavorites();
+    const readBookmark = reopened.load('facility-favorite-hooks').useFacilityFavorite;
+    assert.equal(readBookmark(fehd).saved, false);
+    assert.ok(sampleFacilities.slice(1).every((facility) => readBookmark(facility).saved));
+    reopened.close();
+    unsubscribe?.();
+    unsubscribe = undefined;
+
+    const conflict = loadApp(file, { stubs, changeCatalog: (facilities) => facilities.map((facility) =>
+      facility.source === afcd.source && facility.officialId === afcd.officialId
+        ? { ...facility, coordinate: { latitude: 0, longitude: 0 } } : facility) });
+    await conflict.load('facility-favorite-hooks').loadFacilityFavorites();
+    const summary = conflict.load('app/(tabs)/nearby').FacilitySummary({ facility: afcd, distance: 0, onClose: closeOrExpand });
+    const component = elements(summary).find((node) => node.type.name === 'FacilityDetails');
+    const invalid = component.type(component.props);
+    assert.equal(bookmark(invalid).props.disabled, true);
+    assert.equal(bookmark(invalid).props.onPress, undefined);
+    assert.equal(direction(invalid), undefined);
+    assert.ok(hasNotice(invalid, messages().facilityFavorites.unavailable));
+    assert.equal(await conflict.load('facility-favorites').isFacilityFavorite(resolveFacilityIdentity(afcd).identity), true);
+    conflict.close();
+  } finally {
+    globalThis.fetch = originalFetch;
+    unsubscribe?.();
+    app.close();
+  }
+}
+
+test().then(testNearbyFavoriteButtons).then(() => console.log('PASS: registry, SQLite v8, bus regression and nearby favorite controls'))
   .catch((error) => { console.error(error); process.exitCode = 1; })
   .finally(() => rmSync(scratch, { recursive: true, force: true }));

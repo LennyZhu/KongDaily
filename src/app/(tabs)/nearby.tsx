@@ -1,12 +1,13 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Alert, AppState, FlatList, Linking, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, FlatList, Linking, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import type { Region } from 'react-native-maps';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { facilityVisuals, NearbyFacilitiesMap, type NearbyFacilitiesMapHandle } from '@/components/nearby-facilities-map';
 import { NearbySearchSheet } from '@/components/nearby-search-sheet';
 import { AppText, Icon } from '@/components/ui';
+import { loadFacilityFavorites, useFacilityFavorite } from '@/facility-favorite-hooks';
 import { showFacilityDirections } from '@/facility-navigation';
 import { facilityCategories, facilityFilter, facilityId, facilityText, facilityTextUsesFallback, indexNearbyFacilities, nearbyFacilities, nearbyFacilitySources, petFacilityType,
   type Facility, type FacilityFilter, type FacilityLocale, type NearbyFacility } from '@/facilities';
@@ -118,12 +119,14 @@ export default function NearbyScreen() {
   }, [confirmCenter, moveCamera]);
 
   useFocusEffect(useCallback(() => {
+    void loadFacilityFavorites();
     if (!triedInitialLocation.current) {
       triedInitialLocation.current = true;
       if (AppState.currentState !== 'background') void requestLocation(false);
     }
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'background') cancelLocation();
+      if (state === 'active') void loadFacilityFavorites();
     });
     return () => {
       subscription.remove();
@@ -519,7 +522,7 @@ function FacilityDirections({ facility }: { facility: Facility }) {
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={labels.directions}
       onPress={() => void showFacilityDirections(facility, locale, labels)}
-      style={({ pressed }) => [styles.roundAction, styles.directionsButton, pressed && styles.pressed]}>
+      style={({ pressed }) => [styles.roundAction, pressed && styles.pressed]}>
       <Icon name="location" size={18} />
     </Pressable>
   );
@@ -540,6 +543,12 @@ function FacilityDetails({ facility, distance, type, usesFallback }: {
 }) {
   const { copy, locale } = useLanguage();
   const labels = copy.nearby;
+  const { fontScale } = useWindowDimensions();
+  const favorite = useFacilityFavorite(facility);
+  const favoriteLabels = labels.facilityFavorites;
+  const favoriteLabel = favorite.busy && favorite.saved === undefined ? favoriteLabels.loading
+    : favorite.issue === 'read' ? favoriteLabels.retry
+    : favorite.saved ? favoriteLabels.remove : favoriteLabels.add;
   const openingHours = facility.openingHours && facilityText(facility.openingHours, locale);
   const isPetGarden = facility.category === 'pets';
   const hoursLabel = openingHours && (isPetGarden && !facility.serviceNotice
@@ -554,7 +563,7 @@ function FacilityDetails({ facility, distance, type, usesFallback }: {
       {facility.serviceNotice ? <FacilityServiceNotice remarks={remarks} />
         : showFullDetails && remarks && <AppText variant="detail" tone="muted">{labels.officialRemarks(remarks)}</AppText>}
       <View style={styles.directionsRow}>
-        <View style={styles.grow}>
+        <View style={[styles.grow, { flexBasis: 140 * Math.max(1, fontScale) }]}>
           {type && (isPetGarden ? <PetGardenTypeBadge label={type} /> : <AppText variant="caption" tone="muted">{type}</AppText>)}
           {distance !== undefined && (
             <AppText variant="caption" tone="primary">{labels.directDistance(facilityDistance(distance, copy.nearbyBus))}</AppText>
@@ -567,8 +576,23 @@ function FacilityDetails({ facility, distance, type, usesFallback }: {
             : isPetGarden && <AppText variant="caption" tone="muted">{labels.petGardenRules}</AppText>}
           {usesFallback && <AppText variant="caption" tone="muted">{labels.originalLanguage}</AppText>}
         </View>
-        <FacilityDirections facility={facility} />
+        <View style={styles.facilityActions}>
+          <Pressable accessibilityRole="button" accessibilityLabel={favoriteLabel}
+            accessibilityState={{ selected: favorite.saved, disabled: !favorite.onPress, busy: favorite.busy }}
+            disabled={!favorite.onPress} onPress={favorite.onPress}
+            style={({ pressed }) => [styles.roundAction, pressed && styles.pressed]}>
+            {favorite.busy ? <ActivityIndicator accessible={false} size="small" color={colors.primary} />
+              : <Icon name={favorite.issue === 'read' ? 'arrow.clockwise' : favorite.saved ? 'bookmark.fill' : 'bookmark'}
+                color={favorite.issue === 'unavailable' ? colors.muted : colors.primary} size={18} />}
+          </Pressable>
+          {favorite.facility && <FacilityDirections facility={favorite.facility} />}
+        </View>
       </View>
+      {favorite.issue && (
+        <AppText variant="caption" tone={favorite.issue === 'unavailable' ? 'muted' : 'error'} accessibilityRole="alert">
+          {favoriteLabels[favorite.issue]}
+        </AppText>
+      )}
     </>
   );
 }
@@ -671,8 +695,8 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start', maxWidth: '100%', backgroundColor: colors.tint, borderRadius: radius.pill,
     paddingHorizontal: space.sm, paddingVertical: space.xs,
   },
-  directionsRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  directionsButton: { alignSelf: 'flex-end' },
+  directionsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', gap: space.sm },
+  facilityActions: { flexDirection: 'row', flexShrink: 0, marginLeft: 'auto', gap: space.xs },
   facilityIcon: { width: touchTarget, height: touchTarget, borderRadius: radius.control, alignItems: 'center', justifyContent: 'center' },
   serviceNotice: { gap: space.xs, padding: space.sm, borderRadius: radius.control, backgroundColor: homeColors.cream },
   serviceNoticeBadge: { alignSelf: 'flex-start', paddingVertical: space.xs },
