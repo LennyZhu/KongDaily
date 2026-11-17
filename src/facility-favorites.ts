@@ -67,10 +67,25 @@ export async function listFacilityFavorites(): Promise<FacilityFavorite[]> {
   await pendingWrites;
   const database = await getDatabase();
   const rows = await database.getAllAsync<FavoriteRow>(
-    `SELECT source, stable_facility_id, name_zh_hk_snapshot, name_en_snapshot, category_snapshot, created_at, updated_at
-     FROM facility_favorites ORDER BY created_at DESC, source, stable_facility_id`,
+    `${selectFavorites} ORDER BY created_at DESC, source, stable_facility_id`,
   );
-  return rows.map((row) => ({
+  return rows.map(rowToFavorite);
+}
+
+const selectFavorites = `SELECT source, stable_facility_id, name_zh_hk_snapshot, name_en_snapshot, category_snapshot, created_at, updated_at
+     FROM facility_favorites`;
+
+export async function getFacilityFavorite(identity: FacilityFavoriteIdentity) {
+  await pendingWrites;
+  const database = await getDatabase();
+  const row = await database.getFirstAsync<FavoriteRow>(
+    `${selectFavorites} WHERE source = ? AND stable_facility_id = ?`, identity.source, identity.stableFacilityId,
+  );
+  return row ? rowToFavorite(row) : undefined;
+}
+
+function rowToFavorite(row: FavoriteRow): FacilityFavorite {
+  return {
     source: row.source,
     stableFacilityId: row.stable_facility_id,
     nameSnapshot: row.name_zh_hk_snapshot
@@ -79,7 +94,7 @@ export async function listFacilityFavorites(): Promise<FacilityFavorite[]> {
     categorySnapshot: row.category_snapshot,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-  }));
+  };
 }
 
 export function resolveFacilityFavorite(favorite: FacilityFavorite) {

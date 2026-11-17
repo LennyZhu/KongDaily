@@ -117,6 +117,15 @@ export function petFacilityType(facility: Facility, labels: Messages['nearby']) 
   return facility.petAccess ? labels.inclusivePetParkType : labels.petGardenType;
 }
 
+export function facilityType(facility: Facility, locale: FacilityLocale, labels: Messages['nearby']) {
+  if (facility.category === 'pets') return petFacilityType(facility, labels);
+  const subtype = facility.typeName && facilityText(facility.typeName, locale);
+  if (facility.source === 'afcd') {
+    return subtype ? `${labels.countryParkToilet} · ${subtype}` : labels.countryParkToilet;
+  }
+  return subtype || labels.categories[facility.category];
+}
+
 export function facilityFilter(value: unknown): FacilityFilter {
   return facilityCategories.find((category) => category === value) ?? 'all';
 }

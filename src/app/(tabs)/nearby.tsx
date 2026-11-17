@@ -1,5 +1,5 @@
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useNavigation, useRoute, useRouter } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, FlatList, Linking, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import type { Region } from 'react-native-maps';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,8 +8,9 @@ import { facilityVisuals, NearbyFacilitiesMap, type NearbyFacilitiesMapHandle } 
 import { NearbySearchSheet } from '@/components/nearby-search-sheet';
 import { AppText, Icon } from '@/components/ui';
 import { loadFacilityFavorites, useFacilityFavorite } from '@/facility-favorite-hooks';
+import { resolveStableFacilityIdentity } from '@/facility-identity';
 import { showFacilityDirections } from '@/facility-navigation';
-import { facilityCategories, facilityFilter, facilityId, facilityText, facilityTextUsesFallback, indexNearbyFacilities, nearbyFacilities, nearbyFacilitySources, petFacilityType,
+import { facilityCategories, facilityFilter, facilityId, facilityText, facilityTextUsesFallback, facilityType, indexNearbyFacilities, nearbyFacilities, nearbyFacilitySources, petFacilityType,
   type Facility, type FacilityFilter, type FacilityLocale, type NearbyFacility } from '@/facilities';
 import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
@@ -20,6 +21,13 @@ import type { NearbySearchResult } from '@/nearby-place-search';
 import { colors, floatingTab, homeColors, homeLayout, radius, space, touchTarget } from '@/theme';
 
 type SearchCenter = (NearbySearchResult & { point: Coordinates }) | { kind: 'default' | 'device' | 'map'; point: Coordinates };
+type NearbyParams = {
+  category?: string;
+  view?: string;
+  savedFacilitySource?: string;
+  savedFacilityId?: string;
+  savedFacilityRequest?: string;
+};
 const defaultCenter = { kind: 'default', point: nearbyBusLandmarks.central } satisfies SearchCenter;
 const categories = ['all', ...facilityCategories, 'bus'] as const;
 const modes = [{ key: 'map', icon: 'map' }, { key: 'list', icon: 'list.bullet' }] as const;
@@ -32,9 +40,11 @@ export default function NearbyScreen() {
   const { copy, locale } = useLanguage();
   const labels = copy.nearby;
   const router = useRouter();
+  const navigation = useNavigation();
+  const { key: routeKey } = useRoute();
   const { height } = useWindowDimensions();
   const { bottom } = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ category?: string; view?: string }>();
+  const params = useLocalSearchParams<NearbyParams>();
   const category = facilityFilter(params.category);
   const mode = params.view === 'list' ? 'list' : 'map';
   const [committedSearchCenter, setCommittedSearchCenter] = useState<SearchCenter>(defaultCenter);
@@ -47,6 +57,7 @@ export default function NearbyScreen() {
   const [listRevision, setListRevision] = useState(0);
   const locationRequest = useRef<{ controller: AbortController; manual: boolean } | null>(null);
   const triedInitialLocation = useRef(false);
+  const handledSavedRequest = useRef<string>(undefined);
   const mapRef = useRef<NearbyFacilitiesMapHandle | null>(null);
   const visibleRegion = useRef(regionAround(defaultCenter.point));
   const listOffsets = useRef<Partial<Record<FacilityFilter, number>>>({});
@@ -118,7 +129,34 @@ export default function NearbyScreen() {
     }
   }, [confirmCenter, moveCamera]);
 
+  const focusSavedFacility = useCallback(() => {
+    // Focus events can fire before local search params have re-rendered.
+    const latest = navigation.getState()?.routes.find((route) => route.key === routeKey)?.params as NearbyParams | undefined;
+    const token = latest?.savedFacilityRequest;
+    if (typeof token !== 'string' || !token || handledSavedRequest.current === token) return;
+    handledSavedRequest.current = token;
+    const resolved = typeof latest.savedFacilitySource === 'string' && typeof latest.savedFacilityId === 'string'
+      ? resolveStableFacilityIdentity({ source: latest.savedFacilitySource, stableFacilityId: latest.savedFacilityId }) : undefined;
+    const params: NearbyParams = { savedFacilityRequest: undefined, savedFacilitySource: undefined, savedFacilityId: undefined };
+    if (resolved?.status === 'available' && isNearHongKong(resolved.facility.coordinate)) {
+      triedInitialLocation.current = true;
+      cancelLocation();
+      setPicking(false);
+      setLocationIssue(undefined);
+      setSelectedFacilityKey(facilityId(resolved.facility));
+      moveCamera(resolved.facility.coordinate);
+      params.view = 'map';
+      params.category = resolved.facility.category;
+    }
+    navigation.dispatch({ type: 'SET_PARAMS', source: routeKey, payload: { params } });
+  }, [cancelLocation, moveCamera, navigation, routeKey]);
+
+  useEffect(() => {
+    if (params.savedFacilityRequest && navigation.isFocused()) focusSavedFacility();
+  }, [focusSavedFacility, navigation, params.savedFacilityRequest]);
+
   useFocusEffect(useCallback(() => {
+    focusSavedFacility();
     void loadFacilityFavorites();
     if (!triedInitialLocation.current) {
       triedInitialLocation.current = true;
@@ -133,7 +171,7 @@ export default function NearbyScreen() {
       cancelLocation();
       setPicking(false);
     };
-  }, [cancelLocation, requestLocation]));
+  }, [cancelLocation, focusSavedFacility, requestLocation]));
 
   function editSearch() {
     cancelLocation();
@@ -414,15 +452,6 @@ function FacilitySourceInfo() {
 function facilityPlace(facility: Facility, locale: FacilityLocale) {
   return [facility.area ?? facility.district, facility.address]
     .flatMap((value) => value ? [facilityText(value, locale)] : []).filter(Boolean).join(' · ');
-}
-
-function facilityType(facility: Facility, locale: FacilityLocale, labels: Messages['nearby']) {
-  if (facility.category === 'pets') return petFacilityType(facility, labels);
-  const subtype = facility.typeName && facilityText(facility.typeName, locale);
-  if (facility.source === 'afcd') {
-    return subtype ? `${labels.countryParkToilet} · ${subtype}` : labels.countryParkToilet;
-  }
-  return subtype || labels.categories[facility.category];
 }
 
 function facilityDistance(distance: number, labels: Messages['nearbyBus']) {

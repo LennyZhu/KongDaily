@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { execFileSync, spawnSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
 const { mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs');
+const { createRequire } = require('node:module');
 const { tmpdir } = require('node:os');
 const { dirname, join, resolve } = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
@@ -68,10 +69,12 @@ function loadApp(file, { failAfterV8 = false, changeCatalog, registry, beforeQue
   function load(name) {
     if (loaded.has(name)) return loaded.get(name).exports;
     const isNearby = name === 'app/(tabs)/nearby';
-    const filename = join(root, 'src', name + (isNearby ? '.tsx' : '.ts'));
+    const isSaved = name === 'app/(tabs)/saved';
+    const filename = join(root, 'src', name + (isNearby || isSaved ? '.tsx' : '.ts'));
     const module = { exports: {} };
     loaded.set(name, module);
-    const source = readFileSync(filename, 'utf8') + (isNearby ? '\nexport { FacilitySummary, FacilityListRow };' : '');
+    const source = readFileSync(filename, 'utf8') + (isNearby ? '\nexport { FacilitySummary, FacilityListRow };'
+      : isSaved ? '\nexport { SavedBuses, SavedFacilities };' : '');
     const script = ts.transpileModule(source, {
       compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, esModuleInterop: true, jsx: ts.JsxEmit.ReactJSX },
     }).outputText;
@@ -93,6 +96,12 @@ function loadApp(file, { failAfterV8 = false, changeCatalog, registry, beforeQue
 
 function version(db) {
   return db.prepare('PRAGMA user_version').get().user_version;
+}
+
+function elements(node) {
+  if (!node || typeof node !== 'object') return [];
+  if (Array.isArray(node)) return node.flatMap(elements);
+  return [node, ...elements(node.props?.children)];
 }
 
 function seedV7(file) {
@@ -378,7 +387,9 @@ async function testNearbyFavoriteButtons() {
       throw new Error('Initial read interrupted');
     }
     if (sql.includes('INSERT INTO facility_favorites') && ++insertAttempts === 1) await firstWrite;
-    if (failReadback && sql.startsWith('SELECT 1 AS found FROM facility_favorites')) throw new Error('Readback unavailable');
+    if (failReadback && /FROM facility_favorites WHERE source =/.test(sql) && !sql.startsWith('SELECT 1')) {
+      throw new Error('Readback unavailable');
+    }
   } });
 
   const sources = ['fehd', 'afcd', 'lcsd-parks', 'lcsd-pet-gardens', 'lcsd-inclusive-pet-parks'];
@@ -394,11 +405,6 @@ async function testNearbyFavoriteButtons() {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = () => { throw new Error('Network disabled during favorite tests'); };
 
-  function elements(node) {
-    if (!node || typeof node !== 'object') return [];
-    if (Array.isArray(node)) return node.flatMap(elements);
-    return [node, ...elements(node.props?.children)];
-  }
   function row(facility, expanded) {
     return FacilityListRow({ item: { facility, distance: 10 }, expanded, onPress: closeOrExpand });
   }
@@ -540,6 +546,282 @@ async function testNearbyFavoriteButtons() {
   }
 }
 
-test().then(testNearbyFavoriteButtons).then(() => console.log('PASS: registry, SQLite v8, bus regression and nearby favorite controls'))
+async function testSavedFacilityIntegration() {
+  const { TabRouter } = require('expo-router/build/react-navigation/routers/TabRouter');
+  const parsePathFile = require.resolve('expo-router/build/fork/getStateFromPath');
+  const requireFromRouter = createRequire(parsePathFile);
+  const pathParser = {};
+  // Load Expo Router's actual parser without importing the native rendering entry point in Node.
+  new Function('exports', 'require', readFileSync(parsePathFile, 'utf8'))(pathParser, (id) =>
+    id === '../react-navigation/native' ? { validatePathConfig: requireFromRouter('./validatePathConfig').default } : requireFromRouter(id));
+  const { resolveHref } = require('expo-router/build/link/href');
+  const file = join(scratch, 'saved-facilities.db');
+  const router = TabRouter({});
+  const routeConfig = { routeNames: ['index', 'nearby', 'explore', 'saved'], routeParamList: {}, routeGetIdList: {} };
+  let navigationState = router.getInitialState(routeConfig);
+  const nearbyKey = navigationState.routes.find(({ name }) => name === 'nearby').key;
+  const nearbyRoute = () => navigationState.routes.find(({ key }) => key === nearbyKey);
+  const actions = [];
+  let focusEffect;
+  let effects;
+  let hookSlots;
+  let cursor;
+  let locale = 'zh-HK';
+  let completeLocation;
+  let locationSignal;
+  let locationCalls = 0;
+  const slots = { nearby: [], saved: [] };
+  const navigation = {
+    isFocused: () => navigationState.routes[navigationState.index].key === nearbyKey,
+    getState: () => navigationState,
+    dispatch(action) { navigationState = router.getStateForAction(navigationState, action, routeConfig); },
+  };
+  const navigate = (href) => {
+    const parsed = pathParser.getStateFromPath(resolveHref(href), {
+      screens: { '(tabs)': { path: '(tabs)', screens: { nearby: 'nearby' } } },
+    });
+    const { name, params } = parsed.routes[0].state.routes[0];
+    actions.push({ name, params });
+    navigation.dispatch({ type: 'NAVIGATE', payload: { name, params } });
+  };
+  const stubs = {
+    react: {
+      useCallback: (fn) => fn,
+      useMemo: (fn) => fn(),
+      useEffect: (fn) => effects.push(fn),
+      useRef(initial) { const index = cursor++; return hookSlots[index] ??= { current: initial }; },
+      useState(initial) {
+        const index = cursor++;
+        if (!(index in hookSlots)) hookSlots[index] = typeof initial === 'function' ? initial() : initial;
+        const state = hookSlots;
+        return [state[index], (next) => { state[index] = typeof next === 'function' ? next(state[index]) : next; }];
+      },
+      useSyncExternalStore: (_subscribe, snapshot) => snapshot(),
+    },
+    'expo-router': {
+      Link: 'Link',
+      useRouter: () => ({ navigate }),
+      useLocalSearchParams: () => navigationState.routes[navigationState.index].params ?? {},
+      useRoute: nearbyRoute,
+      useNavigation: () => navigation,
+      useFocusEffect: (fn) => { focusEffect = fn; },
+    },
+    'react-native': {
+      View: 'View', ScrollView: 'ScrollView', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator',
+      StyleSheet: { create: (styles) => styles, hairlineWidth: 1 },
+      AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
+      useWindowDimensions: () => ({ width: 320, height: 710, fontScale: 2 }),
+    },
+    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ bottom: 34 }) },
+    '@/components/ui': {
+      AppText: 'AppText', Icon: 'Icon', EmptyState: 'EmptyState', Filters: 'Filters', PageHeading: 'PageHeading', Screen: 'Screen',
+    },
+    '@/components/bus-ui': { BusAction: 'BusAction' },
+    '@/components/saved-bus-ui': { FavoriteAction: 'FavoriteAction', FavoriteBusRow: 'FavoriteBusRow', savedBusStyles: { card: {} } },
+    '@/components/nearby-facilities-map': {
+      NearbyFacilitiesMap: 'NearbyFacilitiesMap',
+      facilityVisuals: { toilets: { icon: 'toilet' }, pets: { icon: 'pawprint' }, parks: { icon: 'tree' } },
+    },
+    '@/components/nearby-search-sheet': {},
+    '@/nearby-bus-location': {
+      locateNearbyBusStops(signal) {
+        locationCalls += 1;
+        locationSignal = signal;
+        return new Promise((resolve) => { completeLocation = resolve; });
+      },
+    },
+    '@/facility-navigation': {},
+    '@/bus-favorite-hooks': {
+      useBusFavorites: () => ({ status: 'ready', items: [{
+        id: 'bus', pinOrder: 1, target: { source: 'nlb', number: 'B2' },
+      }] }),
+      useUnavailableFavorites: () => new Set(),
+    },
+    '@/language': { useLanguage: () => ({ locale, copy: app.load('i18n').messages[locale] }) },
+  };
+  const app = loadApp(file, { stubs });
+  const { nearbyFacilities, facilityId, facilityText, visibleFacilityMarkers } = app.load('facilities');
+  const { resolveFacilityIdentity } = app.load('facility-identity');
+  const { loadFacilityFavorites, useFacilityFavorite } = app.load('facility-favorite-hooks');
+  const { SavedBuses, SavedFacilities, default: SavedScreen } = app.load('app/(tabs)/saved');
+  const NearbyScreen = app.load('app/(tabs)/nearby').default;
+  const facilities = [
+    nearbyFacilities.find((facility) => facility.source === 'fehd' && facility.name['zh-HK'] && facility.name.en),
+    ...[['afcd', 'ABD/TF/001'], ['lcsd-parks', 'park-035'], ['lcsd-pet-gardens', 'pet-garden-028'],
+      ['lcsd-inclusive-pet-parks', 'inclusive-pet-001']].map(([source, id]) =>
+      nearbyFacilities.find((facility) => facility.source === source && facility.officialId === id)),
+  ];
+  const [toilet, afcd, park, garden, shared] = facilities;
+  const copy = () => app.load('i18n').messages[locale];
+  const effectsOf = (screen, component, runEffects = false) => {
+    hookSlots = slots[screen];
+    cursor = 0;
+    effects = [];
+    const tree = elements(component());
+    if (runEffects) for (const effect of effects) effect();
+    return tree;
+  };
+  const saved = (screen = SavedFacilities) => effectsOf('saved', screen);
+  const nearby = () => effectsOf('nearby', NearbyScreen, true);
+  const map = (tree) => tree.find(({ type }) => type === 'NearbyFacilitiesMap')?.props;
+  const entries = (tree) => tree.filter(({ props }) => props?.accessibilityHint === copy().saved.facilities.locateHint);
+  const name = (facility) => facilityText(facility.name, locale);
+  const entry = (facility) => entries(saved()).find((row) =>
+    elements(row).some(({ type, props }) => type === 'AppText' && props.children === name(facility))
+    && elements(row).some(({ type, props }) => type === 'Icon' && props.name === stubs['@/components/nearby-facilities-map'].facilityVisuals[facility.category].icon));
+  const remove = (tree, displayName) => tree.find(({ props }) => props?.accessibilityLabel === copy().saved.facilities.remove(displayName));
+  const selectTab = (tab, params) => navigation.dispatch({ type: 'NAVIGATE', payload: { name: tab, params } });
+  const tick = () => new Promise(setImmediate);
+
+  try {
+    selectTab('saved');
+    assert.ok(saved().some(({ type, props }) => type === 'EmptyState' && props.title === copy().nearby.facilityFavorites.loading));
+    await loadFacilityFavorites();
+    assert.ok(saved().some(({ type, props }) => type === 'EmptyState' && props.title === copy().saved.facilities.emptyTitle));
+    const all = saved(SavedScreen);
+    assert.ok(all.findIndex(({ type }) => type === SavedBuses) < all.findIndex(({ type }) => type === SavedFacilities));
+    assert.ok(saved(() => SavedBuses({ emptyTitle: '' })).some(({ type, props }) => type === 'FavoriteBusRow' && props.favorite.pinOrder === 1));
+    selectTab('saved', { category: 'buses' });
+    assert.equal(saved(SavedScreen).some(({ type }) => type === SavedFacilities), false);
+    selectTab('saved', { category: 'places' });
+    assert.equal(saved(SavedScreen).some(({ type }) => type === SavedBuses), false);
+
+    const clock = Date.now;
+    let time = clock();
+    try {
+      Date.now = () => ++time;
+      for (const facility of facilities) await useFacilityFavorite(facility).onPress();
+    } finally { Date.now = clock; }
+    assert.equal(entries(saved()).length, 5);
+    assert.deepEqual(saved().filter(({ type, props }) => type === 'AppText' && props.variant === 'homeCardTitle')
+      .map(({ props }) => props.children), [...facilities].reverse().map(name));
+    locale = 'en';
+    assert.ok(entry(park) && entry(garden) && entry(shared));
+    assert.equal(entry(afcd).props.accessibilityHint, 'Show this facility on the Nearby map');
+    assert.ok(saved().some(({ type, props }) => type === 'AppText' && props.children === name(toilet)));
+
+    selectTab('nearby', { category: 'all', view: 'map' });
+    nearby();
+    const cleanup = focusEffect();
+    const devicePoint = { latitude: 22.32, longitude: 114.16 };
+    completeLocation({ kind: 'position', point: devicePoint });
+    await tick();
+    const original = map(nearby());
+    assert.deepEqual(original.devicePoint, devicePoint);
+    original.onAreaBrowsed();
+    void original.onLocate();
+    const oldSignal = locationSignal;
+
+    // Switch from a different category and list mode before the map imperative handle exists.
+    selectTab('nearby', { category: 'pets', view: 'list' });
+    nearby();
+    selectTab('saved');
+    entry(afcd).props.onPress();
+    assert.equal(actions.at(-1).params.savedFacilityId, resolveFacilityIdentity(afcd).identity.stableFacilityId);
+    assert.equal(nearbyRoute().key, nearbyKey);
+    nearby();
+    const focused = map(nearby());
+    assert.equal(focused.selectedId, facilityId(afcd));
+    assert.equal(focused.initialRegion.latitude, afcd.coordinate.latitude);
+    assert.equal(focused.initialRegion.longitude, afcd.coordinate.longitude);
+    assert.equal(nearbyRoute().params.category, 'toilets');
+    assert.equal(nearbyRoute().params.savedFacilityRequest, undefined);
+    assert.equal(focused.areaPending, false);
+    assert.deepEqual(focused.devicePoint, devicePoint);
+    assert.equal(oldSignal.aborted, true);
+    completeLocation({ kind: 'position', point: { latitude: 22.27, longitude: 114.2 } });
+    await tick();
+    assert.equal(map(nearby()).selectedId, facilityId(afcd));
+    assert.deepEqual(map(nearby()).devicePoint, devicePoint);
+    assert.equal(map(nearby()).items.find(({ id }) => id === facilityId(afcd)).distance,
+      original.items.find(({ id }) => id === facilityId(afcd)).distance);
+    assert.equal(visibleFacilityMarkers(focused.items, focused.initialRegion, { width: 320, height: 340 }, focused.selectedId)
+      .some((marker) => marker.kind === 'facility' && marker.item.id === focused.selectedId), true);
+    assert.equal(useFacilityFavorite(afcd).saved, true);
+    assert.equal(locationCalls, 2);
+
+    // Two official facilities share a Chinese name but remain different categories and identities.
+    assert.equal(park.name['zh-HK'], garden.name['zh-HK']);
+    selectTab('saved');
+    const choosePark = entry(park).props.onPress;
+    const chooseGarden = entry(garden).props.onPress;
+    choosePark();
+    chooseGarden();
+    nearby();
+    assert.equal(map(nearby()).selectedId, facilityId(garden));
+    const token = actions.at(-1).params.savedFacilityRequest;
+    map(nearby()).onDismiss();
+    nearby();
+    focusEffect()();
+    assert.equal(map(nearby()).selectedId, undefined);
+    chooseGarden();
+    assert.notEqual(actions.at(-1).params.savedFacilityRequest, token);
+    nearby();
+    assert.equal(map(nearby()).selectedId, facilityId(garden));
+
+    // A saved request may arrive while another tab is taking focus. Ignore it offscreen
+    // and handle the newest request on return, even before local params re-render.
+    choosePark();
+    selectTab('explore');
+    nearby();
+    assert.equal(nearbyRoute().params.savedFacilityRequest, actions.at(-1).params.savedFacilityRequest);
+    chooseGarden();
+    focusEffect()();
+    assert.equal(map(nearby()).selectedId, facilityId(garden));
+    navigate({ pathname: '/(tabs)/nearby', params: {
+      view: 'map', category: 'pets', savedFacilitySource: afcd.source, savedFacilityId: afcd.officialId, savedFacilityRequest: 'bad-id',
+    } });
+    assert.equal(actions.at(-1).params.savedFacilityId, 'ABD/TF/001');
+    nearby();
+    assert.equal(map(nearby()).selectedId, facilityId(garden));
+    assert.equal(nearbyRoute().params.savedFacilityRequest, undefined);
+    cleanup();
+
+    selectTab('saved');
+    const db = new DatabaseSync(file);
+    const routeChanges = actions.length;
+    const pause = db.prepare(`CREATE TRIGGER reject_saved_remove BEFORE DELETE ON facility_favorites
+      BEGIN SELECT RAISE(ABORT,'simulated deletion failure'); END`);
+    pause.run();
+    remove(saved(), name(toilet)).props.onPress();
+    await tick();
+    assert.ok(saved().some(({ props }) => props?.accessibilityRole === 'alert'));
+    assert.ok(entry(toilet));
+    assert.equal(useFacilityFavorite(toilet).saved, true);
+    db.exec('DROP TRIGGER reject_saved_remove');
+    db.close();
+    const removeToilet = remove(saved(), name(toilet)).props.onPress;
+    removeToilet();
+    removeToilet();
+    await tick();
+    assert.equal(entry(toilet), undefined);
+    assert.equal(useFacilityFavorite(toilet).saved, false);
+    assert.equal(actions.length, routeChanges);
+    app.close();
+
+    const reopenForMissing = loadApp(file, { stubs, changeCatalog: (items) => items.flatMap((facility) => {
+      if (facilityId(facility) === facilityId(afcd)) return [];
+      return facilityId(facility) === facilityId(garden) ? [facility, facility] : [facility];
+    }) });
+    const reopenedHook = reopenForMissing.load('facility-favorite-hooks');
+    await reopenedHook.loadFacilityFavorites();
+    const reopened = saved(reopenForMissing.load('app/(tabs)/saved').SavedFacilities);
+    assert.equal(entries(reopened).length, 2);
+    for (const [facility, status] of [[afcd, copy().saved.facilities.unavailable], [garden, copy().saved.facilities.needsReview]]) {
+      assert.ok(reopened.some(({ type, props }) => type === 'AppText' && props.children === name(facility)));
+      assert.ok(reopened.some(({ type, props }) => type === 'AppText' && props.children === status));
+      assert.ok(remove(reopened, name(facility)));
+    }
+    remove(reopened, name(afcd)).props.onPress();
+    await tick();
+    assert.equal(reopenedHook.useFacilityFavorites().items.length, 3);
+    reopenForMissing.close();
+  } finally {
+    app.close();
+  }
+}
+
+test().then(testNearbyFavoriteButtons).then(testSavedFacilityIntegration)
+  .then(() => console.log('PASS: registry, SQLite v8, bus regression and facility favorites across Nearby and Saved'))
   .catch((error) => { console.error(error); process.exitCode = 1; })
   .finally(() => rmSync(scratch, { recursive: true, force: true }));

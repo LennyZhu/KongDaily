@@ -1,12 +1,16 @@
 import { Link, useLocalSearchParams, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { changeBusFavorites, loadBusFavorites, useBusFavorites, useUnavailableFavorites } from '@/bus-favorite-hooks';
 import { homeBusLimit, pinnedBuses, type FavoriteChange } from '@/bus-favorites';
 import { BusAction } from '@/components/bus-ui';
+import { facilityVisuals } from '@/components/nearby-facilities-map';
 import { FavoriteAction, FavoriteBusRow, savedBusStyles } from '@/components/saved-bus-ui';
 import { AppText, EmptyState, Filters, Icon, PageHeading, Screen } from '@/components/ui';
+import { loadFacilityFavorites, removeSavedFacility, useFacilityFavorites } from '@/facility-favorite-hooks';
+import { resolveFacilityFavorite } from '@/facility-favorites';
+import { facilityText, facilityType } from '@/facilities';
 import { useLanguage } from '@/language';
 import { colors, radius, space, touchTarget } from '@/theme';
 
@@ -37,8 +41,8 @@ export default function SavedScreen() {
         selected={category}
         onSelect={(key) => router.setParams({ category: key })}
       />
-      {category === 'places' ? <EmptyState icon="bookmark" title={copy.saved.empty.places} />
-        : <SavedBuses emptyTitle={copy.saved.empty[category]} />}
+      {category !== 'places' && <SavedBuses emptyTitle={copy.saved.empty[category]} />}
+      {category !== 'buses' && <SavedFacilities />}
     </Screen>
   );
 }
@@ -112,6 +116,94 @@ function SavedBuses({ emptyTitle }: { emptyTitle: string }) {
   );
 }
 
+function SavedFacilities() {
+  const { copy, locale } = useLanguage();
+  const router = useRouter();
+  const requestNumber = useRef(0);
+  const { status, items } = useFacilityFavorites();
+  const labels = copy.saved.facilities;
+  const actions = copy.nearby.facilityFavorites;
+
+  useEffect(() => { void loadFacilityFavorites(); }, []);
+
+  return (
+    <View style={styles.list}>
+      <AppText variant="section" accessibilityRole="header">{labels.title}</AppText>
+      {status === 'loading' && <EmptyState icon="clock" title={actions.loading} />}
+      {status === 'error' && (
+        <>
+          <EmptyState icon="exclamationmark.circle" title={labels.loadError} />
+          <BusAction label={actions.retry} onPress={() => void loadFacilityFavorites()} />
+        </>
+      )}
+      {status === 'ready' && items.length === 0 && (
+        <EmptyState icon="bookmark" title={labels.emptyTitle} detail={labels.emptyDetail} />
+      )}
+      {items.map(({ key, favorite, pending, issue }) => {
+        const resolved = resolveFacilityFavorite(favorite);
+        const facility = resolved.status === 'available' ? resolved.facility : undefined;
+        const category = facility?.category ?? favorite.categorySnapshot;
+        const name = facilityText(facility?.name ?? favorite.nameSnapshot, locale);
+        const type = facility ? facilityType(facility, locale, copy.nearby) : copy.nearby.categories[category];
+        const location = facility?.area ?? facility?.district ?? facility?.address;
+        const visual = facilityVisuals[category];
+        const content = (
+          <>
+            <View style={[styles.facilityBadge, { backgroundColor: visual.surface }]}>
+              <Icon name={visual.icon} color={visual.color} size={18} />
+            </View>
+            <View style={styles.facilityCopy}>
+              <AppText variant="homeCardTitle">{name}</AppText>
+              <AppText variant="caption" tone="muted" numberOfLines={location ? 2 : undefined}>
+                {location ? `${type} · ${facilityText(location, locale)}` : type}
+              </AppText>
+              {resolved.status !== 'available' && (
+                <AppText variant="detail" tone="muted">
+                  {resolved.status === 'needs_review' ? labels.needsReview : labels.unavailable}
+                </AppText>
+              )}
+            </View>
+          </>
+        );
+        return (
+          <View key={key} style={savedBusStyles.card}>
+            <View style={styles.facilityLine}>
+              {facility && issue !== 'read' ? (
+                <Pressable accessibilityRole="button" accessibilityHint={labels.locateHint} disabled={pending}
+                  style={({ pressed }) => [styles.facilityRow, pressed && styles.pressed]}
+                  onPress={() => router.navigate({
+                    pathname: '/(tabs)/nearby',
+                    params: {
+                      view: 'map', category: facility.category,
+                      savedFacilitySource: favorite.source, savedFacilityId: favorite.stableFacilityId,
+                      savedFacilityRequest: `${Date.now()}-${++requestNumber.current}`,
+                    },
+                  })}>
+                  {content}
+                  <Icon name="chevron.right" color={colors.muted} size={12} />
+                </Pressable>
+              ) : <View style={styles.facilityRow}>{content}</View>}
+              <Pressable accessibilityRole="button"
+                accessibilityLabel={issue === 'read' ? actions.retry : labels.remove(name)}
+                accessibilityState={{ busy: pending, disabled: pending }}
+                disabled={pending} onPress={() => void removeSavedFacility(favorite)}
+                style={({ pressed }) => [styles.facilityAction, pressed && styles.pressed]}>
+                {pending ? <ActivityIndicator color={colors.primary} size="small" />
+                  : <Icon name={issue === 'read' ? 'arrow.clockwise' : 'bookmark.slash'} size={18} />}
+              </Pressable>
+            </View>
+            {!pending && (issue === 'read' || issue === 'write') && (
+              <AppText variant="detail" tone="error" accessibilityRole="alert" style={styles.facilityIssue}>
+                {actions[issue]}
+              </AppText>
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   heading: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, alignItems: 'center', justifyContent: 'space-between' },
   settings: {
@@ -134,4 +226,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, padding: space.md,
     borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border,
   },
+  facilityLine: { flexDirection: 'row', alignItems: 'center', paddingRight: space.sm },
+  facilityRow: {
+    flex: 1, minWidth: 0, minHeight: touchTarget, flexDirection: 'row', alignItems: 'center',
+    padding: space.md, gap: space.sm,
+  },
+  facilityBadge: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: radius.control },
+  facilityCopy: { flex: 1, minWidth: 0, gap: space.xs },
+  facilityAction: {
+    width: touchTarget, height: touchTarget, alignItems: 'center', justifyContent: 'center',
+    borderRadius: radius.pill, backgroundColor: colors.tint,
+  },
+  facilityIssue: { paddingHorizontal: space.md, paddingBottom: space.md },
 });

@@ -468,7 +468,16 @@ const zhHK = {
     empty: {
       all: '暫無收藏',
       buses: '暫無收藏的巴士',
-      places: '暫無收藏的地點',
+    },
+    facilities: {
+      title: '收藏設施',
+      emptyTitle: '尚未收藏設施',
+      emptyDetail: '可在「附近」收藏常去的公廁、公園及寵物公園。',
+      loadError: '未能讀取收藏設施',
+      needsReview: '設施資料待核實',
+      unavailable: '此收藏暫時無法定位',
+      locateHint: '在附近地圖顯示此設施',
+      remove: (name: string) => `取消收藏：${name}`,
     },
   },
   search: {
@@ -954,7 +963,16 @@ const en: typeof zhHK = {
     empty: {
       all: 'Nothing saved yet',
       buses: 'No saved buses yet',
-      places: 'No saved places yet',
+    },
+    facilities: {
+      title: 'Saved facilities',
+      emptyTitle: 'No saved facilities yet',
+      emptyDetail: 'Save frequently visited facilities from Nearby.',
+      loadError: 'Couldn’t load saved facilities',
+      needsReview: 'Facility details need verification',
+      unavailable: 'This saved facility cannot be located right now',
+      locateHint: 'Show this facility on the Nearby map',
+      remove: (name: string) => `Remove ${name} from favorites`,
     },
   },
   search: {
