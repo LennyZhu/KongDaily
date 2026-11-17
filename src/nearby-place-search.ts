@@ -12,7 +12,7 @@ const namesOf = (field?: Facility['name']) => [field?.['zh-HK'], field?.en]
   .flatMap((value) => value ? [searchable(value)] : []);
 const facilities = nearbyFacilities.map((facility) => ({
   facility,
-  names: namesOf(facility.name),
+  names: [facility.name, facility.aliases].flatMap(namesOf),
   details: [facility.district, facility.area, facility.address].flatMap(namesOf),
 }));
 const landmarkOrder: NearbyLandmark[] = ['central', ...(Object.keys(nearbyBusLandmarks) as NearbyLandmark[])

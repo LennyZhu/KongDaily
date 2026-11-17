@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { facilityVisuals } from '@/components/nearby-facilities-map';
 import { AppText, Icon, type IconName } from '@/components/ui';
-import { facilityId, facilityText } from '@/facilities';
+import { facilityId, facilityText, petFacilityType } from '@/facilities';
 import { useLanguage } from '@/language';
 import { canSearchLandsd, LandsdSearchError, normalizePlaceQuery, placeSearchDebounceMs, placeSearchMaxLength,
   searchLandsd, type LandsdSearchIssue, type LandsdSearchResponse } from '@/landsd-location-search';
@@ -110,7 +110,7 @@ export function NearbySearchSheet({ onChoose, onClose, onEdit, onLocate, locatin
               {local.facilities.map((facility) => (
                 <SearchRow key={facilityId(facility)} icon={facilityVisuals[facility.category].icon} title={facilityText(facility.name, locale)}
                   detail={addressLine(facility.area ?? facility.district, facility.address)}
-                  source={facility.category === 'pets' ? labels.petGardenType
+                  source={facility.category === 'pets' ? petFacilityType(facility, labels)
                     : facility.sourceName ? facilityText(facility.sourceName, locale) : undefined}
                   onPress={() => choose({ kind: 'facility', facility })} />
               ))}

@@ -4,7 +4,7 @@ import { ActivityIndicator, AppState, Pressable, StyleSheet, View, type GestureR
 import MapView, { Marker, type Region } from 'react-native-maps';
 
 import { AppText, Icon, type IconName } from '@/components/ui';
-import { facilityText, hitsFacilityMarker, visibleFacilityMarkers, type FacilityCategory, type NearbyFacility } from '@/facilities';
+import { facilityText, hitsFacilityMarker, petFacilityType, visibleFacilityMarkers, type FacilityCategory, type NearbyFacility } from '@/facilities';
 import { useLanguage } from '@/language';
 import type { Coordinates } from '@/nearby-bus-data';
 import { createNearbyMapMotion } from '@/nearby-map-motion';
@@ -190,7 +190,7 @@ export function NearbyFacilitiesMap({ mapRef, initialRegion, devicePoint, placeP
                 coordinate={facility.coordinate}
                 accessibilityRole="button"
                 accessibilityLabel={marker.count > 1 ? labels.samePointMarker(name, marker.count)
-                  : `${name} · ${facility.category === 'pets' ? labels.petGardenType : labels.categories[facility.category]}`}
+                  : `${name} · ${facility.category === 'pets' ? petFacilityType(facility, labels) : labels.categories[facility.category]}`}
                 accessibilityState={{ selected }}
                 zIndex={selected ? 1 : 0}
                 stopPropagation

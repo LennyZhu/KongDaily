@@ -8,7 +8,7 @@ import { facilityVisuals, NearbyFacilitiesMap, type NearbyFacilitiesMapHandle } 
 import { NearbySearchSheet } from '@/components/nearby-search-sheet';
 import { AppText, Icon } from '@/components/ui';
 import { showFacilityDirections } from '@/facility-navigation';
-import { facilityCategories, facilityFilter, facilityId, facilityText, facilityTextUsesFallback, indexNearbyFacilities, nearbyFacilities, nearbyFacilitySources,
+import { facilityCategories, facilityFilter, facilityId, facilityText, facilityTextUsesFallback, indexNearbyFacilities, nearbyFacilities, nearbyFacilitySources, petFacilityType,
   type Facility, type FacilityFilter, type FacilityLocale, type NearbyFacility } from '@/facilities';
 import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
@@ -319,7 +319,7 @@ function NearbyHeading() {
 function facilityEmptyMessage(category: FacilityFilter, labels: Messages['nearby']) {
   if (category === 'toilets') return labels.noToilets;
   if (category === 'parks') return labels.noParks;
-  if (category === 'pets') return labels.noPetGardens;
+  if (category === 'pets') return labels.noPetParks;
   return nearbyFacilities.length ? labels.noMatches : labels.empty;
 }
 
@@ -364,19 +364,22 @@ function FacilitySourceInfo() {
   const labels = copy.nearby;
 
   function showSource() {
+    const inclusiveSource = nearbyFacilitySources.find((dataset) => 'rulesUrls' in dataset);
     const datasets = nearbyFacilitySources.map((dataset) => {
       const lines = [labels.source(facilityText(dataset.sourceName, locale)), labels.snapshotDate(dataset.snapshotDate)];
       if ('fetchedAt' in dataset) {
         const acquired = new Intl.DateTimeFormat(locale, {
           dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Hong_Kong',
         }).format(new Date(dataset.fetchedAt));
-        const coverage = dataset.category === 'pets' ? labels.petGardenCoverage : labels.parkCoverage;
+        const coverage = dataset.source === 'lcsd-inclusive-pet-parks' ? labels.inclusivePetParkCoverage
+          : dataset.category === 'pets' ? labels.petGardenCoverage : labels.parkCoverage;
         lines.push(labels.revisionDate(dataset.revisionDate), labels.acquiredAt(acquired), coverage(dataset.recordCount));
       }
       return lines.join('\n');
     });
     const details = [
-      ...datasets, labels.sourceNote, labels.navigation.coordinateNote, labels.navigation.parkCoordinateNote, labels.csdiCredit,
+      ...datasets, labels.inclusivePetParkRules, labels.sourceNote, labels.navigation.coordinateNote,
+      labels.navigation.parkCoordinateNote, labels.navigation.petGardenCoordinateNote, labels.csdiCredit,
       labels.placeSearch.credit,
     ];
     function openSource(url: string) {
@@ -387,9 +390,11 @@ function FacilitySourceInfo() {
     Alert.alert(labels.sourceInformation, details.join('\n\n'), [
       ...nearbyFacilitySources.map(({ source, sourceUrl }) => ({
         text: source === 'lcsd-pet-gardens' ? labels.openPetGardenSource
+          : source === 'lcsd-inclusive-pet-parks' ? labels.openInclusivePetParkSource
           : labels.openOfficialSource(source === 'lcsd-parks' ? 'LCSD' : source.toUpperCase()),
         onPress: () => openSource(sourceUrl),
       })),
+      ...(inclusiveSource ? [{ text: labels.openInclusivePetParkRules, onPress: () => openSource(inclusiveSource.rulesUrls[locale]) }] : []),
       { text: labels.csdiTerms, onPress: () => openSource('https://portal.csdi.gov.hk/csdi-webpage/doc/TNC') },
       { text: labels.close, style: 'cancel' },
     ]);
@@ -409,7 +414,7 @@ function facilityPlace(facility: Facility, locale: FacilityLocale) {
 }
 
 function facilityType(facility: Facility, locale: FacilityLocale, labels: Messages['nearby']) {
-  if (facility.category === 'pets') return labels.petGardenType;
+  if (facility.category === 'pets') return petFacilityType(facility, labels);
   const subtype = facility.typeName && facilityText(facility.typeName, locale);
   if (facility.source === 'afcd') {
     return subtype ? `${labels.countryParkToilet} · ${subtype}` : labels.countryParkToilet;
@@ -426,6 +431,21 @@ function PetGardenTypeBadge({ label }: { label: string }) {
     <View style={styles.petGardenType}>
       <AppText variant="caption" tone="primary">{label}</AppText>
     </View>
+  );
+}
+
+function SharedPetRules({ access, expanded = false }: {
+  access: NonNullable<Facility['petAccess']>; expanded?: boolean;
+}) {
+  const { copy: { nearby: labels }, locale } = useLanguage();
+  const terms = [access.leashRequired && labels.dogsLeashed, labels.petAccessScopes[access.scope]].filter(Boolean);
+  return (
+    <>
+      <AppText variant="caption" tone="primary">{terms.join(' · ')}</AppText>
+      {expanded && access.scope === 'exclusions' && (
+        <AppText variant="detail" tone="muted">{facilityText(access.scopeText, locale)}</AppText>
+      )}
+    </>
   );
 }
 
@@ -471,6 +491,7 @@ function FacilityListRow({ item: { facility, distance }, expanded, onPress }: {
           </View>
           {place !== '' && <AppText variant="detail" tone="muted" numberOfLines={expanded ? undefined : 2}>{place}</AppText>}
           {isPetGarden && <PetGardenTypeBadge label={type} />}
+          {!expanded && facility.petAccess && <SharedPetRules access={facility.petAccess} />}
           <AppText variant="caption" tone="muted">{caption}</AppText>
           {!expanded && facility.serviceNotice && <FacilityServiceNotice />}
         </View>
@@ -491,8 +512,9 @@ function FacilityDirections({ facility }: { facility: Facility }) {
   const labels = copy.nearby.navigation;
   const isOfficialToilet = facility.category === 'toilets' && (facility.source === 'fehd' || facility.source === 'afcd');
   const isLcsdPark = facility.category === 'parks' && facility.source === 'lcsd-parks';
-  const isLcsdPetGarden = facility.category === 'pets' && facility.source === 'lcsd-pet-gardens';
-  if (!isOfficialToilet && !isLcsdPark && !isLcsdPetGarden) return null;
+  const isLcsdPetFacility = facility.category === 'pets'
+    && (facility.source === 'lcsd-pet-gardens' || facility.source === 'lcsd-inclusive-pet-parks');
+  if (!isOfficialToilet && !isLcsdPark && !isLcsdPetFacility) return null;
 
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={labels.directions}
@@ -541,7 +563,8 @@ function FacilityDetails({ facility, distance, type, usesFallback }: {
             : (facility.category === 'parks' || isPetGarden) && <AppText variant="detail" tone="muted">{labels.parkHoursUnavailable}</AppText>}
           {showFullDetails && details && <AppText variant="detail" tone="muted">{labels.officialDetails(details)}</AppText>}
           {showFullDetails && phone && <AppText variant="detail" tone="muted">{labels.venueEnquiries(phone)}</AppText>}
-          {isPetGarden && <AppText variant="caption" tone="muted">{labels.petGardenRules}</AppText>}
+          {facility.petAccess ? <SharedPetRules access={facility.petAccess} expanded={showFullDetails} />
+            : isPetGarden && <AppText variant="caption" tone="muted">{labels.petGardenRules}</AppText>}
           {usesFallback && <AppText variant="caption" tone="muted">{labels.originalLanguage}</AppText>}
         </View>
         <FacilityDirections facility={facility} />

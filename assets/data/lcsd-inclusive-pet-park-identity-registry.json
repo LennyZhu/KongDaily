@@ -1,0 +1,3042 @@
+{
+  "schemaVersion": 1,
+  "source": "lcsd-inclusive-pet-parks",
+  "layer": "IPPET",
+  "description": "Permanent KongDaily identifiers for reviewed LCSD inclusive pet venues. Re-review identity, scope, hours and site changes before repinning.",
+  "sourceName": {
+    "zh-HK": "康樂及文化事務署",
+    "en": "Leisure and Cultural Services Department"
+  },
+  "attribution": {
+    "zh-HK": "資料來源：香港特別行政區政府、康樂及文化事務署及空間數據共享平台（CSDI Portal）。資料知識產權由政府及相關機構擁有。",
+    "en": "Source: Hong Kong SAR Government, Leisure and Cultural Services Department and CSDI Portal. The Government and relevant organisations own the intellectual property rights in the data."
+  },
+  "sourceEvidence": {
+    "datasetUrl": "https://portal.csdi.gov.hk/csdi-webpage/dataset/lcsd_rcd_1670384557490_22821",
+    "metadataUrl": "https://portal.csdi.gov.hk/csdi-webpage/metadata/lcsd_rcd_1670384557490_22821/html",
+    "downloadUrl": "https://portal.csdi.gov.hk/csdi-webpage/file-api?dataset_id=lcsd_rcd_1670384557490_22821&format=geojson&layer_name=IPPET",
+    "coordinateCheckUrl": "https://portal.csdi.gov.hk/server/rest/services/common/lcsd_rcd_1670384557490_22821/FeatureServer/0/query?where=1%3D1&outFields=OBJECTID%2CNameTC%2CNameEN&outSR=4326&orderByFields=OBJECTID&f=json",
+    "termsUrl": "https://portal.csdi.gov.hk/csdi-webpage/doc/TNC",
+    "openDataUrl": "https://data.gov.hk/en-data/dataset/hk-lcsd-facility-facility-ipfp",
+    "legacyUrl": "https://www.lcsd.gov.hk/datagovhk/facility/facility-ipfp.json",
+    "dictionaryUrl": "https://www.lcsd.gov.hk/datagovhk/facility/facility-ipfp_data_dictionary.pdf",
+    "archivesUrl": "https://portal.csdi.gov.hk/csdi-webpage/archivedDatasetFileListPage/lcsd_rcd_1670384557490_22821",
+    "listingUrls": {
+      "zh-HK": "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165",
+      "en": "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165"
+    },
+    "rulesUrls": {
+      "zh-HK": "https://www2.lcsd.gov.hk/tc/facilities/otherinfo/petpark.html",
+      "en": "https://www.lcsd.gov.hk/en/facilities/otherinfo/petpark.html"
+    },
+    "annexUrl": "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf",
+    "wholeVenueEvidenceUrl": "https://www.info.gov.hk/gia/general/201901/23/P2019012300381.htm",
+    "wholeVenueEvidenceEnglishUrl": "https://www.info.gov.hk/gia/general/201901/23/P2019012300383p.htm",
+    "checksums": {
+      "inclusive.json": "d274caa71cc7ac2181012f57a83029e77617819ce02658ae028daa8046c549e1",
+      "inclusive-rest4326.json": "bc78bd8380fc58f7704511a45f1ef81c3caf0012cfce8c8061f590f693e45483",
+      "inclusive-meta.html": "af25664a4d301c2d1eeeabad13fa6777f7840d63da5122aaf24fa51c26bf3aff",
+      "inclusive-legacy.json": "ecd003b0aa3a9ea5bb623ddfd8ea0b0201057276cb14ca2df5874d0aa0ae0539",
+      "pet-165-tc.html": "c07482d552397ff499dcf2abf521beebfa2173ad443327d8722ca5794be763c1",
+      "pet-165-en.html": "ee92a872cc797955c29238d74339ffc2487bdcae9e8a7617e356dbf746506f5a",
+      "rules-en.html": "df3e5440069387823788981ed057a3739f493aee34a2f087be9266f7926afa73",
+      "annexe.pdf": "53d67631829d8fb60971ab16d4fcef795ed958ba6b9d7aeb2531d2baf55d044b",
+      "inclusive-dictionary.pdf": "eb98ef608944af887349a33e6e8a346e10fa62f8f3107ae702dadb37fb565a25"
+    },
+    "acquiredAt": {
+      "inclusive.json": "2026-11-17T21:11:16+08:00",
+      "inclusive-rest4326.json": "2026-11-17T21:11:18+08:00",
+      "pet-165-tc.html": "2026-11-17T21:11:27+08:00",
+      "pet-165-en.html": "2026-11-17T21:11:17+08:00",
+      "annexe.pdf": "2026-11-17T21:11:17+08:00"
+    },
+    "archiveChecksums": {
+      "2026-06-21": "84c43a84c8ab022af1531c65fb44ae5ec3cd9ddeaabb94aa5ecfc4fb70d91e13",
+      "2026-09-27": "486abc43c3ea357a0dae88ffd66eb9e6c86dc219e9faffcc07d8688fa72cf1c8"
+    }
+  },
+  "reviewedSnapshot": {
+    "snapshotDate": "2026-10-25",
+    "revisionDate": "2026-10-08",
+    "sha256": "d274caa71cc7ac2181012f57a83029e77617819ce02658ae028daa8046c549e1",
+    "rawCount": 181,
+    "bilingualListingCandidates": 170,
+    "approvedCount": 45,
+    "heldObjectIds": [
+      1,
+      4,
+      5,
+      8,
+      10,
+      12,
+      13,
+      14,
+      17,
+      18,
+      19,
+      20,
+      21,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      35,
+      38,
+      40,
+      41,
+      43,
+      44,
+      51,
+      53,
+      54,
+      57,
+      58,
+      59,
+      62,
+      64,
+      65,
+      66,
+      67,
+      69,
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83,
+      84,
+      85,
+      86,
+      87,
+      88,
+      89,
+      90,
+      91,
+      92,
+      93,
+      94,
+      95,
+      96,
+      97,
+      98,
+      99,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105,
+      107,
+      108,
+      109,
+      110,
+      111,
+      112,
+      113,
+      114,
+      115,
+      117,
+      118,
+      119,
+      120,
+      123,
+      126,
+      127,
+      128,
+      129,
+      130,
+      131,
+      133,
+      134,
+      135,
+      136,
+      137,
+      138,
+      139,
+      140,
+      141,
+      142,
+      143,
+      144,
+      145,
+      146,
+      147,
+      149,
+      150,
+      151,
+      152,
+      153,
+      154,
+      155,
+      156,
+      157,
+      158,
+      159,
+      161,
+      162,
+      163,
+      164,
+      165,
+      167,
+      168,
+      169,
+      170,
+      171,
+      172,
+      173,
+      174,
+      175,
+      176,
+      177,
+      178,
+      179,
+      180,
+      181
+    ]
+  },
+  "records": [
+    {
+      "name": {
+        "zh-HK": "加多近街花園 (指定位置)",
+        "en": "Cadogan Street Garden (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "中西區",
+        "en": "CENTRAL AND WESTERN"
+      },
+      "address": {
+        "zh-HK": "堅尼地城，加多近街及域多利道交界",
+        "en": "Cadogan Street j/o Victoria Road, Kennedy Town"
+      },
+      "coordinate": {
+        "longitude": 114.1253695222,
+        "latitude": 22.2826301147
+      },
+      "id": "inclusive-pet-001",
+      "reviewedFieldsSha256": "9c0abfbcffcf3ca9bdad4f1bb80b61e2ab054232a496cfd0d9e873edf74db489",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "加多近街花園 (指定位置)",
+          "en": "Cadogan Street Garden (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2846",
+            "geoInfoMapId": "PS7BW9LQw1"
+          },
+          "en": {
+            "opId": "2846",
+            "geoInfoMapId": "PS7BW9LQw1"
+          }
+        },
+        "annexNumbers": [
+          1
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 75
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 75
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 72
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "堅巷花園",
+        "en": "Caine Lane Garden"
+      },
+      "district": {
+        "zh-HK": "中西區",
+        "en": "CENTRAL AND WESTERN"
+      },
+      "address": {
+        "zh-HK": "上環堅巷",
+        "en": "Caine Lane, Sheung Wan"
+      },
+      "coordinate": {
+        "longitude": 114.1480911304,
+        "latitude": 22.2832365551
+      },
+      "id": "inclusive-pet-002",
+      "reviewedFieldsSha256": "77c648f9f44164c3112fcbeed794ef68d4d93110e4e2675172326e8ce1b38ba8",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "堅巷花園 (指定位置)",
+          "en": "Caine Lane Garden (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "3206",
+            "geoInfoMapId": "JUQVbUh6ST"
+          },
+          "en": {
+            "opId": "3206",
+            "geoInfoMapId": "JUQVbUh6ST"
+          }
+        },
+        "annexNumbers": [
+          2
+        ]
+      },
+      "aliases": {
+        "zh-HK": "堅巷花園 (指定位置)",
+        "en": "Caine Lane Garden (Designated Areas)"
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 9
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 9
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 4
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "中西區海濱長廊——中環段 (指定位置)",
+        "en": "Central and Western District Promenade—Central Section (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "中西區",
+        "en": "CENTRAL AND WESTERN"
+      },
+      "address": {
+        "zh-HK": "龍和道",
+        "en": "Lung Wo Road, Hong Kong"
+      },
+      "coordinate": {
+        "longitude": 114.1654087084,
+        "latitude": 22.2834596556
+      },
+      "id": "inclusive-pet-003",
+      "reviewedFieldsSha256": "6604f05141bc13b8f2cc778b3dfed7b3e335b9d0b4e5dfc14828ca6dc509dc5d",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=1",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=1",
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "中西區海濱長廊 - 中環段 (指定位置)",
+          "en": "Central and Western District Promenade - Central Section (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2311",
+            "geoInfoMapId": "kkpo6aeVNa"
+          },
+          "en": {
+            "opId": "2311",
+            "geoInfoMapId": "kkpo6aeVNa"
+          }
+        },
+        "annexNumbers": [
+          4
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 121
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 121
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 120
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "中西區海濱長廊 – 西區副食品批發市場段 (指定位置)",
+        "en": "Central and Western District Promenade - Western Wholesale Food Market Section (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "中西區",
+        "en": "CENTRAL AND WESTERN"
+      },
+      "address": {
+        "zh-HK": "西環豐物道 8 號",
+        "en": "8 Fung Mat Road, Sai Wan"
+      },
+      "coordinate": {
+        "longitude": 114.136165486,
+        "latitude": 22.2895777316
+      },
+      "id": "inclusive-pet-004",
+      "reviewedFieldsSha256": "bee191eaec4815644090db79bcfb7c3c7f2b41e6fb63a5d8d3784a9bc4b69b70",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=1",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=1"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "中西區海濱長廊 – 西區副食品批發市場段 (指定位置)",
+          "en": "Central and Western District Promenade - Western Wholesale Food Market Section (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2549",
+            "geoInfoMapId": "WfnZOXWGqb"
+          },
+          "en": {
+            "opId": "2549",
+            "geoInfoMapId": "WfnZOXWGqb"
+          }
+        }
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 122
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 122
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 121
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "柴灣公園 (指定位置)",
+        "en": "Chai Wan Park (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "東區",
+        "en": "EASTERN"
+      },
+      "address": {
+        "zh-HK": "柴灣公園近祥民道休憩花園",
+        "en": "Chai Wan Park near Cheung Man Road Rest Garden"
+      },
+      "coordinate": {
+        "longitude": 114.2374600029,
+        "latitude": 22.2663029977
+      },
+      "id": "inclusive-pet-005",
+      "reviewedFieldsSha256": "fca506be7f4e704f2a029643ef31f5676d86a6ccdaa59032b2eeadd90b8cc5a4",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "柴灣公園 (指定位置)",
+          "en": "Chai Wan Park (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2852",
+            "geoInfoMapId": "E9afheUi77"
+          },
+          "en": {
+            "opId": "2852",
+            "geoInfoMapId": "E9afheUi77"
+          }
+        },
+        "annexNumbers": [
+          17
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 71
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 71
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 68
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "茶果嶺海濱公園",
+        "en": "Cha Kwo Ling Promenade"
+      },
+      "district": {
+        "zh-HK": "觀塘",
+        "en": "KWUN TONG"
+      },
+      "address": {
+        "zh-HK": "觀塘",
+        "en": "Kwun Tong"
+      },
+      "coordinate": {
+        "longitude": 114.2237962103,
+        "latitude": 22.3042550723
+      },
+      "id": "inclusive-pet-006",
+      "reviewedFieldsSha256": "33c643563b377e3aa861842d30d709531645a796693117b13a7dac57a0cac1f1",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=6",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=6",
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "茶果嶺海濱公園 (指定位置)",
+          "en": "Cha Kwo Ling Promenade (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2985",
+            "geoInfoMapId": "2HE7MMlcag"
+          },
+          "en": {
+            "opId": "2985",
+            "geoInfoMapId": "2HE7MMlcag"
+          }
+        },
+        "annexNumbers": [
+          58
+        ]
+      },
+      "aliases": {
+        "zh-HK": "茶果嶺海濱公園 (指定位置)",
+        "en": "Cha Kwo Ling Promenade (Designated Areas)"
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 33
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 33
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 28
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "照潭徑花園(指定位置)",
+        "en": "Chiu Tam Path Garden (Designated areas)"
+      },
+      "district": {
+        "zh-HK": "荃灣",
+        "en": "TSUEN WAN"
+      },
+      "address": {
+        "zh-HK": "荃灣照潭徑",
+        "en": "Chiu Tam Path, Tsuen Wan"
+      },
+      "coordinate": {
+        "longitude": 114.1085829704,
+        "latitude": 22.3789470439
+      },
+      "id": "inclusive-pet-007",
+      "reviewedFieldsSha256": "d538427ab8ee5e315ea7a81b4a7bbfeccaffbd36c17b860260736a409e704cab",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated areas"
+      },
+      "scopeEvidence": [
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=13",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=13",
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "照潭徑花園(指定位置)",
+          "en": "Chiu Tam Path Garden (Designated areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "3160",
+            "geoInfoMapId": "hVVhfUhs3m"
+          },
+          "en": {
+            "opId": "3160",
+            "geoInfoMapId": "hVVhfUhs3m"
+          }
+        },
+        "annexNumbers": [
+          166
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 22
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 22
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 17
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "干德道兒童遊樂場 (指定位置)",
+        "en": "Conduit Road Children's Playground (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "中西區",
+        "en": "CENTRAL AND WESTERN"
+      },
+      "address": {
+        "zh-HK": "中半山，干德道",
+        "en": "Conduit Road, Mid-level"
+      },
+      "coordinate": {
+        "longitude": 114.1417617753,
+        "latitude": 22.2811711297
+      },
+      "id": "inclusive-pet-008",
+      "reviewedFieldsSha256": "2c962fd1cb49fe1311db0965025205e03f9fa396e66ca4f6094e10cd0ad38548",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "干德道兒童遊樂場 (指定位置)",
+          "en": "Conduit Road Children's Playground (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2844",
+            "geoInfoMapId": "D1zcHH1Q65"
+          },
+          "en": {
+            "opId": "2844",
+            "geoInfoMapId": "D1zcHH1Q65"
+          }
+        },
+        "annexNumbers": [
+          7
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 74
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 74
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 71
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "富康街休憩處 (指定位置)",
+        "en": "Fu Hong Street Sitting-out Area (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "東區",
+        "en": "EASTERN"
+      },
+      "address": {
+        "zh-HK": "富康街十號",
+        "en": "10 Fu Hong Street"
+      },
+      "coordinate": {
+        "longitude": 114.2487492069,
+        "latitude": 22.2686275592
+      },
+      "id": "inclusive-pet-009",
+      "reviewedFieldsSha256": "f10836f4877d7cb0d9b6b6e0107316256ae6a81c89d0022b20a1b10ed93d95a1",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=2",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=2",
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "富康街休憩處 (指定位置)",
+          "en": "Fu Hong Street Sitting-out Area (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2331",
+            "geoInfoMapId": "DKPDo1Sg8Q"
+          },
+          "en": {
+            "opId": "2331",
+            "geoInfoMapId": "DKPDo1Sg8Q"
+          }
+        },
+        "annexNumbers": [
+          18
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 70
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 70
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 67
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "曉光街休憩花園",
+        "en": "Hiu Kwong Street Rest Garden"
+      },
+      "district": {
+        "zh-HK": "觀塘",
+        "en": "KWUN TONG"
+      },
+      "address": {
+        "zh-HK": "觀塘曉光街(曉麗苑對面)",
+        "en": "Opposite at Hiu Lai Court, Hiu Kwong Street, Kwun Tong"
+      },
+      "coordinate": {
+        "longitude": 114.2303760967,
+        "latitude": 22.3181194477
+      },
+      "id": "inclusive-pet-010",
+      "reviewedFieldsSha256": "40a16c563f888409b9b62f606a28bc16b9a6ef97207ae1e36068d216bd60758e",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=6",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=6"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "曉光街休憩花園 (指定位置)",
+          "en": "Hiu Kwong Street Rest Garden (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2343",
+            "geoInfoMapId": "fDtkFeoVdP"
+          },
+          "en": {
+            "opId": "2343",
+            "geoInfoMapId": "fDtkFeoVdP"
+          }
+        },
+        "annexNumbers": [
+          59
+        ]
+      },
+      "aliases": {
+        "zh-HK": "曉光街休憩花園 (指定位置)",
+        "en": "Hiu Kwong Street Rest Garden (Designated Areas)"
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 116
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 116
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 114
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "海安路遊樂場 (指定位置)",
+        "en": "Hoi On Road Playground (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "荃灣",
+        "en": "TSUEN WAN"
+      },
+      "address": {
+        "zh-HK": "荃灣海安路",
+        "en": "Hoi On Road, Tsuen Wan"
+      },
+      "coordinate": {
+        "longitude": 114.1025100035,
+        "latitude": 22.3716199971
+      },
+      "id": "inclusive-pet-011",
+      "reviewedFieldsSha256": "9a924e0cc5faf0842cd81d881218b67f7812795b86ace3d1119b0febf2d42946",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "海安路遊樂場 (指定位置)",
+          "en": "Hoi On Road Playground (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2973",
+            "geoInfoMapId": "UhmJg7tRcN"
+          },
+          "en": {
+            "opId": "2973",
+            "geoInfoMapId": "UhmJg7tRcN"
+          }
+        },
+        "annexNumbers": [
+          168
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 48
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 48
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 43
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "香港單車館公園 (指定位置)",
+        "en": "Hong Kong Velodrome Park (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "西貢",
+        "en": "SAI KUNG"
+      },
+      "address": {
+        "zh-HK": "將軍澳寶康路105-107號",
+        "en": "105-107 Po Hong Road, Tseung Kwan O"
+      },
+      "coordinate": {
+        "longitude": 114.2614103908,
+        "latitude": 22.312913939
+      },
+      "id": "inclusive-pet-012",
+      "reviewedFieldsSha256": "675f19ef81484aa360e7d77126d740dd982af5c4845483481fd48d11bf6b948c",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "香港單車館公園 (指定位置)",
+          "en": "Hong Kong Velodrome Park (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2904",
+            "geoInfoMapId": "bvTUBXCIGa"
+          },
+          "en": {
+            "opId": "2904",
+            "geoInfoMapId": "bvTUBXCIGa"
+          }
+        },
+        "annexNumbers": [
+          127
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 42
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 42
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 37
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "康達徑花園 (指定位置)",
+        "en": "Hong Tat Path Garden (Designated Area)"
+      },
+      "district": {
+        "zh-HK": "油尖旺",
+        "en": "YAU TSIM MONG"
+      },
+      "address": {
+        "zh-HK": "九龍科學館道",
+        "en": "Science Museum Road, Kowloon"
+      },
+      "coordinate": {
+        "longitude": 114.179608878,
+        "latitude": 22.3013416676
+      },
+      "id": "inclusive-pet-013",
+      "reviewedFieldsSha256": "405f2149a1feada2c040433bcc83a12a92edd50f5a353dffc80a76c737cea96c",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Area"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "康達徑花園 (指定位置)",
+          "en": "Hong Tat Path Garden (Designated Area)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2983",
+            "geoInfoMapId": "CYqPIoAcwi"
+          },
+          "en": {
+            "opId": "2983",
+            "geoInfoMapId": "CYqPIoAcwi"
+          }
+        },
+        "annexNumbers": [
+          92
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 34
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 34
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 29
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "國瑞路公園 (指定位置)",
+        "en": "Kwok Shui Road Park (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "荃灣",
+        "en": "TSUEN WAN"
+      },
+      "address": {
+        "zh-HK": "荃灣國瑞路",
+        "en": "Kwok Shui Road, Tsuen Wan"
+      },
+      "coordinate": {
+        "longitude": 114.1283193123,
+        "latitude": 22.3714184336
+      },
+      "id": "inclusive-pet-014",
+      "reviewedFieldsSha256": "f26e9b2b0c3f1d7af48e94d8fc9358746ae611f608444c74f167ad06d66fcd65",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "國瑞路公園 (指定位置)",
+          "en": "Kwok Shui Road Park (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2969",
+            "geoInfoMapId": "Ey6yPf1Nvh"
+          },
+          "en": {
+            "opId": "2969",
+            "geoInfoMapId": "Ey6yPf1Nvh"
+          }
+        },
+        "annexNumbers": [
+          169
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 47
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 47
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 42
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "觀塘海濱花園 (指定位置)",
+        "en": "Kwun Tong Promenade (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "觀塘",
+        "en": "KWUN TONG"
+      },
+      "address": {
+        "zh-HK": "九龍觀塘海濱道80號",
+        "en": "80 Hoi Bun Road, Kwun Tong, Kowloon"
+      },
+      "coordinate": {
+        "longitude": 114.2190807674,
+        "latitude": 22.3097399791
+      },
+      "id": "inclusive-pet-015",
+      "reviewedFieldsSha256": "0700947c4c7695cfb070cad67d3611c92b6a491c5327409d2e5901f6881a501d",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=6",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=6",
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "觀塘海濱花園 (指定位置)",
+          "en": "Kwun Tong Promenade (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2696",
+            "geoInfoMapId": "1juqPjpRUu"
+          },
+          "en": {
+            "opId": "2696",
+            "geoInfoMapId": "1juqPjpRUu"
+          }
+        },
+        "annexNumbers": [
+          60
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 23
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 23
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 18
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "觀塘道休憩花園 (指定位置)",
+        "en": "Kwun Tong Road Rest Garden (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "觀塘",
+        "en": "KWUN TONG"
+      },
+      "address": {
+        "zh-HK": "觀塘馬蹄徑",
+        "en": "Horse Shoe Lane, Kwun Tong"
+      },
+      "coordinate": {
+        "longitude": 114.221928372,
+        "latitude": 22.3142875611
+      },
+      "id": "inclusive-pet-016",
+      "reviewedFieldsSha256": "f908cb95564bf5f226b27eaf2cc49f287fbfb9b7aea3ac6c5e2645aa4d92af07",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "觀塘道休憩花園 (指定位置)",
+          "en": "Kwun Tong Road Rest Garden (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2870",
+            "geoInfoMapId": "w19vrRj7rC"
+          },
+          "en": {
+            "opId": "2870",
+            "geoInfoMapId": "w19vrRj7rC"
+          }
+        },
+        "annexNumbers": [
+          61
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 61
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 61
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 58
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "荔枝角公園 (指定位置)",
+        "en": "Lai Chi Kok Park (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "深水埗",
+        "en": "SHAM SHUI PO"
+      },
+      "address": {
+        "zh-HK": "九龍荔枝角荔灣道1號",
+        "en": "No.1 Lai Wan Road, Lai Chi Kok, Kowloon"
+      },
+      "coordinate": {
+        "longitude": 114.1369305603,
+        "latitude": 22.3395805508
+      },
+      "id": "inclusive-pet-017",
+      "reviewedFieldsSha256": "5018d882940c5ecb8717a1f957f399e8023b7bff4658e8f35a55b60320febe4f",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "荔枝角公園 (指定位置)",
+          "en": "Lai Chi Kok Park (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2878",
+            "geoInfoMapId": "x6HuBB7yhv"
+          },
+          "en": {
+            "opId": "2878",
+            "geoInfoMapId": "x6HuBB7yhv"
+          }
+        },
+        "annexNumbers": [
+          72
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 60
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 60
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 56
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "獅子山公園 (指定位置)",
+        "en": "Lion Rock Park (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "黃大仙",
+        "en": "WONG TAI SIN"
+      },
+      "address": {
+        "zh-HK": "九龍黃大仙竹園道",
+        "en": "Chuk Yuen Road, Wong Tai Sin, Kowloon"
+      },
+      "coordinate": {
+        "longitude": 114.1838503475,
+        "latitude": 22.3449600987
+      },
+      "id": "inclusive-pet-018",
+      "reviewedFieldsSha256": "4367ed493e00596a064c26ae194677c6dc377451a44c213872d50259fdfcfd92",
+      "scope": "exclusions",
+      "scopeText": {
+        "zh-HK": "棒球場、射箭場及社區園圃(紅色範圍)除外",
+        "en": "Except Baseball Pitch, Archery Range & Community Garden (Red Area)"
+      },
+      "scopeEvidence": [
+        null,
+        null
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "獅子山公園 (棒球場、射箭場及社區園圃(紅色範圍)除外)",
+          "en": "Lion Rock Park (Except Baseball Pitch, Archery Range & Community Garden (Red Area))"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2888",
+            "geoInfoMapId": "P05hIo12Ew"
+          },
+          "en": {
+            "opId": "2888",
+            "geoInfoMapId": "P05hIo12Ew"
+          }
+        },
+        "annexNumbers": [
+          83
+        ]
+      },
+      "aliases": {
+        "zh-HK": "獅子山公園 (棒球場、射箭場及社區園圃(紅色範圍)除外)",
+        "en": "Lion Rock Park (Except Baseball Pitch, Archery Range & Community Garden (Red Area))"
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 37
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 37
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 32
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "馬鞍山海濱長廊 (指定位置)",
+        "en": "Ma On Shan Promenade (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "沙田",
+        "en": "SHA TIN"
+      },
+      "address": {
+        "zh-HK": "馬鞍山寧泰路",
+        "en": "Ning Tai Road, Ma On Shan"
+      },
+      "coordinate": {
+        "longitude": 114.2214520554,
+        "latitude": 22.4112137951
+      },
+      "id": "inclusive-pet-019",
+      "reviewedFieldsSha256": "f974b489e707861391e99c2670e8d36593d355688eeea89904e2b7b4e92eab20",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "馬鞍山海濱長廊 (指定位置)",
+          "en": "Ma On Shan Promenade (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2914",
+            "geoInfoMapId": "dn4KszFj6J"
+          },
+          "en": {
+            "opId": "2914",
+            "geoInfoMapId": "dn4KszFj6J"
+          }
+        },
+        "annexNumbers": [
+          141
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 50
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 50
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 45
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "梅窩銀河花園 (2區) (指定位置)",
+        "en": "Mui Wo River Silver Garden (Area 2) (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "離島",
+        "en": "ISLANDS"
+      },
+      "address": {
+        "zh-HK": "大嶼山梅窩銀石街",
+        "en": "Ngan Shek Street, Mui Wo, Lantau Island"
+      },
+      "coordinate": {
+        "longitude": 113.9973579751,
+        "latitude": 22.2666683378
+      },
+      "id": "inclusive-pet-020",
+      "reviewedFieldsSha256": "4843ce690f794fb35e41ec943070df4e1ce1cb37dafdcb104c671c48e0557562",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=3",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=3"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "梅窩銀河花園 (2區) (指定位置)",
+          "en": "Mui Wo River Silver Garden (Area 2) (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2359",
+            "geoInfoMapId": "uptxx55uqG"
+          },
+          "en": {
+            "opId": "2359",
+            "geoInfoMapId": "uptxx55uqG"
+          }
+        }
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 3
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 1
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "長洲體育館旁休憩用地 (指定位置)",
+        "en": "Open Space next to Cheung Chau Sports Centre (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "離島",
+        "en": "ISLANDS"
+      },
+      "address": {
+        "zh-HK": "長洲醫院路三號",
+        "en": "No.3,Cheung Chau Hospital Road, Cheung Chau"
+      },
+      "coordinate": {
+        "longitude": 114.0318600035,
+        "latitude": 22.2076699977
+      },
+      "id": "inclusive-pet-021",
+      "reviewedFieldsSha256": "dd6504d47b51819e896cba18bf9f56bc63e63957c36c957acd400d301dce58bc",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "長洲體育館旁休憩用地(指定位置)",
+          "en": "Open Space next to Cheung Chau Sports Centre (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2949",
+            "geoInfoMapId": "CxaAucxVh7"
+          },
+          "en": {
+            "opId": "2949",
+            "geoInfoMapId": "CxaAucxVh7"
+          }
+        },
+        "annexNumbers": [
+          101
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 55
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 55
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 50
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "百和路遊樂場 (指定位置)",
+        "en": "Pak Wo Road Playground (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "北區",
+        "en": "NORTH"
+      },
+      "address": {
+        "zh-HK": "新界粉嶺百和路",
+        "en": "Pak Wo Road, Fanling, N.T."
+      },
+      "coordinate": {
+        "longitude": 114.1333908036,
+        "latitude": 22.4929323975
+      },
+      "id": "inclusive-pet-022",
+      "reviewedFieldsSha256": "d90d68df828061bbeea8beb36429c26d9a35ebda84fb50bff1fce8f99414e89f",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "百和路遊樂場 (指定位置)",
+          "en": "Pak Wo Road Playground (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2892",
+            "geoInfoMapId": "SKg8rtaxSk"
+          },
+          "en": {
+            "opId": "2892",
+            "geoInfoMapId": "SKg8rtaxSk"
+          }
+        },
+        "annexNumbers": [
+          120
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 36
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 36
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 31
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "山頂道花園 (指定位置)",
+        "en": "Peak Road Garden (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "中西區",
+        "en": "CENTRAL AND WESTERN"
+      },
+      "address": {
+        "zh-HK": "香港山頂 山頂道",
+        "en": "Peak Road, The Peak, Hong Kong"
+      },
+      "coordinate": {
+        "longitude": 114.1497574446,
+        "latitude": 22.2709928074
+      },
+      "id": "inclusive-pet-023",
+      "reviewedFieldsSha256": "7ed7a2e58a0e4acea8f3661bd53efc8d47517d3bdad14a95525eaa28071fbd50",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "山頂道花園 (指定位置)",
+          "en": "Peak Road Garden (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2848",
+            "geoInfoMapId": "qtjBQfuhw3"
+          },
+          "en": {
+            "opId": "2848",
+            "geoInfoMapId": "qtjBQfuhw3"
+          }
+        },
+        "annexNumbers": [
+          8
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 73
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 73
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 70
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "鰂魚涌公園 (指定位置)",
+        "en": "Quarry Bay Park (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "東區",
+        "en": "EASTERN"
+      },
+      "address": {
+        "zh-HK": "鰂魚涌公園 (二期)近海澤街",
+        "en": "Quarry Bay Park (Phase II ) near Hoi Chak Street"
+      },
+      "coordinate": {
+        "longitude": 114.2104976808,
+        "latitude": 22.2906621049
+      },
+      "id": "inclusive-pet-024",
+      "reviewedFieldsSha256": "ddf6117c91366e687121a58e05355c7e5cc8c265ca20941aef6987f60cbf61d9",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "鰂魚涌公園 (指定位置)",
+          "en": "Quarry Bay Park (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2850",
+            "geoInfoMapId": "4zsh5U5br3"
+          },
+          "en": {
+            "opId": "2850",
+            "geoInfoMapId": "4zsh5U5br3"
+          }
+        },
+        "annexNumbers": [
+          22
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 68
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 68
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 65
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "三家村遊樂場",
+        "en": "Sam Ka Tsuen Recreation Ground"
+      },
+      "district": {
+        "zh-HK": "觀塘",
+        "en": "KWUN TONG"
+      },
+      "address": {
+        "zh-HK": "三家村茶果嶺道四山街交界",
+        "en": "J/O Cha Kwo Ling Road & Sze Shan Street, Sam Ka Tsuen"
+      },
+      "coordinate": {
+        "longitude": 114.2373317102,
+        "latitude": 22.2942656655
+      },
+      "id": "inclusive-pet-025",
+      "reviewedFieldsSha256": "bbe626295a969e2f183e64678af802865c35e6f577950f2096cf32f4f86a9fc9",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=6",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=6"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "三家村遊樂場 (指定位置)",
+          "en": "Sam Ka Tsuen Recreation Ground (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2702",
+            "geoInfoMapId": "ZDgoVAhx3r"
+          },
+          "en": {
+            "opId": "2702",
+            "geoInfoMapId": "ZDgoVAhx3r"
+          }
+        },
+        "annexNumbers": [
+          65
+        ]
+      },
+      "aliases": {
+        "zh-HK": "三家村遊樂場 (指定位置)",
+        "en": "Sam Ka Tsuen Recreation Ground (Designated Areas)"
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 6
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 6
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 1
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "深慈街遊樂場 (指定位置)",
+        "en": "Sham Tsz Street Playground (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "荃灣",
+        "en": "TSUEN WAN"
+      },
+      "address": {
+        "zh-HK": "荃灣深井深慈街",
+        "en": "Sham Tsz Street, Sham Tseng, Tsuen Wan"
+      },
+      "coordinate": {
+        "longitude": 114.0638668808,
+        "latitude": 22.3651429567
+      },
+      "id": "inclusive-pet-026",
+      "reviewedFieldsSha256": "fc65dc95eaa1838ac597edf0f4f798d0ad08983732968a51e695d295ee64ca38",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=13",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=13",
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "深慈街遊樂場 (指定位置)",
+          "en": "Sham Tsz Street Playground (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2571",
+            "geoInfoMapId": "5So0BggmtQ"
+          },
+          "en": {
+            "opId": "2571",
+            "geoInfoMapId": "5So0BggmtQ"
+          }
+        },
+        "annexNumbers": [
+          170
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 166
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 166
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 166
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "沙田公園 (指定位置)",
+        "en": "Sha Tin Park (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "沙田",
+        "en": "SHA TIN"
+      },
+      "address": {
+        "zh-HK": "沙田源禾路2號",
+        "en": "No. 2 Yuen Wo Road, Sha Tin"
+      },
+      "coordinate": {
+        "longitude": 114.1904143034,
+        "latitude": 22.3800470975
+      },
+      "id": "inclusive-pet-027",
+      "reviewedFieldsSha256": "fa46a2c5ba83ad1080395ac9dcbeb9db249f50f36c78afda25884b6c9005f8ae",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "沙田公園(指定位置)",
+          "en": "Sha Tin Park (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2957",
+            "geoInfoMapId": "zbg2eIRCBg"
+          },
+          "en": {
+            "opId": "2957",
+            "geoInfoMapId": "zbg2eIRCBg"
+          }
+        },
+        "annexNumbers": [
+          146
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 49
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 49
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 44
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "石硤尾公園 (指定位置)",
+        "en": "Shek Kip Mei Park (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "深水埗",
+        "en": "SHAM SHUI PO"
+      },
+      "address": {
+        "zh-HK": "九龍深水埗歌和老街石硤尾公園(第二期)",
+        "en": "Shek Kip Mei Park (Stage II), Cornwall Street, Sham Shui Po, Kowloon"
+      },
+      "coordinate": {
+        "longitude": 114.1709509614,
+        "latitude": 22.3388636066
+      },
+      "id": "inclusive-pet-028",
+      "reviewedFieldsSha256": "7afc051b629d3d03f7bcfb53610dd8c5e0df2ce19b32359625d2fb31cad065fd",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "石硤尾公園 (指定位置)",
+          "en": "Shek Kip Mei Park (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2880",
+            "geoInfoMapId": "eL0VVSKx6R"
+          },
+          "en": {
+            "opId": "2880",
+            "geoInfoMapId": "eL0VVSKx6R"
+          }
+        },
+        "annexNumbers": [
+          76
+        ]
+      },
+      "noticeInDetails": true,
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 15
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 15
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 10
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "小西灣海濱花園 (指定位置)",
+        "en": "Siu Sai Wan Promenade (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "東區",
+        "en": "EASTERN"
+      },
+      "address": {
+        "zh-HK": "小西灣道28號",
+        "en": "28 Siu Sai Wan Road"
+      },
+      "coordinate": {
+        "longitude": 114.2505518217,
+        "latitude": 22.2674961051
+      },
+      "id": "inclusive-pet-029",
+      "reviewedFieldsSha256": "894e8bedf6eb944807c1ad0bacc68ead7dea83d1a9d19848733edcd08f6ce6df",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=2",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=2",
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "小西灣海濱花園 (指定位置)",
+          "en": "Siu Sai Wan Promenade (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2329",
+            "geoInfoMapId": "yKWBWuZ5fm"
+          },
+          "en": {
+            "opId": "2329",
+            "geoInfoMapId": "yKWBWuZ5fm"
+          }
+        },
+        "annexNumbers": [
+          23
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 11
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 11
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 6
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "中山紀念公園 (指定位置)",
+        "en": "Sun Yat Sen Memorial Park (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "中西區",
+        "en": "CENTRAL AND WESTERN"
+      },
+      "address": {
+        "zh-HK": "香港西營盤東邊街北",
+        "en": "Eastern Street North, Sai Ying Pun"
+      },
+      "coordinate": {
+        "longitude": 114.1455324731,
+        "latitude": 22.2904503603
+      },
+      "id": "inclusive-pet-030",
+      "reviewedFieldsSha256": "ad077d04362fdefe731c949ff6985d06f867118beceb452fd1a5d1343b4c2850",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=1",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=1",
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "中山紀念公園 (指定位置)",
+          "en": "Sun Yat Sen Memorial Park (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2555",
+            "geoInfoMapId": "z3BerwV4yS"
+          },
+          "en": {
+            "opId": "2555",
+            "geoInfoMapId": "z3BerwV4yS"
+          }
+        },
+        "annexNumbers": [
+          12
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 125
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 125
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 124
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "大埔海濱公園 (指定位置)",
+        "en": "Tai Po Waterfront Park (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "大埔",
+        "en": "TAI PO"
+      },
+      "address": {
+        "zh-HK": "新界大埔大發街",
+        "en": "Dai Fat Street, Tai Po, New Territories"
+      },
+      "coordinate": {
+        "longitude": 114.1786027394,
+        "latitude": 22.4530427552
+      },
+      "id": "inclusive-pet-031",
+      "reviewedFieldsSha256": "17c2954c33a86b376491437e873b407fa5493066534c9255538cb45e0ecda5d6",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=12",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=12",
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "大埔海濱公園 (指定位置)",
+          "en": "Tai Po Waterfront Park (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2609",
+            "geoInfoMapId": "puDHJwM10U"
+          },
+          "en": {
+            "opId": "2609",
+            "geoInfoMapId": "puDHJwM10U"
+          }
+        },
+        "annexNumbers": [
+          160
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 106
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 106
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 103
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "大窩口道遊樂場",
+        "en": "Tai Wo Hau Road Playground"
+      },
+      "district": {
+        "zh-HK": "葵青",
+        "en": "KWAI TSING"
+      },
+      "address": {
+        "zh-HK": "葵涌大窩口道",
+        "en": "Tai Wo Hau Road Playground, Kwai Chung"
+      },
+      "coordinate": {
+        "longitude": 114.1310587012,
+        "latitude": 22.3657692071
+      },
+      "id": "inclusive-pet-032",
+      "reviewedFieldsSha256": "a0399475bd3947e02d5dfa03f8e9cd768ea23eeb5fd8f958ea2fb44fc78a8801",
+      "scope": "venue",
+      "scopeText": {
+        "zh-HK": "開放整個場地予市民攜同其寵物進入及使用",
+        "en": "opening up the whole venues"
+      },
+      "scopeEvidence": [
+        "https://www.info.gov.hk/gia/general/201901/23/P2019012300381.htm",
+        "https://www.info.gov.hk/gia/general/201901/23/P2019012300383p.htm",
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf",
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=5",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=5"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "大窩口道遊樂場",
+          "en": "Tai Wo Hau Road Playground"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2309",
+            "geoInfoMapId": "a7NzXy87Mu"
+          },
+          "en": {
+            "opId": "2309",
+            "geoInfoMapId": "a7NzXy87Mu"
+          }
+        },
+        "annexNumbers": [
+          112
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 132
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 132
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 131
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "天水圍公園 (指定位置)",
+        "en": "Tin Shui Wai Park (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "元朗",
+        "en": "YUEN LONG"
+      },
+      "address": {
+        "zh-HK": "天水圍天瑞路6號",
+        "en": "6 Tin Shui Road, Tin Shui Wai, Yuen Long"
+      },
+      "coordinate": {
+        "longitude": 114.0023768039,
+        "latitude": 22.4565858153
+      },
+      "id": "inclusive-pet-033",
+      "reviewedFieldsSha256": "1d99f008068de6185e3186f138f5f3063a807b60b7751d32c1b592b144736a7a",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=18",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=18",
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "天水圍公園 (指定位置)",
+          "en": "Tin Shui Wai Park (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "3192",
+            "geoInfoMapId": "5K0bBxQNUU"
+          },
+          "en": {
+            "opId": "3192",
+            "geoInfoMapId": "5K0bBxQNUU"
+          }
+        },
+        "annexNumbers": [
+          190
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 7
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 7
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 2
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "棠蔭街山邊休憩處",
+        "en": "Tong Yam Street Hillside Sitting-out Area"
+      },
+      "district": {
+        "zh-HK": "深水埗",
+        "en": "SHAM SHUI PO"
+      },
+      "address": {
+        "zh-HK": "石硤尾棠蔭街",
+        "en": "Tong Yam Street, Shek Kip Mei"
+      },
+      "coordinate": {
+        "longitude": 114.1698564964,
+        "latitude": 22.328403444
+      },
+      "id": "inclusive-pet-034",
+      "reviewedFieldsSha256": "3e6cd9f44b36912aff27868117600e734a3604db0d20d131790f929fd1eb0b6b",
+      "scope": "venue",
+      "scopeText": {
+        "zh-HK": "開放整個場地予市民攜同其寵物進入及使用",
+        "en": "opening up the whole venues"
+      },
+      "scopeEvidence": [
+        "https://www.info.gov.hk/gia/general/201901/23/P2019012300381.htm",
+        "https://www.info.gov.hk/gia/general/201901/23/P2019012300383p.htm",
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf",
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=9",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=9"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "棠蔭街山邊休憩處",
+          "en": "Tong Yam Street Hillside Sitting-out Area"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2301",
+            "geoInfoMapId": "O6GyczICP2"
+          },
+          "en": {
+            "opId": "2301",
+            "geoInfoMapId": "O6GyczICP2"
+          }
+        },
+        "annexNumbers": [
+          78
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 148
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 148
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 147
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "尖沙咀海濱花園 (指定位置)",
+        "en": "Tsim Sha Tsui Promenade (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "油尖旺",
+        "en": "YAU TSIM MONG"
+      },
+      "address": {
+        "zh-HK": "九龍尖沙咀梳士巴利道",
+        "en": "Salisbury Road, Tsimshatsui, Kowloon"
+      },
+      "coordinate": {
+        "longitude": 114.1759671786,
+        "latitude": 22.2943661704
+      },
+      "id": "inclusive-pet-035",
+      "reviewedFieldsSha256": "3d98de4e2725d002a033690820f04985ef325b1416bbe72f520f1ad78ae40c21",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Area"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "尖沙咀海濱花園 (指定位置)",
+          "en": "Tsim Sha Tsui Promenade (Designated Area)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2758",
+            "geoInfoMapId": "eSpx2i7sUi"
+          },
+          "en": {
+            "opId": "2758",
+            "geoInfoMapId": "eSpx2i7sUi"
+          }
+        },
+        "annexNumbers": [
+          95
+        ]
+      },
+      "aliases": {
+        "en": "Tsim Sha Tsui Promenade (Designated Area)"
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 56
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 56
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 52
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "青衣海濱公園—海欣花園段 (指定位置)",
+        "en": "Tsing Yi Promenade-Grand Horizon Portion (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "葵青",
+        "en": "KWAI TSING"
+      },
+      "address": {
+        "zh-HK": "新界青衣楓樹窩路",
+        "en": "Fung Shue Wo Road, Tsing Yi, New Territories"
+      },
+      "coordinate": {
+        "longitude": 114.1100204633,
+        "latitude": 22.3525751514
+      },
+      "id": "inclusive-pet-036",
+      "reviewedFieldsSha256": "79f4d5ac1540323b1a2b07dab829e4877f8fcac2c723d40960dfee13c151fb4f",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=5",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=5"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "青衣海濱公園 - 海欣花園段 (指定位置)",
+          "en": "Tsing Yi Promenade - Grand Horizon Portion (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2323",
+            "geoInfoMapId": "KvZVeX5Fga"
+          },
+          "en": {
+            "opId": "2323",
+            "geoInfoMapId": "KvZVeX5Fga"
+          }
+        }
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 52
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 52
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 47
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "荃景圍花園 (指定位置)",
+        "en": "Tsuen King Circuit Garden (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "荃灣",
+        "en": "TSUEN WAN"
+      },
+      "address": {
+        "zh-HK": "新界荃灣美環街",
+        "en": "Mei Wan Street, Tsuen Wan, N.T."
+      },
+      "coordinate": {
+        "longitude": 114.1109000029,
+        "latitude": 22.3779399977
+      },
+      "id": "inclusive-pet-037",
+      "reviewedFieldsSha256": "07b8b025ddd608f227058c927559438f0aa67a5eedb4ecfd39e765c954cd5968",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "荃景圍花園 (指定位置)",
+          "en": "Tsuen King Circuit Garden (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2971",
+            "geoInfoMapId": "VDfbrGJWZl"
+          },
+          "en": {
+            "opId": "2971",
+            "geoInfoMapId": "VDfbrGJWZl"
+          }
+        },
+        "annexNumbers": [
+          171
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 46
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 46
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 41
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "荃灣海濱單車匯合中心 (指定位置)",
+        "en": "Tsuen Wan Waterfront Cycling Entry / Exit Hub (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "荃灣",
+        "en": "TSUEN WAN"
+      },
+      "address": {
+        "zh-HK": "新界荃灣海興路",
+        "en": "Hoi Hing Road, Tsuen Wan, N.T."
+      },
+      "coordinate": {
+        "longitude": 114.1074155897,
+        "latitude": 22.3702868993
+      },
+      "id": "inclusive-pet-038",
+      "reviewedFieldsSha256": "d34274b83733953a3ccf43e643d5f1b1035b1995c8602ae38d7b860966daee18",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated areas"
+      },
+      "scopeEvidence": [
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=13",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=13",
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "荃灣海濱單車匯合中心 (指定位置)",
+          "en": "Tsuen Wan Waterfront Cycling Entry / Exit Hub (Designated areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2575",
+            "geoInfoMapId": "nCW0Oyts4p"
+          },
+          "en": {
+            "opId": "2575",
+            "geoInfoMapId": "nCW0Oyts4p"
+          }
+        },
+        "annexNumbers": [
+          174
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 160
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 160
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 160
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "維多利亞公園 - 山丘涼亭 (指定位置)",
+        "en": "Victoria Park - Hill Knoll Pavilion (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "灣仔",
+        "en": "WAN CHAI"
+      },
+      "address": {
+        "zh-HK": "香港銅鑼灣興發街一號",
+        "en": "1 Hing Fat Street, Causeway Bay, Hong Kong"
+      },
+      "coordinate": {
+        "longitude": 114.1871542164,
+        "latitude": 22.2833983205
+      },
+      "id": "inclusive-pet-039",
+      "reviewedFieldsSha256": "fc9654e05881649b5b07ab429d5a3440ad255d831a41b8367b09439e5d70c5a4",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=15",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=15"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "維多利亞公園 - 山丘涼亭 (指定位置)",
+          "en": "Victoria Park - Hill Knoll Pavilion (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2670",
+            "geoInfoMapId": "MsqXvZ7aTx"
+          },
+          "en": {
+            "opId": "2670",
+            "geoInfoMapId": "MsqXvZ7aTx"
+          }
+        }
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 63
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 63
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 60
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "山頂花園",
+        "en": "Victoria Peak Garden"
+      },
+      "district": {
+        "zh-HK": "中西區",
+        "en": "CENTRAL AND WESTERN"
+      },
+      "address": {
+        "zh-HK": "柯士甸山道40號對面",
+        "en": "Opposite at No. 40 Mount Austin Road"
+      },
+      "coordinate": {
+        "longitude": 114.1440555382,
+        "latitude": 22.2737569407
+      },
+      "id": "inclusive-pet-040",
+      "reviewedFieldsSha256": "38cdd5b8ff09dffb8bae4740a11f1356996289231b23a61137658d2d790ff935",
+      "scope": "venue",
+      "scopeText": {
+        "zh-HK": "開放整個場地予市民攜同其寵物進入及使用",
+        "en": "opening up the whole venues"
+      },
+      "scopeEvidence": [
+        "https://www.info.gov.hk/gia/general/201901/23/P2019012300381.htm",
+        "https://www.info.gov.hk/gia/general/201901/23/P2019012300383p.htm",
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf",
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=1",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=1"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "山頂花園",
+          "en": "Victoria Peak Garden"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2293",
+            "geoInfoMapId": "S5C9JuRJYp"
+          },
+          "en": {
+            "opId": "2293",
+            "geoInfoMapId": "S5C9JuRJYp"
+          }
+        },
+        "annexNumbers": [
+          13
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 124
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 124
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 123
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "華發遊樂場 (指定位置)",
+        "en": "Wah Fat Playground (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "屯門",
+        "en": "TUEN MUN"
+      },
+      "address": {
+        "zh-HK": "屯門華發街",
+        "en": "Wah Fat Street, Tuen Mun"
+      },
+      "coordinate": {
+        "longitude": 113.9819799791,
+        "latitude": 22.3841700182
+      },
+      "id": "inclusive-pet-041",
+      "reviewedFieldsSha256": "9eb68469da3d37527d72f550322fe7365a6c913e4e31ecf72adfd58a701dac34",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "華發遊樂場 (指定位置)",
+          "en": "Wah Fat Playground (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2920",
+            "geoInfoMapId": "DS9lZDNjVJ"
+          },
+          "en": {
+            "opId": "2920",
+            "geoInfoMapId": "DS9lZDNjVJ"
+          }
+        },
+        "annexNumbers": [
+          185
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 45
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 45
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 40
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "宏業南街休憩花園",
+        "en": "Wang Yip Street South Rest Garden"
+      },
+      "district": {
+        "zh-HK": "元朗",
+        "en": "YUEN LONG"
+      },
+      "address": {
+        "zh-HK": "元朗宏業南街",
+        "en": "Wang Yip Street South, Yuen Long"
+      },
+      "coordinate": {
+        "longitude": 114.0282753489,
+        "latitude": 22.448143106
+      },
+      "id": "inclusive-pet-042",
+      "reviewedFieldsSha256": "8b47b86df60cb5c58776c81d402c3769fd888fcb09aa19dde5073830fd5a24c9",
+      "scope": "venue",
+      "scopeText": {
+        "zh-HK": "開放整個場地予市民攜同其寵物進入及使用",
+        "en": "opening up the whole venues"
+      },
+      "scopeEvidence": [
+        "https://www.info.gov.hk/gia/general/201901/23/P2019012300381.htm",
+        "https://www.info.gov.hk/gia/general/201901/23/P2019012300383p.htm",
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf",
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=18",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=18"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "宏業南街休憩花園",
+          "en": "Wang Yip Street South Rest Garden"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2307",
+            "geoInfoMapId": "slSofo0y32"
+          },
+          "en": {
+            "opId": "2307",
+            "geoInfoMapId": "slSofo0y32"
+          }
+        },
+        "annexNumbers": [
+          193
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 16
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 16
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 11
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "瀑布灣公園 (指定位置)",
+        "en": "Waterfall Bay Park (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "南區",
+        "en": "SOUTHERN"
+      },
+      "address": {
+        "zh-HK": "華富邨瀑布灣道",
+        "en": "Waterfall Bay Road, Wah Fu Estate"
+      },
+      "coordinate": {
+        "longitude": 114.1345701767,
+        "latitude": 22.2507645059
+      },
+      "id": "inclusive-pet-043",
+      "reviewedFieldsSha256": "930199d8573e3f1b22690eabaeb55c05db6181fcf246798f0aa2b74f316f3876",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=11",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=11",
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "瀑布灣公園 (指定位置)",
+          "en": "Waterfall Bay Park (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2623",
+            "geoInfoMapId": "HwXkoHQuZn"
+          },
+          "en": {
+            "opId": "2623",
+            "geoInfoMapId": "HwXkoHQuZn"
+          }
+        },
+        "annexNumbers": [
+          35
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 39
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 39
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 34
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "城西公園 (指定位置)",
+        "en": "West End Park (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "中西區",
+        "en": "CENTRAL AND WESTERN"
+      },
+      "address": {
+        "zh-HK": "中半山，列堤頓道及屋蘭士里 交界",
+        "en": "J/O Lyttelton Road and Oaklands Path, Mid-level"
+      },
+      "coordinate": {
+        "longitude": 114.1431080964,
+        "latitude": 22.2834855619
+      },
+      "id": "inclusive-pet-044",
+      "reviewedFieldsSha256": "54f71ee49b38e24e192a21412fb49a3049ee5c840db68c001904b02d39e1dfae",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        null,
+        null,
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "城西公園 (指定位置)",
+          "en": "West End Park (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2842",
+            "geoInfoMapId": "S3DVKw3KoF"
+          },
+          "en": {
+            "opId": "2842",
+            "geoInfoMapId": "S3DVKw3KoF"
+          }
+        },
+        "annexNumbers": [
+          14
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 72
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 72
+        },
+        {
+          "snapshotDate": "2026-06-21",
+          "objectId": 69
+        }
+      ]
+    },
+    {
+      "name": {
+        "zh-HK": "月華街遊樂場 (指定位置)",
+        "en": "Yuet Wah Street Playground (Designated Areas)"
+      },
+      "district": {
+        "zh-HK": "觀塘",
+        "en": "KWUN TONG"
+      },
+      "address": {
+        "zh-HK": "九龍觀塘月華街",
+        "en": "Yuet Wah Street, Kwun Tong, Kowloon"
+      },
+      "coordinate": {
+        "longitude": 114.2266602835,
+        "latitude": 22.3150395646
+      },
+      "id": "inclusive-pet-045",
+      "reviewedFieldsSha256": "7a9147b547d021457cbdeabb4188a81ddd1268abc0270ce49b2741eaf6db97e8",
+      "scope": "designated",
+      "scopeText": {
+        "zh-HK": "指定位置",
+        "en": "Designated Areas"
+      },
+      "scopeEvidence": [
+        "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=165&fcid=&did=6",
+        "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=165&fcid=&did=6",
+        "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+      ],
+      "listingEvidence": {
+        "name": {
+          "zh-HK": "月華街遊樂場 (指定位置)",
+          "en": "Yuet Wah Street Playground (Designated Areas)"
+        },
+        "references": {
+          "zh-HK": {
+            "opId": "2700",
+            "geoInfoMapId": "Nlr9dF0fqQ"
+          },
+          "en": {
+            "opId": "2700",
+            "geoInfoMapId": "Nlr9dF0fqQ"
+          }
+        },
+        "annexNumbers": [
+          69
+        ]
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 2
+        }
+      ]
+    }
+  ]
+}

@@ -1,8 +1,10 @@
 import afcd from '../assets/data/afcd-toilets.json';
 import fehd from '../assets/data/fehd-toilets.json';
+import lcsdInclusivePetParks from '../assets/data/lcsd-inclusive-pet-parks.json';
 import lcsdParks from '../assets/data/lcsd-parks.json';
 import lcsdPetGardens from '../assets/data/lcsd-pet-gardens.json';
 
+import type { Messages } from '@/i18n';
 import { distanceBetween, isNearHongKong, type Coordinates } from '@/nearby-bus-data';
 
 export const facilityCategories = ['toilets', 'pets', 'parks'] as const;
@@ -11,6 +13,7 @@ export type FacilityFilter = 'all' | FacilityCategory;
 
 export type FacilityLocale = 'zh-HK' | 'en';
 type FacilityText = { 'zh-HK': string; en?: string } | { en: string; 'zh-HK'?: string };
+const petAccessScopes = ['venue', 'designated', 'exclusions', 'unknown'] as const;
 
 export type Facility = {
   source: string;
@@ -21,6 +24,7 @@ export type Facility = {
   officialType?: string;
   typeName?: FacilityText;
   name: FacilityText;
+  aliases?: FacilityText;
   address?: FacilityText;
   district?: FacilityText;
   area?: FacilityText;
@@ -31,6 +35,7 @@ export type Facility = {
   phone?: FacilityText;
   remarks?: FacilityText;
   serviceNotice?: boolean;
+  petAccess?: { scope: (typeof petAccessScopes)[number]; scopeText: FacilityText; leashRequired: boolean };
 };
 
 export type NearbyFacility = { id: string; facility: Facility; distance: number };
@@ -62,6 +67,12 @@ const lcsdPetGardenSource = {
   sourceUrl: lcsdPetGardens.source.url,
   category: 'pets',
 } as const;
+const lcsdInclusivePetParkSource = {
+  source: 'lcsd-inclusive-pet-parks',
+  sourceName: lcsdInclusivePetParks.sourceName,
+  sourceUrl: lcsdInclusivePetParks.source.url,
+  category: 'pets',
+} as const;
 
 export const nearbyFacilitySources = [
   { ...fehdSource, snapshotDate: fehd.snapshotDate },
@@ -80,6 +91,14 @@ export const nearbyFacilitySources = [
     fetchedAt: lcsdPetGardens.source.fetchedAt,
     recordCount: lcsdPetGardens.records.length,
   },
+  {
+    ...lcsdInclusivePetParkSource,
+    snapshotDate: lcsdInclusivePetParks.snapshotDate,
+    revisionDate: lcsdInclusivePetParks.revisionDate,
+    fetchedAt: lcsdInclusivePetParks.source.fetchedAt,
+    recordCount: lcsdInclusivePetParks.records.length,
+    rulesUrls: lcsdInclusivePetParks.source.rulesUrls,
+  },
 ] as const;
 
 export const nearbyFacilities: readonly Facility[] = [
@@ -88,7 +107,15 @@ export const nearbyFacilities: readonly Facility[] = [
   ...afcd.records.map((record) => ({ ...record, ...afcdSource })),
   ...lcsdParks.records.map((record) => ({ ...record, ...lcsdParkSource })),
   ...lcsdPetGardens.records.map((record) => ({ ...record, ...lcsdPetGardenSource })),
+  ...lcsdInclusivePetParks.records.map(({ petAccess, ...record }): Facility => ({
+    ...record, ...lcsdInclusivePetParkSource,
+    petAccess: { ...petAccess, scope: petAccessScopes.find((scope) => scope === petAccess.scope) ?? 'unknown' },
+  })),
 ];
+
+export function petFacilityType(facility: Facility, labels: Messages['nearby']) {
+  return facility.petAccess ? labels.inclusivePetParkType : labels.petGardenType;
+}
 
 export function facilityFilter(value: unknown): FacilityFilter {
   return facilityCategories.find((category) => category === value) ?? 'all';
