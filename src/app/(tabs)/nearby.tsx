@@ -1,25 +1,25 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, FlatList, Linking, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
-import type MapView from 'react-native-maps';
+import { Alert, AppState, FlatList, Linking, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import type { Region } from 'react-native-maps';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { facilityVisuals, NearbyFacilitiesMap } from '@/components/nearby-facilities-map';
+import { facilityVisuals, NearbyFacilitiesMap, type NearbyFacilitiesMapHandle } from '@/components/nearby-facilities-map';
+import { NearbySearchSheet } from '@/components/nearby-search-sheet';
 import { AppText, Icon } from '@/components/ui';
 import { showFacilityDirections } from '@/facility-navigation';
-import { facilityCategories, facilityFilter, facilityText, facilityTextUsesFallback, indexNearbyFacilities, nearbyFacilities, nearbyFacilitySources,
+import { facilityCategories, facilityFilter, facilityId, facilityText, facilityTextUsesFallback, indexNearbyFacilities, nearbyFacilities, nearbyFacilitySources,
   type Facility, type FacilityFilter, type FacilityLocale, type NearbyFacility } from '@/facilities';
 import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
-import type { Coordinates } from '@/nearby-bus-data';
-import { nearbyBusLandmarks, type NearbyLandmark } from '@/nearby-bus-landmarks';
+import { isNearHongKong, type Coordinates } from '@/nearby-bus-data';
+import { nearbyBusLandmarks } from '@/nearby-bus-landmarks';
 import { locateNearbyBusStops, type NearbyLocationIssue } from '@/nearby-bus-location';
+import type { NearbySearchResult } from '@/nearby-place-search';
 import { colors, floatingTab, homeColors, homeLayout, radius, space, touchTarget } from '@/theme';
 
-type Reference = { kind: 'default' | 'landmark'; landmark: NearbyLandmark } | { kind: 'device'; point: Coordinates };
-const defaultReference = { kind: 'default', landmark: 'central' } satisfies Reference;
-const landmarks = Object.keys(nearbyBusLandmarks) as NearbyLandmark[];
+type SearchCenter = (NearbySearchResult & { point: Coordinates }) | { kind: 'default' | 'device' | 'map'; point: Coordinates };
+const defaultCenter = { kind: 'default', point: nearbyBusLandmarks.central } satisfies SearchCenter;
 const categories = ['all', ...facilityCategories, 'bus'] as const;
 const modes = [{ key: 'map', icon: 'map' }, { key: 'list', icon: 'list.bullet' }] as const;
 
@@ -36,72 +36,145 @@ export default function NearbyScreen() {
   const params = useLocalSearchParams<{ category?: string; view?: string }>();
   const category = facilityFilter(params.category);
   const mode = params.view === 'list' ? 'list' : 'map';
-  const [reference, setReference] = useState<Reference>(defaultReference);
-  const [selectedId, setSelectedId] = useState<string>();
+  const [committedSearchCenter, setCommittedSearchCenter] = useState<SearchCenter>(defaultCenter);
+  const [deviceLocation, setDeviceLocation] = useState<Coordinates>();
+  const [areaPending, setAreaPending] = useState(false);
+  const [selectedFacilityKey, setSelectedFacilityKey] = useState<string>();
   const [picking, setPicking] = useState(false);
   const [locating, setLocating] = useState(false);
   const [locationIssue, setLocationIssue] = useState<NearbyLocationIssue>();
-  const locationRequest = useRef<AbortController | null>(null);
-  const mapRef = useRef<MapView | null>(null);
-  const viewport = useRef(regionAround(nearbyBusLandmarks.central));
+  const [listRevision, setListRevision] = useState(0);
+  const locationRequest = useRef<{ controller: AbortController; manual: boolean } | null>(null);
+  const triedInitialLocation = useRef(false);
+  const mapRef = useRef<NearbyFacilitiesMapHandle | null>(null);
+  const visibleRegion = useRef(regionAround(defaultCenter.point));
   const listOffsets = useRef<Partial<Record<FacilityFilter, number>>>({});
+  const currentOffsets = listOffsets.current;
 
-  const point = reference.kind === 'device' ? reference.point : nearbyBusLandmarks[reference.landmark];
-  const referenceName = reference.kind === 'device' ? copy.nearbyBus.currentLocation : copy.nearbyBus.landmarks[reference.landmark];
-  const referenceLabel = reference.kind === 'default' ? labels.defaultArea
-    : reference.kind === 'landmark' ? labels.browseArea : copy.nearbyBus.reference;
+  const { point } = committedSearchCenter;
+  const centerName = committedSearchCenter.kind === 'landmark' ? copy.nearbyBus.landmarks[committedSearchCenter.landmark]
+    : committedSearchCenter.kind === 'place' ? facilityText(committedSearchCenter.place.name, locale)
+    : committedSearchCenter.kind === 'facility' ? facilityText(committedSearchCenter.facility.name, locale)
+    : committedSearchCenter.kind === 'device' ? copy.nearbyBus.currentLocation
+    : committedSearchCenter.kind === 'map' ? labels.mapCenter : copy.nearbyBus.landmarks.central;
+  const centerConfirmed = committedSearchCenter.kind !== 'default';
+  const placePin = committedSearchCenter.kind === 'landmark' || committedSearchCenter.kind === 'place'
+    ? { point, name: centerName } : undefined;
   const items = useMemo(() => indexNearbyFacilities(nearbyFacilities, category, point), [category, point]);
-  const selected = items.find(({ id }) => id === selectedId);
+  const selected = items.find(({ id }) => id === selectedFacilityKey);
   const samePointFacilities = mode === 'map' && selected ? items.filter(({ id, facility: { coordinate } }) =>
     id !== selected.id && coordinate.latitude === selected.facility.coordinate.latitude
     && coordinate.longitude === selected.facility.coordinate.longitude) : [];
 
   const cancelLocation = useCallback(() => {
-    locationRequest.current?.abort();
+    if (!locationRequest.current) return;
+    locationRequest.current.controller.abort();
     locationRequest.current = null;
     setLocating(false);
   }, []);
 
+  const recordViewport = useCallback((region: Region) => { visibleRegion.current = region; }, []);
+
+  const recordCameraMove = useCallback((region: Region) => {
+    recordViewport(region);
+    setAreaPending(false);
+  }, [recordViewport]);
+
+  const moveCamera = useCallback((target: Coordinates) => {
+    const region = regionAround(target);
+    if (mapRef.current) mapRef.current.moveTo(region);
+    else recordCameraMove(region);
+  }, [recordCameraMove]);
+
+  const confirmCenter = useCallback((center: SearchCenter) => {
+    setLocationIssue(undefined);
+    setCommittedSearchCenter(center);
+    listOffsets.current = {};
+    setListRevision((revision) => revision + 1);
+  }, []);
+
+  const requestLocation = useCallback(async (manual: boolean, fromSearch = false) => {
+    const active = locationRequest.current;
+    if (active && (!manual || active.manual)) return;
+    active?.controller.abort();
+    const request = { controller: new AbortController(), manual };
+    locationRequest.current = request;
+    if (manual) {
+      setLocating(true);
+      setLocationIssue(undefined);
+    }
+    const result = await locateNearbyBusStops(request.controller.signal, manual);
+    if (locationRequest.current !== request) return;
+    locationRequest.current = null;
+    if (manual) setLocating(false);
+    if (result.kind === 'position') {
+      setDeviceLocation(result.point);
+      confirmCenter({ kind: 'device', point: result.point });
+      moveCamera(result.point);
+      if (fromSearch) setPicking(false);
+    } else if (manual && result.kind !== 'cancelled') {
+      setLocationIssue(result.kind);
+    }
+  }, [confirmCenter, moveCamera]);
+
   useFocusEffect(useCallback(() => {
+    if (!triedInitialLocation.current) {
+      triedInitialLocation.current = true;
+      if (AppState.currentState !== 'background') void requestLocation(false);
+    }
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'background') cancelLocation();
     });
     return () => {
       subscription.remove();
       cancelLocation();
+      setPicking(false);
     };
-  }, [cancelLocation]));
+  }, [cancelLocation, requestLocation]));
 
-  function moveCamera(target: Coordinates) {
-    const next = regionAround(target);
-    viewport.current = next;
-    mapRef.current?.animateToRegion(next, 250);
+  function editSearch() {
+    cancelLocation();
+    setLocationIssue(undefined);
   }
 
-  function chooseLandmark(landmark: NearbyLandmark) {
+  function closeSearch() {
     cancelLocation();
     setPicking(false);
-    setLocationIssue(undefined);
-    setReference({ kind: 'landmark', landmark });
-    moveCamera(nearbyBusLandmarks[landmark]);
   }
 
-  async function useLocation() {
-    if (locationRequest.current) return;
-    const request = new AbortController();
-    locationRequest.current = request;
-    setLocating(true);
-    setLocationIssue(undefined);
-    const result = await locateNearbyBusStops(request.signal);
-    if (locationRequest.current !== request) return;
-    locationRequest.current = null;
-    setLocating(false);
-    if (result.kind === 'position') {
-      setReference({ kind: 'device', point: result.point });
-      moveCamera(result.point);
-    } else if (result.kind !== 'cancelled') {
-      setLocationIssue(result.kind);
+  function chooseResult(result: NearbySearchResult) {
+    const point = result.kind === 'facility' ? result.facility.coordinate
+      : result.kind === 'place' ? result.place.point : nearbyBusLandmarks[result.landmark];
+    if (!isNearHongKong(point)) {
+      Alert.alert(labels.outsideSearchArea);
+      return;
     }
+    closeSearch();
+    if (result.kind === 'facility') {
+      if (category !== 'all' && category !== result.facility.category) router.setParams({ category: result.facility.category });
+      setSelectedFacilityKey(facilityId(result.facility));
+    } else {
+      setSelectedFacilityKey(undefined);
+    }
+    confirmCenter({ ...result, point });
+    moveCamera(point);
+  }
+
+  function searchThisArea() {
+    cancelLocation();
+    const { latitude, longitude } = visibleRegion.current;
+    const point = { latitude, longitude };
+    if (!isNearHongKong(point)) {
+      Alert.alert(labels.outsideSearchArea);
+      return;
+    }
+    confirmCenter({ kind: 'map', point });
+    setAreaPending(false);
+  }
+
+  function selectFacility(id?: string) {
+    cancelLocation();
+    setSelectedFacilityKey(id);
   }
 
   return (
@@ -109,40 +182,20 @@ export default function NearbyScreen() {
       style={[styles.screen, { paddingBottom: bottom + floatingTab.height + floatingTab.bottomGap + space.sm }]}>
       <ScrollView style={[styles.headerScroll, { maxHeight: height * 0.43 }]}
         contentContainerStyle={styles.header} keyboardShouldPersistTaps="handled">
-        <View style={styles.heading}>
-          <Icon name="map" size={27} />
-          <View style={styles.grow}>
-            <AppText variant="moduleTitle" accessibilityRole="header">{labels.title}</AppText>
-            <AppText variant="detail" tone="muted">{labels.intro}</AppText>
-          </View>
-          <FacilitySourceInfo />
-        </View>
+        <NearbyHeading />
 
-        <View style={styles.locationBar}>
-          <Pressable accessibilityRole="button" accessibilityLabel={`${referenceLabel} · ${referenceName}`}
-            accessibilityHint={labels.chooseArea} onPress={() => {
-              cancelLocation();
-              setPicking(true);
-            }} style={({ pressed }) => [styles.area, pressed && styles.pressed]}>
-            <Icon name="mappin" size={18} />
-            <View style={styles.grow}>
-              <AppText variant="homeCardTitle">{referenceName}</AppText>
-              <AppText variant="caption" tone="muted">{referenceLabel}</AppText>
-            </View>
-            <Icon name="chevron.down" size={11} />
-          </Pressable>
+        <Pressable accessibilityRole="button" accessibilityHint={centerConfirmed ? labels.searchPlaces : undefined}
+          onPress={() => {
+            editSearch();
+            setPicking(true);
+          }} style={({ pressed }) => [styles.searchEntry, pressed && styles.pressed]}>
+          <Icon name="magnifyingglass" size={20} />
+          <AppText variant="detail" tone={centerConfirmed ? 'text' : 'muted'} style={styles.shrink}>
+            {centerConfirmed ? centerName : labels.searchPlaces}
+          </AppText>
+        </Pressable>
 
-          <Pressable accessibilityRole="button" disabled={locating}
-            accessibilityState={{ busy: locating, disabled: locating }} onPress={() => void useLocation()}
-            style={({ pressed }) => [styles.locationAction, pressed && styles.pressed]}>
-            {locating ? <ActivityIndicator color={colors.primary} /> : <Icon name="location" size={17} />}
-            <AppText variant="caption" tone="primary" style={styles.shrink}>
-              {locating ? copy.nearbyBus.locating : labels.useLocation}
-            </AppText>
-          </Pressable>
-        </View>
-
-        {locationIssue && (
+        {locationIssue && !picking && (
           <View style={styles.locationIssue}>
             <Icon name="info.circle" size={17} />
             <AppText variant="detail" tone="muted" style={styles.grow} accessibilityRole="alert">
@@ -159,9 +212,11 @@ export default function NearbyScreen() {
               <Pressable key={key} accessibilityRole="button" accessibilityState={key === 'bus' ? undefined : { selected: active }}
                 onPress={() => {
                   if (key === 'bus') {
+                    cancelLocation();
                     router.push('/bus/nearby');
                   } else if (key !== category) {
-                    if (selected && key !== 'all' && selected.facility.category !== key) setSelectedId(undefined);
+                    cancelLocation();
+                    if (selected && key !== 'all' && selected.facility.category !== key) setSelectedFacilityKey(undefined);
                     router.setParams({ category: key });
                   }
                 }}
@@ -179,7 +234,11 @@ export default function NearbyScreen() {
           const active = mode === key;
           return (
             <Pressable key={key} accessibilityRole="tab" accessibilityState={{ selected: active }}
-              onPress={() => router.setParams({ view: key })}
+              onPress={() => {
+                if (key === mode) return;
+                cancelLocation();
+                router.setParams({ view: key });
+              }}
               style={({ pressed }) => [styles.segment, active && styles.activeSegment, pressed && styles.pressed]}>
               <Icon name={icon} size={17} color={active ? colors.primary : colors.muted} />
               <AppText variant="homeCardTitle" tone={active ? 'primary' : 'muted'} style={styles.shrink}>{labels[key]}</AppText>
@@ -190,31 +249,41 @@ export default function NearbyScreen() {
 
       <View style={styles.body}>
         {mode === 'map' ? (
-          <NearbyFacilitiesMap mapRef={mapRef} initialRegion={viewport.current} items={items}
-            devicePoint={reference.kind === 'device' ? reference.point : undefined} selectedId={selected?.id}
+          <NearbyFacilitiesMap mapRef={mapRef} initialRegion={visibleRegion.current} items={items}
+            devicePoint={deviceLocation} placePin={placePin} selectedId={selected?.id} areaPending={areaPending}
+            locating={locating} onLocate={() => void requestLocation(true)}
             emptyMessage={items.length ? labels.noFacilitiesInView : facilityEmptyMessage(category, labels)}
-            onRegionChange={(region) => { viewport.current = region; }}
-            onSelect={({ id }) => setSelectedId(id)} onDismiss={() => setSelectedId(undefined)}
-            onRecenter={() => moveCamera(point)} onShowList={() => router.setParams({ view: 'list' })} />
+            onViewportChange={recordViewport} onCameraMove={recordCameraMove} onMapInteraction={cancelLocation}
+            onAreaBrowsed={() => setAreaPending(true)} onSearchArea={searchThisArea}
+            onSelect={({ id }) => selectFacility(id)} onDismiss={() => selectFacility()}
+            onShowList={() => {
+              cancelLocation();
+              router.setParams({ view: 'list' });
+            }} />
         ) : (
-          <NearbyFacilitiesList key={category} items={items} category={category} selectedId={selected?.id}
-            initialOffset={listOffsets.current[category] ?? 0}
-            onScroll={(offset) => { listOffsets.current[category] = offset; }}
+          <NearbyFacilitiesList key={`${category}:${listRevision}`} items={items} category={category} selectedId={selected?.id}
+            initialOffset={currentOffsets[category] ?? 0} centerName={centerName}
+            onScroll={(offset) => { currentOffsets[category] = offset; }}
             onSelect={(item) => {
-              setSelectedId((current) => current === item.id ? undefined : item.id);
+              cancelLocation();
+              setSelectedFacilityKey((current) => current === item.id ? undefined : item.id);
               if (selected?.id !== item.id) moveCamera(item.facility.coordinate);
             }} />
+        )}
+
+        {mode === 'map' && areaPending && (
+          <AppText variant="caption" tone="muted" style={styles.areaStatus}>{labels.browsingMap}</AppText>
         )}
 
         {mode === 'map' && selected && (
           <View style={[styles.selectedCard, { maxHeight: height * 0.3 }]}>
             <ScrollView contentContainerStyle={styles.selectedContents}>
-              <FacilitySummary facility={selected.facility} distance={selected.distance} onClose={() => setSelectedId(undefined)} />
+              <FacilitySummary facility={selected.facility} distance={selected.distance} onClose={() => selectFacility()} />
               {samePointFacilities.length > 0 && (
                 <View>
                   <AppText variant="caption" tone="muted">{labels.sameOfficialCoordinate}</AppText>
                   {samePointFacilities.map(({ id, facility }) => (
-                    <Pressable key={id} accessibilityRole="button" onPress={() => setSelectedId(id)}
+                    <Pressable key={id} accessibilityRole="button" onPress={() => selectFacility(id)}
                       style={({ pressed }) => [styles.samePointChoice, pressed && styles.pressed]}>
                       <AppText variant="detail" tone="primary" style={styles.grow}>{facilityText(facility.name, locale)}</AppText>
                       <Icon name="chevron.right" size={13} />
@@ -227,34 +296,23 @@ export default function NearbyScreen() {
         )}
       </View>
 
-      <Modal visible={picking} presentationStyle="pageSheet" animationType="slide" onRequestClose={() => setPicking(false)}>
-        <SafeAreaView style={styles.screen} accessibilityViewIsModal>
-          <View style={styles.sheetHeader}>
-            <AppText variant="homeHeading" accessibilityRole="header" style={styles.grow}>{labels.chooseArea}</AppText>
-            <Pressable accessibilityRole="button" accessibilityLabel={labels.close} onPress={() => setPicking(false)}
-              style={({ pressed }) => [styles.roundAction, pressed && styles.pressed]}>
-              <Icon name="xmark" size={16} />
-            </Pressable>
-          </View>
-          <ScrollView contentContainerStyle={styles.sheetChoices}>
-            {landmarks.map((landmark) => {
-              const active = reference.kind !== 'device' && reference.landmark === landmark;
-              return (
-                <Pressable key={landmark} accessibilityRole="button" accessibilityState={{ selected: active }}
-                  onPress={() => chooseLandmark(landmark)}
-                  style={({ pressed }) => [styles.landmark, active && styles.activeLandmark, pressed && styles.pressed]}>
-                  <Icon name="mappin" size={17} />
-                  <AppText variant="detail" style={styles.grow} tone={active ? 'primary' : 'text'}>
-                    {copy.nearbyBus.landmarks[landmark]}
-                  </AppText>
-                  {active && <Icon name="checkmark" size={15} />}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </SafeAreaView>
-      </Modal>
+      {picking && <NearbySearchSheet onChoose={chooseResult} onClose={closeSearch} onEdit={editSearch}
+        onLocate={() => void requestLocation(true, true)} locating={locating} locationIssue={locationIssue} />}
     </SafeAreaView>
+  );
+}
+
+function NearbyHeading() {
+  const { copy: { nearby: labels } } = useLanguage();
+  return (
+    <View style={styles.heading}>
+      <Icon name="map" size={27} />
+      <View style={styles.grow}>
+        <AppText variant="moduleTitle" accessibilityRole="header">{labels.title}</AppText>
+        <AppText variant="detail" tone="muted">{labels.intro}</AppText>
+      </View>
+      <FacilitySourceInfo />
+    </View>
   );
 }
 
@@ -264,11 +322,12 @@ function facilityEmptyMessage(category: FacilityFilter, labels: Messages['nearby
   return nearbyFacilities.length ? labels.noMatches : labels.empty;
 }
 
-function NearbyFacilitiesList({ items, category, selectedId, initialOffset, onScroll, onSelect }: {
+function NearbyFacilitiesList({ items, category, selectedId, initialOffset, centerName, onScroll, onSelect }: {
   items: NearbyFacility[];
   category: FacilityFilter;
   selectedId?: string;
   initialOffset: number;
+  centerName: string;
   onScroll: (offset: number) => void;
   onSelect: (item: NearbyFacility) => void;
 }) {
@@ -281,6 +340,12 @@ function NearbyFacilitiesList({ items, category, selectedId, initialOffset, onSc
     <FlatList data={items} extraData={selectedId} keyExtractor={({ id }) => id} contentOffset={contentOffset}
       scrollEventThrottle={32} onScroll={({ nativeEvent }) => onScroll(nativeEvent.contentOffset.y)}
       contentContainerStyle={items.length ? styles.list : styles.emptyList}
+      ListHeaderComponent={(
+        <View style={styles.centerSummary}>
+          <AppText variant="caption" tone="primary" style={styles.shrink}>{labels.searchCenter(centerName)}</AppText>
+          <AppText variant="caption" tone="muted" style={styles.shrink}>{labels.sortedByDistance}</AppText>
+        </View>
+      )}
       ListEmptyComponent={(
         <View style={styles.empty}>
           <View style={[styles.emptyIcon, { backgroundColor: visual.surface }]}><Icon name={visual.icon} color={visual.color} size={28} /></View>
@@ -301,7 +366,7 @@ function FacilitySourceInfo() {
     const datasets = nearbyFacilitySources.map(({ sourceName, snapshotDate }) =>
       [labels.source(facilityText(sourceName, locale)), labels.snapshotDate(snapshotDate)].join('\n'));
     const details = [
-      ...datasets, labels.sourceNote, labels.navigation.coordinateNote, labels.csdiCredit,
+      ...datasets, labels.sourceNote, labels.navigation.coordinateNote, labels.csdiCredit, labels.placeSearch.credit,
     ];
     function openSource(url: string) {
       void Linking.openURL(url).catch(() => {
@@ -481,17 +546,10 @@ const styles = StyleSheet.create({
   },
   grow: { flex: 1, minWidth: 0, gap: space.xs },
   shrink: { flexShrink: 1 },
-  locationBar: {
-    flexDirection: 'row', alignItems: 'stretch', marginHorizontal: homeLayout.gutter, borderRadius: radius.largeCard,
-    backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
-  },
-  area: {
-    flex: 1, minWidth: 0, minHeight: touchTarget, flexDirection: 'row', alignItems: 'center',
-    padding: space.sm, gap: space.sm,
-  },
-  locationAction: {
-    maxWidth: '47%', minHeight: touchTarget, flexDirection: 'row', alignItems: 'center',
-    padding: space.sm, gap: space.xs,
+  searchEntry: {
+    minWidth: 0, minHeight: 48, flexDirection: 'row', alignItems: 'center', marginHorizontal: homeLayout.gutter,
+    paddingHorizontal: space.md, paddingVertical: space.sm, gap: space.sm,
+    borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
   },
   locationIssue: {
     marginHorizontal: homeLayout.gutter, padding: space.sm, borderRadius: radius.control,
@@ -515,7 +573,12 @@ const styles = StyleSheet.create({
   },
   activeSegment: { backgroundColor: colors.tint },
   body: { flex: 1, minHeight: 0, borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  areaStatus: { marginHorizontal: homeLayout.gutter, marginTop: space.xs },
   list: { paddingHorizontal: homeLayout.gutter, paddingTop: space.xs, paddingBottom: space.md, gap: space.sm },
+  centerSummary: {
+    flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: space.xs,
+    backgroundColor: colors.tint, borderRadius: radius.control, paddingHorizontal: space.md, paddingVertical: space.sm,
+  },
   emptyList: { flexGrow: 1, paddingHorizontal: homeLayout.gutter, paddingVertical: space.lg },
   empty: { alignItems: 'center', gap: space.sm, paddingTop: space.xxl },
   emptyIcon: {
@@ -552,14 +615,6 @@ const styles = StyleSheet.create({
   roundAction: {
     width: touchTarget, height: touchTarget, alignItems: 'center', justifyContent: 'center',
     borderRadius: radius.pill, backgroundColor: colors.tint,
-  },
-  sheetHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: homeLayout.gutter, paddingVertical: space.sm,
-  },
-  sheetChoices: { paddingHorizontal: homeLayout.gutter, paddingBottom: space.lg, gap: space.sm },
-  landmark: {
-    minHeight: touchTarget, flexDirection: 'row', alignItems: 'center', padding: space.md, gap: space.sm,
-    borderRadius: radius.control, backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
   },
   activeLandmark: { backgroundColor: colors.tint, borderColor: colors.primary },
   pressed: { opacity: 0.72 },
