@@ -121,7 +121,7 @@ export function facilityFilter(value: unknown): FacilityFilter {
   return facilityCategories.find((category) => category === value) ?? 'all';
 }
 
-export function facilityId({ source, officialId }: Facility) {
+export function facilityId({ source, officialId }: Pick<Facility, 'source' | 'officialId'>) {
   return JSON.stringify([source, officialId]);
 }
 

@@ -2,7 +2,7 @@ import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
 import { type LanguagePreference } from '@/i18n';
 
-const schemaVersion = 7;
+const schemaVersion = 8;
 let databasePromise: Promise<SQLiteDatabase> | undefined;
 
 async function openAppDatabase() {
@@ -141,6 +141,23 @@ async function openAppDatabase() {
             PRIMARY KEY (api_type, language)
           );
           PRAGMA user_version = 7;
+        `);
+      }
+
+      if (version.user_version < 8) {
+        await transaction.execAsync(`
+          CREATE TABLE facility_favorites (
+            source TEXT NOT NULL CHECK (length(trim(source)) > 0),
+            stable_facility_id TEXT NOT NULL CHECK (length(trim(stable_facility_id)) > 0),
+            name_zh_hk_snapshot TEXT,
+            name_en_snapshot TEXT,
+            category_snapshot TEXT NOT NULL CHECK (category_snapshot IN ('toilets', 'parks', 'pets')),
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            CHECK (coalesce(length(trim(name_zh_hk_snapshot)), 0) > 0 OR coalesce(length(trim(name_en_snapshot)), 0) > 0),
+            PRIMARY KEY (source, stable_facility_id)
+          );
+          PRAGMA user_version = 8;
         `);
       }
     });
