@@ -1,6 +1,7 @@
 import afcd from '../assets/data/afcd-toilets.json';
 import fehd from '../assets/data/fehd-toilets.json';
 import lcsdParks from '../assets/data/lcsd-parks.json';
+import lcsdPetGardens from '../assets/data/lcsd-pet-gardens.json';
 
 import { distanceBetween, isNearHongKong, type Coordinates } from '@/nearby-bus-data';
 
@@ -27,6 +28,7 @@ export type Facility = {
   updatedAt?: string;
   openingHours?: FacilityText;
   details?: FacilityText;
+  phone?: FacilityText;
   remarks?: FacilityText;
   serviceNotice?: boolean;
 };
@@ -54,6 +56,12 @@ const lcsdParkSource = {
   sourceUrl: lcsdParks.source.url,
   category: 'parks',
 } as const;
+const lcsdPetGardenSource = {
+  source: 'lcsd-pet-gardens',
+  sourceName: lcsdPetGardens.sourceName,
+  sourceUrl: lcsdPetGardens.source.url,
+  category: 'pets',
+} as const;
 
 export const nearbyFacilitySources = [
   { ...fehdSource, snapshotDate: fehd.snapshotDate },
@@ -65,6 +73,13 @@ export const nearbyFacilitySources = [
     fetchedAt: lcsdParks.source.fetchedAt,
     recordCount: lcsdParks.records.length,
   },
+  {
+    ...lcsdPetGardenSource,
+    snapshotDate: lcsdPetGardens.snapshotDate,
+    revisionDate: lcsdPetGardens.revisionDate,
+    fetchedAt: lcsdPetGardens.source.fetchedAt,
+    recordCount: lcsdPetGardens.records.length,
+  },
 ] as const;
 
 export const nearbyFacilities: readonly Facility[] = [
@@ -72,6 +87,7 @@ export const nearbyFacilities: readonly Facility[] = [
     ? [{ ...record, ...fehdSource, typeName: fehdTypeLabels[record.officialType] }] : []),
   ...afcd.records.map((record) => ({ ...record, ...afcdSource })),
   ...lcsdParks.records.map((record) => ({ ...record, ...lcsdParkSource })),
+  ...lcsdPetGardens.records.map((record) => ({ ...record, ...lcsdPetGardenSource })),
 ];
 
 export function facilityFilter(value: unknown): FacilityFilter {

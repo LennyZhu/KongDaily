@@ -319,7 +319,7 @@ function NearbyHeading() {
 function facilityEmptyMessage(category: FacilityFilter, labels: Messages['nearby']) {
   if (category === 'toilets') return labels.noToilets;
   if (category === 'parks') return labels.noParks;
-  if (category === 'pets') return labels.pending.pets;
+  if (category === 'pets') return labels.noPetGardens;
   return nearbyFacilities.length ? labels.noMatches : labels.empty;
 }
 
@@ -366,11 +366,12 @@ function FacilitySourceInfo() {
   function showSource() {
     const datasets = nearbyFacilitySources.map((dataset) => {
       const lines = [labels.source(facilityText(dataset.sourceName, locale)), labels.snapshotDate(dataset.snapshotDate)];
-      if (dataset.source === 'lcsd-parks') {
+      if ('fetchedAt' in dataset) {
         const acquired = new Intl.DateTimeFormat(locale, {
           dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Hong_Kong',
         }).format(new Date(dataset.fetchedAt));
-        lines.push(labels.revisionDate(dataset.revisionDate), labels.acquiredAt(acquired), labels.parkCoverage(dataset.recordCount));
+        const coverage = dataset.category === 'pets' ? labels.petGardenCoverage : labels.parkCoverage;
+        lines.push(labels.revisionDate(dataset.revisionDate), labels.acquiredAt(acquired), coverage(dataset.recordCount));
       }
       return lines.join('\n');
     });
@@ -385,7 +386,8 @@ function FacilitySourceInfo() {
     }
     Alert.alert(labels.sourceInformation, details.join('\n\n'), [
       ...nearbyFacilitySources.map(({ source, sourceUrl }) => ({
-        text: labels.openOfficialSource(source === 'lcsd-parks' ? 'LCSD' : source.toUpperCase()),
+        text: source === 'lcsd-pet-gardens' ? labels.openPetGardenSource
+          : labels.openOfficialSource(source === 'lcsd-parks' ? 'LCSD' : source.toUpperCase()),
         onPress: () => openSource(sourceUrl),
       })),
       { text: labels.csdiTerms, onPress: () => openSource('https://portal.csdi.gov.hk/csdi-webpage/doc/TNC') },
@@ -407,6 +409,7 @@ function facilityPlace(facility: Facility, locale: FacilityLocale) {
 }
 
 function facilityType(facility: Facility, locale: FacilityLocale, labels: Messages['nearby']) {
+  if (facility.category === 'pets') return labels.petGardenType;
   const subtype = facility.typeName && facilityText(facility.typeName, locale);
   if (facility.source === 'afcd') {
     return subtype ? `${labels.countryParkToilet} · ${subtype}` : labels.countryParkToilet;
@@ -418,6 +421,19 @@ function facilityDistance(distance: number, labels: Messages['nearbyBus']) {
   return distance < 1000 ? labels.metres(Math.round(distance)) : labels.kilometres(Math.round(distance / 100) / 10);
 }
 
+function PetGardenTypeBadge({ label }: { label: string }) {
+  return (
+    <View style={styles.petGardenType}>
+      <AppText variant="caption" tone="primary">{label}</AppText>
+    </View>
+  );
+}
+
+function isAllDayOpeningHours(hours: string) {
+  const text = hours.normalize('NFKC').trim().toLowerCase().replace(/[ \t]+/g, ' ');
+  return /^(?:(?:每日 ?)?24 ?小時(?: ?開放)?|全日 ?開放|(?:open )?24 (?:hours|hrs)(?: daily)?)$/.test(text);
+}
+
 function FacilityListRow({ item: { facility, distance }, expanded, onPress }: {
   item: NearbyFacility; expanded: boolean; onPress: () => void;
 }) {
@@ -427,8 +443,9 @@ function FacilityListRow({ item: { facility, distance }, expanded, onPress }: {
   const place = facilityPlace(facility, locale);
   const isAfcd = facility.source === 'afcd';
   const isPark = facility.category === 'parks';
+  const isPetGarden = facility.category === 'pets';
   const source = facility.source === 'fehd' ? labels.fehdShort
-    : isAfcd || isPark ? undefined : facility.sourceName ? facilityText(facility.sourceName, locale) : facility.source;
+    : isAfcd || isPark || isPetGarden ? undefined : facility.sourceName ? facilityText(facility.sourceName, locale) : facility.source;
   const usesFallback = [facility.name, facility.area ?? facility.district, facility.address]
     .some((field) => facilityTextUsesFallback(field, locale));
   const type = facilityType(facility, locale, labels);
@@ -453,14 +470,15 @@ function FacilityListRow({ item: { facility, distance }, expanded, onPress }: {
             </View>
           </View>
           {place !== '' && <AppText variant="detail" tone="muted" numberOfLines={expanded ? undefined : 2}>{place}</AppText>}
+          {isPetGarden && <PetGardenTypeBadge label={type} />}
           <AppText variant="caption" tone="muted">{caption}</AppText>
           {!expanded && facility.serviceNotice && <FacilityServiceNotice />}
         </View>
       </Pressable>
       {expanded && (
         <View style={styles.listDetails}>
-          <FacilityDetails facility={facility} type={facility.officialType === 'toilet' ? undefined : type}
-            usesFallback={!usesFallback && [facility.openingHours, facility.remarks, facility.details]
+          <FacilityDetails facility={facility} type={facility.officialType === 'toilet' || isPetGarden ? undefined : type}
+            usesFallback={!usesFallback && [facility.openingHours, facility.remarks, facility.details, facility.phone]
               .some((field) => facilityTextUsesFallback(field, locale))} />
         </View>
       )}
@@ -473,7 +491,8 @@ function FacilityDirections({ facility }: { facility: Facility }) {
   const labels = copy.nearby.navigation;
   const isOfficialToilet = facility.category === 'toilets' && (facility.source === 'fehd' || facility.source === 'afcd');
   const isLcsdPark = facility.category === 'parks' && facility.source === 'lcsd-parks';
-  if (!isOfficialToilet && !isLcsdPark) return null;
+  const isLcsdPetGarden = facility.category === 'pets' && facility.source === 'lcsd-pet-gardens';
+  if (!isOfficialToilet && !isLcsdPark && !isLcsdPetGarden) return null;
 
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={labels.directions}
@@ -500,21 +519,29 @@ function FacilityDetails({ facility, distance, type, usesFallback }: {
   const { copy, locale } = useLanguage();
   const labels = copy.nearby;
   const openingHours = facility.openingHours && facilityText(facility.openingHours, locale);
+  const isPetGarden = facility.category === 'pets';
+  const hoursLabel = openingHours && (isPetGarden && !facility.serviceNotice
+    && [facility.openingHours?.['zh-HK'], facility.openingHours?.en].every((hours) => !hours?.trim() || isAllDayOpeningHours(hours))
+      ? labels.allDayOpeningHours : labels.officialHours(openingHours));
   const remarks = facility.remarks && facilityText(facility.remarks, locale);
   const details = facility.details && facilityText(facility.details, locale);
+  const phone = facility.phone && facilityText(facility.phone, locale);
+  const showFullDetails = !isPetGarden || distance === undefined;
   return (
     <>
       {facility.serviceNotice ? <FacilityServiceNotice remarks={remarks} />
-        : remarks && <AppText variant="detail" tone="muted">{labels.officialRemarks(remarks)}</AppText>}
+        : showFullDetails && remarks && <AppText variant="detail" tone="muted">{labels.officialRemarks(remarks)}</AppText>}
       <View style={styles.directionsRow}>
         <View style={styles.grow}>
-          {type && <AppText variant="caption" tone="muted">{type}</AppText>}
+          {type && (isPetGarden ? <PetGardenTypeBadge label={type} /> : <AppText variant="caption" tone="muted">{type}</AppText>)}
           {distance !== undefined && (
             <AppText variant="caption" tone="primary">{labels.directDistance(facilityDistance(distance, copy.nearbyBus))}</AppText>
           )}
-          {openingHours ? <AppText variant="detail" tone="muted">{labels.officialHours(openingHours)}</AppText>
-            : facility.category === 'parks' && <AppText variant="detail" tone="muted">{labels.parkHoursUnavailable}</AppText>}
-          {details && <AppText variant="detail" tone="muted">{labels.officialDetails(details)}</AppText>}
+          {hoursLabel ? <AppText variant="detail" tone="muted">{hoursLabel}</AppText>
+            : (facility.category === 'parks' || isPetGarden) && <AppText variant="detail" tone="muted">{labels.parkHoursUnavailable}</AppText>}
+          {showFullDetails && details && <AppText variant="detail" tone="muted">{labels.officialDetails(details)}</AppText>}
+          {showFullDetails && phone && <AppText variant="detail" tone="muted">{labels.venueEnquiries(phone)}</AppText>}
+          {isPetGarden && <AppText variant="caption" tone="muted">{labels.petGardenRules}</AppText>}
           {usesFallback && <AppText variant="caption" tone="muted">{labels.originalLanguage}</AppText>}
         </View>
         <FacilityDirections facility={facility} />
@@ -616,6 +643,10 @@ const styles = StyleSheet.create({
   listDetails: {
     borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
     padding: space.sm, marginHorizontal: space.sm, gap: space.xs,
+  },
+  petGardenType: {
+    alignSelf: 'flex-start', maxWidth: '100%', backgroundColor: colors.tint, borderRadius: radius.pill,
+    paddingHorizontal: space.sm, paddingVertical: space.xs,
   },
   directionsRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   directionsButton: { alignSelf: 'flex-end' },

@@ -12,7 +12,7 @@ import { colors, homeColors, radius, shadows, space, touchTarget } from '@/theme
 
 export const facilityVisuals = {
   toilets: { icon: 'figure.dress.line.vertical.figure', color: colors.primary, surface: colors.tint },
-  pets: { icon: 'pawprint', color: homeColors.rustInk, surface: homeColors.peach },
+  pets: { icon: 'pawprint', color: colors.primarySoft, surface: colors.tint },
   parks: { icon: 'tree', color: colors.primary, surface: colors.tint },
 } satisfies Record<FacilityCategory, { icon: IconName; color: string; surface: string }>;
 
@@ -190,7 +190,7 @@ export function NearbyFacilitiesMap({ mapRef, initialRegion, devicePoint, placeP
                 coordinate={facility.coordinate}
                 accessibilityRole="button"
                 accessibilityLabel={marker.count > 1 ? labels.samePointMarker(name, marker.count)
-                  : `${name} · ${labels.categories[facility.category]}`}
+                  : `${name} · ${facility.category === 'pets' ? labels.petGardenType : labels.categories[facility.category]}`}
                 accessibilityState={{ selected }}
                 zIndex={selected ? 1 : 0}
                 stopPropagation

@@ -1,0 +1,1795 @@
+{
+  "schemaVersion": 1,
+  "source": "lcsd-pet-gardens",
+  "layer": "PETG",
+  "description": "Permanent KongDaily keys for reviewed dedicated gardens. Keep keys on renumbering. Re-review moves, aliases, closures and scope changes before repinning.",
+  "sourceName": {
+    "zh-HK": "康樂及文化事務署",
+    "en": "Leisure and Cultural Services Department"
+  },
+  "attribution": {
+    "zh-HK": "資料來源：香港特別行政區政府、康樂及文化事務署及空間數據共享平台（CSDI Portal）。資料知識產權由政府及相關機構擁有。",
+    "en": "Source: Hong Kong SAR Government, Leisure and Cultural Services Department and CSDI Portal. The Government and relevant organisations own the intellectual property rights in the data."
+  },
+  "sourceEvidence": {
+    "datasetUrl": "https://portal.csdi.gov.hk/csdi-webpage/dataset/lcsd_rcd_1670384486075_71092",
+    "metadataUrl": "https://portal.csdi.gov.hk/csdi-webpage/metadata/lcsd_rcd_1670384486075_71092/html",
+    "archivesUrl": "https://portal.csdi.gov.hk/csdi-webpage/archivedDatasetFileListPage/lcsd_rcd_1670384486075_71092",
+    "snapshotSha256": {
+      "2026-10-25": "606576cff58d89dfdca94eeba2f9cb1c733627243fa745995cbfefd673b19f43",
+      "2026-05-10": "1f85143bd79181cee00becf96fb93793b755ce9142f806bf4bf27769e1bf4e7f",
+      "2026-08-30": "744aa68e4674bc8b4ea5a66ca6eb6498faf7a7052e9ff9ce196281e2cda20099"
+    },
+    "listingCheckedAt": "2026-11-17T19:25:27+08:00",
+    "listingSha256": {
+      "zh-HK": "972c4df7c67b6920be2579c76428ded410316ec26e640346b968fed3146fd86c",
+      "en": "3b60aef3f7258e0ab8c7ec50f7af3065d52fff39faf28c81483b8217d6b2fcc7"
+    }
+  },
+  "listingUrls": {
+    "zh-HK": "https://www.lcsd.gov.hk/clpss/tc/webApp/Facility/Details.do?ftid=47",
+    "en": "https://www.lcsd.gov.hk/clpss/en/webApp/Facility/Details.do?ftid=47"
+  },
+  "reviewedSnapshot": {
+    "snapshotDate": "2026-10-25",
+    "revisionDate": "2026-10-13",
+    "sha256": "606576cff58d89dfdca94eeba2f9cb1c733627243fa745995cbfefd673b19f43",
+    "rawCount": 55,
+    "bilingualListingCandidates": 47,
+    "approvedCount": 36,
+    "excludedObjectIds": [
+      1,
+      3,
+      4,
+      5,
+      7,
+      8,
+      9,
+      11,
+      12,
+      14,
+      16,
+      19,
+      25,
+      27,
+      29,
+      35,
+      36,
+      42,
+      43
+    ]
+  },
+  "records": [
+    {
+      "id": "pet-garden-001",
+      "name": {
+        "zh-HK": "一鳴路公園",
+        "en": "Yat Ming Road Park"
+      },
+      "district": {
+        "zh-HK": "北區",
+        "en": "NORTH DISTRICT"
+      },
+      "address": {
+        "zh-HK": "粉嶺一鳴路與百和路交界",
+        "en": "Junction of Yat Ming Road and Pak Wo Road"
+      },
+      "coordinate": {
+        "longitude": 114.1452701648,
+        "latitude": 22.4854462662
+      },
+      "listingEvidence": {
+        "clpssTableId": "2483",
+        "geoInfoMapId": "awQKxL2Zkx",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "一鳴路公園",
+          "en": "Yat Ming Road Park"
+        },
+        "address": {
+          "zh-HK": "粉嶺一鳴路與百和路交界",
+          "en": "Junction of Yat Ming Road and Pak Wo Road"
+        },
+        "olderOpenDataOffsetMetres": 30
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 47
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 45
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 43
+        }
+      ],
+      "reviewedFieldsSha256": "0cf149a35d1c68e60f723d90f9a77d5d05e286e4f8661526cb85833807a989f7"
+    },
+    {
+      "id": "pet-garden-002",
+      "name": {
+        "zh-HK": "中西區海濱長廊——上環段",
+        "en": "Central and Western District Promenade—Sheung Wan Section"
+      },
+      "district": {
+        "zh-HK": "中西區",
+        "en": "CENTRAL AND WESTERN DISTRICT"
+      },
+      "address": {
+        "zh-HK": "上環中港道",
+        "en": "Chung Kong Road Sheung Wan"
+      },
+      "coordinate": {
+        "longitude": 114.1495433624,
+        "latitude": 22.2892165974
+      },
+      "listingEvidence": {
+        "clpssTableId": "1068",
+        "geoInfoMapId": "BX99za303g",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "中西區海濱長廊 – 上環段",
+          "en": "Central and Western District Promenade – Sheung Wan Section"
+        },
+        "address": {
+          "zh-HK": "上環中港道",
+          "en": "Chung Kong Road Sheung Wan"
+        },
+        "olderOpenDataOffsetMetres": 19
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 23
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 21
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 19
+        }
+      ],
+      "reviewedFieldsSha256": "705cdb48cffb547fa19834aaf6bff45d287a0154b2576f1d4e7cf59191ba0180"
+    },
+    {
+      "id": "pet-garden-003",
+      "name": {
+        "zh-HK": "中西區海濱長廊——中環段",
+        "en": "Central and Western District Promenade—Central Section"
+      },
+      "district": {
+        "zh-HK": "中西區",
+        "en": "CENTRAL AND WESTERN DISTRICT"
+      },
+      "address": {
+        "zh-HK": "金鐘龍和道",
+        "en": "Lung Wo Road, Admiralty"
+      },
+      "coordinate": {
+        "longitude": 114.1666090804,
+        "latitude": 22.2827616676
+      },
+      "listingEvidence": {
+        "clpssTableId": "1277",
+        "geoInfoMapId": "IPCkWrHSYn",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "中西區海濱長廊 – 中環段",
+          "en": "Central and Western District Promenade – Central Section"
+        },
+        "address": {
+          "zh-HK": "金鐘龍和道",
+          "en": "Lung Wo Road, Admiralty"
+        },
+        "olderOpenDataOffsetMetres": 23
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 20
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 18
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 15
+        }
+      ],
+      "reviewedFieldsSha256": "1bbbb1d5c8d8ad39030fb9a914598b640c2ff694b5ec20a74bed3197b71ffbf4"
+    },
+    {
+      "id": "pet-garden-004",
+      "name": {
+        "zh-HK": "九龍仔公園",
+        "en": "Kowloon Tsai Park"
+      },
+      "district": {
+        "zh-HK": "九龍城",
+        "en": "KWOLOON CITY"
+      },
+      "address": {
+        "zh-HK": "九龍城延文禮士道13號",
+        "en": "13 Inverness Road, Kowloon City, Kowloon."
+      },
+      "coordinate": {
+        "longitude": 114.1834556419,
+        "latitude": 22.3328645662
+      },
+      "listingEvidence": {
+        "clpssTableId": "44",
+        "geoInfoMapId": "dADdAXDB4D",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "九龍仔公園",
+          "en": "Kowloon Tsai Park"
+        },
+        "address": {
+          "zh-HK": "九龍城延文禮士道13號",
+          "en": "13 Inverness Road, Kowloon City, Kowloon."
+        },
+        "olderOpenDataOffsetMetres": 42
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 32
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 30
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 28
+        }
+      ],
+      "reviewedFieldsSha256": "d47949a9662dc1b2002c9e2c17d0d2bdcee9b724759c1837a5e4e410e57505ba",
+      "remarks": {
+        "zh-HK": "寵物活動區在公園車路入口旁。",
+        "en": "The pet area is beside the park’s vehicle entrance."
+      }
+    },
+    {
+      "id": "pet-garden-005",
+      "name": {
+        "zh-HK": "北角海濱花園(一期)",
+        "en": "North Point Promenade (Phase I)"
+      },
+      "district": {
+        "zh-HK": "東區",
+        "en": "EASTERN DISTRICT"
+      },
+      "address": {
+        "zh-HK": "北角琴行街",
+        "en": "Kam Hong Street, North Point"
+      },
+      "coordinate": {
+        "longitude": 114.2022829577,
+        "latitude": 22.2936676066
+      },
+      "listingEvidence": {
+        "clpssTableId": "2206",
+        "geoInfoMapId": "ObSxLIbrvs",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "北角海濱花園(一期)",
+          "en": "North Point Promenade (Phase I)"
+        },
+        "address": {
+          "zh-HK": "北角琴行街",
+          "en": "Kam Hong Street, North Point"
+        },
+        "olderOpenDataOffsetMetres": 92
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 10
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 8
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 5
+        }
+      ],
+      "reviewedFieldsSha256": "04f673ab5ee661957e4032f6aeede17502f442b366eb6c55484f541fa9bc5089"
+    },
+    {
+      "id": "pet-garden-006",
+      "name": {
+        "zh-HK": "和宜合道花園",
+        "en": "Wo Yi Hop Road Garden"
+      },
+      "district": {
+        "zh-HK": "荃灣",
+        "en": "TSUEN WAN"
+      },
+      "address": {
+        "zh-HK": "新界荃灣和宜合道",
+        "en": "Wo Yi Hop Road, Tsuen Wan"
+      },
+      "coordinate": {
+        "longitude": 114.1361200588,
+        "latitude": 22.372573263
+      },
+      "listingEvidence": {
+        "clpssTableId": "1069",
+        "geoInfoMapId": "GcS02GowHQ",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "和宜合道花園",
+          "en": "Wo Yi Hop Road Garden"
+        },
+        "address": {
+          "zh-HK": "新界荃灣和宜合道",
+          "en": "Wo Yi Hop Road, Tsuen Wan"
+        },
+        "olderOpenDataOffsetMetres": 23
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 49
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 47
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 45
+        }
+      ],
+      "reviewedFieldsSha256": "9235d6ce1dd735f9c52feec9faf962e43a1116331692d0946a02b1b4911aea90"
+    },
+    {
+      "id": "pet-garden-007",
+      "name": {
+        "zh-HK": "國瑞路公園",
+        "en": "Kwok Shui Road Park"
+      },
+      "district": {
+        "zh-HK": "荃灣",
+        "en": "TSUEN WAN"
+      },
+      "address": {
+        "zh-HK": "荃灣國瑞路",
+        "en": "Kwok Shui Road, Tsuen Wan"
+      },
+      "coordinate": {
+        "longitude": 114.1288441441,
+        "latitude": 22.3711254806
+      },
+      "listingEvidence": {
+        "clpssTableId": "1452",
+        "geoInfoMapId": "AK2xuVDHwi",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "國瑞路公園",
+          "en": "Kwok Shui Road Park"
+        },
+        "address": {
+          "zh-HK": "荃灣國瑞路",
+          "en": "Kwok Shui Road, Tsuen Wan"
+        },
+        "olderOpenDataOffsetMetres": 53
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 51
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 49
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 47
+        }
+      ],
+      "reviewedFieldsSha256": "fa2c1c35ef03c7ae7047158bc8e220045065a2f6af35abffca3f046adf772033"
+    },
+    {
+      "id": "pet-garden-008",
+      "name": {
+        "zh-HK": "大坑徑休憩處",
+        "en": "Tai Hang Drive Sitting-out Area"
+      },
+      "district": {
+        "zh-HK": "灣仔",
+        "en": "WAN CHAI"
+      },
+      "address": {
+        "zh-HK": "香港灣仔大坑徑 (近大坑徑與春輝道交界)",
+        "en": "Tai Hang Drive, Wan Chai, Hong Kong (adjacent to the junction of Tai Hang Drive and Chun Fai Road)"
+      },
+      "coordinate": {
+        "longitude": 114.1933320566,
+        "latitude": 22.2736834815
+      },
+      "listingEvidence": {
+        "clpssTableId": "1073",
+        "geoInfoMapId": "fgt6GQPuko",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "大坑徑休憩處",
+          "en": "Tai Hang Drive Sitting-out Area"
+        },
+        "address": {
+          "zh-HK": "香港灣仔大坑徑 (近大坑徑與春輝道交界)",
+          "en": "Tai Hang Drive, Wan Chai, Hong Kong (adjacent to the junction of Tai Hang Drive and Chun Fai Road)"
+        },
+        "olderOpenDataOffsetMetres": 8
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 6
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 4
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 1
+        }
+      ],
+      "reviewedFieldsSha256": "dea8f8f20054805d65c376d8116104e744e099ea927e4c15b0d02c58ca28b799"
+    },
+    {
+      "id": "pet-garden-009",
+      "name": {
+        "zh-HK": "天業路休憩處",
+        "en": "Tin Yip Road Sitting-out Area"
+      },
+      "district": {
+        "zh-HK": "元朗",
+        "en": "YUEN LONG"
+      },
+      "address": {
+        "zh-HK": "元朗天水圍濕地公園路",
+        "en": "Wetland Park Road (near Tin Yip Road), Tin Shui Wai, Yuen Long"
+      },
+      "coordinate": {
+        "longitude": 114.0065190499,
+        "latitude": 22.4655015473
+      },
+      "listingEvidence": {
+        "clpssTableId": "1299",
+        "geoInfoMapId": "v68PG0h7s2",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "天業路休憩處",
+          "en": "Tin Yip Road Sitting-out area"
+        },
+        "address": {
+          "zh-HK": "元朗天水圍濕地公園路(近天業路)",
+          "en": "Wetland Park Road (near Tin Yip Road), Tin Shui Wai, Yuen Long"
+        },
+        "olderOpenDataOffsetMetres": 16
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 52
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 50
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 48
+        }
+      ],
+      "reviewedFieldsSha256": "47293264687f02b2d9128e321f4d86491209e43e5cc0383b9fedfc6e2fcec612"
+    },
+    {
+      "id": "pet-garden-010",
+      "name": {
+        "zh-HK": "宋王臺遊樂場",
+        "en": "Sung Wong Toi Playground"
+      },
+      "district": {
+        "zh-HK": "九龍城",
+        "en": "KWOLOON CITY"
+      },
+      "address": {
+        "zh-HK": "九龍城世運道",
+        "en": "Olympic Avenue, Kowloon City"
+      },
+      "coordinate": {
+        "longitude": 114.1902595816,
+        "latitude": 22.3266231094
+      },
+      "listingEvidence": {
+        "clpssTableId": "2208",
+        "geoInfoMapId": "7urLfaumpH",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "宋王臺遊樂場",
+          "en": "Sung Wong Toi Playground"
+        },
+        "address": {
+          "zh-HK": "九龍城世運道",
+          "en": "Olympic Avenue, Kowloon City"
+        },
+        "olderOpenDataOffsetMetres": 26
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 30
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 28
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 26
+        }
+      ],
+      "reviewedFieldsSha256": "e80c91d8ddc07fbc1e29a2ced21d642b5f56fae57f836349b21139b9606f8946"
+    },
+    {
+      "id": "pet-garden-011",
+      "name": {
+        "zh-HK": "富康街寵物公園",
+        "en": "Fu Hong Street Pet Garden"
+      },
+      "district": {
+        "zh-HK": "東區",
+        "en": "EASTERN DISTRICT"
+      },
+      "address": {
+        "zh-HK": "富康街十號",
+        "en": "10 Fu Hong Street"
+      },
+      "coordinate": {
+        "longitude": 114.2483134914,
+        "latitude": 22.2684796489
+      },
+      "listingEvidence": {
+        "clpssTableId": "1266",
+        "geoInfoMapId": "J2ZY57g3vp",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "富康街寵物公園",
+          "en": "Fu Hong Street Pet Garden"
+        },
+        "address": {
+          "zh-HK": "富康街十號",
+          "en": "10 Fu Hong Street"
+        },
+        "olderOpenDataOffsetMetres": 15
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 21
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 19
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 16
+        }
+      ],
+      "reviewedFieldsSha256": "79f2dccbbeaa3ebdc45186c44a16e79eb74ecd7c4ee36a5bccc90477afa84e18"
+    },
+    {
+      "id": "pet-garden-012",
+      "name": {
+        "zh-HK": "寶琳休憩處",
+        "en": "Po Lam Sitting-out Area"
+      },
+      "district": {
+        "zh-HK": "西貢",
+        "en": "SAI KUNG"
+      },
+      "address": {
+        "zh-HK": "西貢將軍澳寶琳北路",
+        "en": "Po Lam Road North, Tseung Kwan O, Sai Kung"
+      },
+      "coordinate": {
+        "longitude": 114.2539906466,
+        "latitude": 22.3272591158
+      },
+      "listingEvidence": {
+        "clpssTableId": "1158",
+        "geoInfoMapId": "h5Lw8KieRK",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "寶琳休憩處",
+          "en": "Po Lam Sitting-out Area"
+        },
+        "address": {
+          "zh-HK": "西貢將軍澳寶琳北路",
+          "en": "Po Lam Road North, Tseung Kwan O, Sai Kung"
+        },
+        "olderOpenDataOffsetMetres": 11
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 46
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 44
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 42
+        }
+      ],
+      "reviewedFieldsSha256": "3f70d16940c5dc0392026d26f3f16d05e77a50f52c7abdca78a7bdda2e54672b"
+    },
+    {
+      "id": "pet-garden-013",
+      "name": {
+        "zh-HK": "屋蘭士街休憩處",
+        "en": "Oaklands Avenue Sitting-out Area"
+      },
+      "district": {
+        "zh-HK": "中西區",
+        "en": "CENTRAL AND WESTERN DISTRICT"
+      },
+      "address": {
+        "zh-HK": "半山屋蘭士街",
+        "en": "Oaklands Avenue, Mid-level"
+      },
+      "coordinate": {
+        "longitude": 114.1436254793,
+        "latitude": 22.282927467
+      },
+      "listingEvidence": {
+        "clpssTableId": "1278",
+        "geoInfoMapId": "DAEFP2BcP4",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "屋蘭士街休憩處",
+          "en": "Oaklands Avenue Sitting-out Area"
+        },
+        "address": {
+          "zh-HK": "半山屋蘭士街",
+          "en": "Oaklands Avenue, Mid-level"
+        },
+        "olderOpenDataOffsetMetres": 14
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 22
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 20
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 17
+        }
+      ],
+      "reviewedFieldsSha256": "e0b1bf393151af9513d981be4fa50765cc1a9833b6d38af323f9fe5e05b92592"
+    },
+    {
+      "id": "pet-garden-014",
+      "name": {
+        "zh-HK": "市鎮公園北兒童遊樂場",
+        "en": "Town Park North Children's Playground"
+      },
+      "district": {
+        "zh-HK": "元朗",
+        "en": "YUEN LONG"
+      },
+      "address": {
+        "zh-HK": "新界元朗市鎮公園北路 (入口近青山公路-屏山段)",
+        "en": "Town Park North Road, Yuen Long (Entrance near Castle Peak Road - Ping Shan)"
+      },
+      "coordinate": {
+        "longitude": 114.0185670809,
+        "latitude": 22.4440169072
+      },
+      "listingEvidence": {
+        "clpssTableId": "1076",
+        "geoInfoMapId": "GAUtbkY5Az",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "市鎮公園北兒童遊樂場",
+          "en": "Town Park North Children's Playground"
+        },
+        "address": {
+          "zh-HK": "新界元朗市鎮公園北路 (入口近青山公路-屏山段)",
+          "en": "Town Park North Road, Yuen Long (Entrance near Castle Peak Road - Ping Shan)"
+        },
+        "olderOpenDataOffsetMetres": 36
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 38
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 36
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 34
+        }
+      ],
+      "reviewedFieldsSha256": "d68c99aa79714a67f9a0cce5a36f454cd364b63df1fc06f6261cb08604b14abf"
+    },
+    {
+      "id": "pet-garden-015",
+      "name": {
+        "zh-HK": "常安街寵物公園",
+        "en": "Sheung On Street Pet Garden"
+      },
+      "district": {
+        "zh-HK": "東區",
+        "en": "EASTERN DISTRICT"
+      },
+      "address": {
+        "zh-HK": "柴灣常安街",
+        "en": "Sheung On Street, Chai Wan"
+      },
+      "coordinate": {
+        "longitude": 114.2421428168,
+        "latitude": 22.2686574419
+      },
+      "listingEvidence": {
+        "clpssTableId": "2204",
+        "geoInfoMapId": "KmORE0ZhXE",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "常安街寵物公園",
+          "en": "Sheung On Street Pet Garden"
+        },
+        "address": {
+          "zh-HK": "柴灣常安街",
+          "en": "Sheung On Street, Chai Wan"
+        },
+        "olderOpenDataOffsetMetres": 10
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 26
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 24
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 22
+        }
+      ],
+      "reviewedFieldsSha256": "88cf56c8a49346abbe11fe922cc9428d721bbb16c00a58805470e160e684f28b"
+    },
+    {
+      "id": "pet-garden-016",
+      "name": {
+        "zh-HK": "常盛街公園",
+        "en": "Sheung Shing Street Park"
+      },
+      "district": {
+        "zh-HK": "九龍城",
+        "en": "KWOLOON CITY"
+      },
+      "address": {
+        "zh-HK": "九龍何文田公主道",
+        "en": "Princess Margaret Road, Homantin, Kowloon"
+      },
+      "coordinate": {
+        "longitude": 114.1793299514,
+        "latitude": 22.3183886504
+      },
+      "listingEvidence": {
+        "clpssTableId": "2128",
+        "geoInfoMapId": "p1T40RtrIk",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "常盛街公園",
+          "en": "Sheung Shing Street Park"
+        },
+        "address": {
+          "zh-HK": "九龍何文田公主道",
+          "en": "Princess Margaret Road, Homantin, Kowloon"
+        },
+        "olderOpenDataOffsetMetres": 18
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 31
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 29
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 27
+        }
+      ],
+      "reviewedFieldsSha256": "f0d6f739d233d6508dcd4eca57b2e91154a4378fd29c867903d7e573b91fb65c"
+    },
+    {
+      "id": "pet-garden-017",
+      "name": {
+        "zh-HK": "康祥街休憩處",
+        "en": "Hong Cheung Street Sitting-out Area"
+      },
+      "district": {
+        "zh-HK": "東區",
+        "en": "EASTERN DISTRICT"
+      },
+      "address": {
+        "zh-HK": "西灣河康祥街",
+        "en": "Hong Cheung Street, Sai Wan Ho"
+      },
+      "coordinate": {
+        "longitude": 114.2220455202,
+        "latitude": 22.2842359926
+      },
+      "listingEvidence": {
+        "clpssTableId": "1294",
+        "geoInfoMapId": "xynqBnDlUt",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "康祥街休憩處",
+          "en": "Hong Cheung Street Sitting-out Area"
+        },
+        "address": {
+          "zh-HK": "西灣河康祥街",
+          "en": "Hong Cheung Street, Sai Wan Ho"
+        },
+        "olderOpenDataOffsetMetres": 55
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 18
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 16
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 13
+        }
+      ],
+      "reviewedFieldsSha256": "dba9fca860ded97a651131d00e42c78ad9ce0f221a78e2fa2f8f70a6e58eb293"
+    },
+    {
+      "id": "pet-garden-018",
+      "name": {
+        "zh-HK": "文昌街公園",
+        "en": "Man Cheong Street Park"
+      },
+      "district": {
+        "zh-HK": "油尖旺",
+        "en": "YAU TSIM MONG"
+      },
+      "address": {
+        "zh-HK": "九龍渡船街 / 欣翔道交界",
+        "en": "Junction of Ferry Street / Yan Cheung Road, Kowloon"
+      },
+      "coordinate": {
+        "longitude": 114.1671681583,
+        "latitude": 22.3086696492
+      },
+      "listingEvidence": {
+        "clpssTableId": "543",
+        "geoInfoMapId": "0QC9UFhsGd",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "文昌街公園",
+          "en": "Man Cheong Street Park"
+        },
+        "address": {
+          "zh-HK": "九龍渡船街 / 欣翔道交界",
+          "en": "Junction of Ferry Street / Yan Cheung Road, Kowloon"
+        },
+        "olderOpenDataOffsetMetres": 9
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 37
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 35
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 33
+        }
+      ],
+      "reviewedFieldsSha256": "ff33d8a5372ba87b68c0638a20de92455d85ab3edfb0b9fc88de58aab534f1e4"
+    },
+    {
+      "id": "pet-garden-019",
+      "name": {
+        "zh-HK": "東喜道休憩處",
+        "en": "Tung Hei Road Sitting-out Area"
+      },
+      "district": {
+        "zh-HK": "東區",
+        "en": "EASTERN DISTRICT"
+      },
+      "address": {
+        "zh-HK": "筲箕灣東喜道80號",
+        "en": "80 Tung Hei Road, Shau Kei Wan"
+      },
+      "coordinate": {
+        "longitude": 114.2297774065,
+        "latitude": 22.2799710163
+      },
+      "listingEvidence": {
+        "clpssTableId": "1293",
+        "geoInfoMapId": "veQbTmIpAc",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "東喜道休憩處",
+          "en": "Tung Hei Road Sitting-out Area"
+        },
+        "address": {
+          "zh-HK": "筲箕灣東喜道80號",
+          "en": "80 Tung Hei Road, Shau Kei Wan"
+        },
+        "olderOpenDataOffsetMetres": 69
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 55
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 53
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 51
+        }
+      ],
+      "reviewedFieldsSha256": "b3ee7cb18cdb58b6976bdbd2024ea9bbee5fb98f0d47e498b917dfefa72a28ab"
+    },
+    {
+      "id": "pet-garden-020",
+      "name": {
+        "zh-HK": "樂民道寵物公園",
+        "en": "Lok Man Road Pet Garden"
+      },
+      "district": {
+        "zh-HK": "東區",
+        "en": "EASTERN DISTRICT"
+      },
+      "address": {
+        "zh-HK": "樂民道四號",
+        "en": "4 Lok Man Road"
+      },
+      "coordinate": {
+        "longitude": 114.2352219753,
+        "latitude": 22.2684749491
+      },
+      "listingEvidence": {
+        "clpssTableId": "1256",
+        "geoInfoMapId": "voeg0DQUD4",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "樂民道寵物公園",
+          "en": "Lok Man Road Pet Garden"
+        },
+        "address": {
+          "zh-HK": "樂民道四號",
+          "en": "4 Lok Man Road"
+        },
+        "olderOpenDataOffsetMetres": 17
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 24
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 22
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 20
+        }
+      ],
+      "reviewedFieldsSha256": "44a43feb2fd96e123f19b5bcda8fd5b2f8ec58384cc5d8bd5b0847c90592291f"
+    },
+    {
+      "id": "pet-garden-021",
+      "name": {
+        "zh-HK": "洪德路二號休憩處",
+        "en": "Hung Tak Road Sitting-out Area No. 2"
+      },
+      "district": {
+        "zh-HK": "元朗",
+        "en": "YUEN LONG"
+      },
+      "address": {
+        "zh-HK": "元朗洪水橋洪德路",
+        "en": "Hung Tak Road, Hung Shui Kiu, Yuen Long"
+      },
+      "coordinate": {
+        "longitude": 113.9982887073,
+        "latitude": 22.433515035
+      },
+      "listingEvidence": {
+        "clpssTableId": "1300",
+        "geoInfoMapId": "QbdsDqKvsz",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "洪德路二號休憩處",
+          "en": "Hung Tak Road Sitting-out Area No.2"
+        },
+        "address": {
+          "zh-HK": "元朗洪水橋洪德路",
+          "en": "Hung Tak Road, Hung Shui Kiu, , Yuen Long"
+        },
+        "olderOpenDataOffsetMetres": 12
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 53
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 51
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 49
+        }
+      ],
+      "reviewedFieldsSha256": "29261e6c66d390df85d67bc849bb1b91bf315a8f0e610f2daa40643b5cda6a94"
+    },
+    {
+      "id": "pet-garden-022",
+      "name": {
+        "zh-HK": "深慈街遊樂場",
+        "en": "Sham Tsz Street Playground"
+      },
+      "district": {
+        "zh-HK": "荃灣",
+        "en": "TSUEN WAN"
+      },
+      "address": {
+        "zh-HK": "荃灣深井深慈街",
+        "en": "Sham Tsz Street, Sham Tseng, Tsuen Wan"
+      },
+      "coordinate": {
+        "longitude": 114.0639773159,
+        "latitude": 22.3654518779
+      },
+      "listingEvidence": {
+        "clpssTableId": "609",
+        "geoInfoMapId": "xRc8pkLyfj",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "深慈街遊樂場",
+          "en": "Sham Tsz Street Playground"
+        },
+        "address": {
+          "zh-HK": "荃灣深井深慈街",
+          "en": "Sham Tsz Street, Sham Tseng, Tsuen Wan"
+        },
+        "olderOpenDataOffsetMetres": 52
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 50
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 48
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 46
+        }
+      ],
+      "reviewedFieldsSha256": "3619c9444e3637203fcdda58a6b83ef84d4957bcc652ffcc11569f743d710dd4"
+    },
+    {
+      "id": "pet-garden-023",
+      "name": {
+        "zh-HK": "清譽街花園",
+        "en": "Tsing Yu Street Garden"
+      },
+      "district": {
+        "zh-HK": "葵青",
+        "en": "KWAI TSING"
+      },
+      "address": {
+        "zh-HK": "青衣清譽街",
+        "en": "Tsing Yu Street, Tsing Yi"
+      },
+      "coordinate": {
+        "longitude": 114.1014099841,
+        "latitude": 22.3545945506
+      },
+      "listingEvidence": {
+        "clpssTableId": "846",
+        "geoInfoMapId": "8zeRHsgiwz",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "清譽街花園",
+          "en": "Tsing Yu Street Garden"
+        },
+        "address": {
+          "zh-HK": "青衣清譽街",
+          "en": "Tsing Yu Street, Tsing Yi"
+        },
+        "olderOpenDataOffsetMetres": 14
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 44
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 42
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 40
+        }
+      ],
+      "reviewedFieldsSha256": "f7afb7a44f84caec05e04f1ac5292467989284655bfab313d2994e7fa4dc9fc7"
+    },
+    {
+      "id": "pet-garden-024",
+      "name": {
+        "zh-HK": "環保大道寵物公園",
+        "en": "Wan Po Road Pet Garden"
+      },
+      "district": {
+        "zh-HK": "西貢",
+        "en": "SAI KUNG"
+      },
+      "address": {
+        "zh-HK": "將軍澳環保大道",
+        "en": "Wan Po Road, Tseung Kwan O"
+      },
+      "coordinate": {
+        "longitude": 114.2683685987,
+        "latitude": 22.3044800973
+      },
+      "listingEvidence": {
+        "clpssTableId": "1191",
+        "geoInfoMapId": "gvVaeHpRAr",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "環保大道寵物公園",
+          "en": "Wan Po Road Pet Garden"
+        },
+        "address": {
+          "zh-HK": "西貢將軍澳環保大道",
+          "en": "Wan Po Road, Tseung Kwan O, Sai Kung"
+        },
+        "olderOpenDataOffsetMetres": 79
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 48
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 46
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 44
+        }
+      ],
+      "reviewedFieldsSha256": "ba0460d871a7cf0e14c3e87b776ebf58676eb4236c5a467b896b5c9e9fa746cd"
+    },
+    {
+      "id": "pet-garden-025",
+      "name": {
+        "zh-HK": "窩打老道/渡船街休憩處",
+        "en": "Waterloo Road/Ferry Street Sitting-out Area"
+      },
+      "district": {
+        "zh-HK": "油尖旺",
+        "en": "YAU TSIM MONG"
+      },
+      "address": {
+        "zh-HK": "九龍窩打老道 ／渡船街交界",
+        "en": "Junction of Waterloo Road / Ferry Street, Kowloon"
+      },
+      "coordinate": {
+        "longitude": 114.1670630388,
+        "latitude": 22.3130260062
+      },
+      "listingEvidence": {
+        "clpssTableId": "2099",
+        "geoInfoMapId": "EqVqRyv6DL",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "窩打老道／渡船街休憩處",
+          "en": "Waterloo Road／Ferry Street Sitting-out Area"
+        },
+        "address": {
+          "zh-HK": "九龍窩打老道 ／渡船街交界",
+          "en": "Junction of Waterloo Road / Ferry Street, Kowloon"
+        },
+        "olderOpenDataOffsetMetres": 30
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 41
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 39
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 37
+        }
+      ],
+      "reviewedFieldsSha256": "d53391c395b7945aea4628df5849d5e1cadb83562eab4ad092a06149d93d8467"
+    },
+    {
+      "id": "pet-garden-026",
+      "name": {
+        "zh-HK": "紅菱街休憩處",
+        "en": "Hung Ling Street Sitting-out Area"
+      },
+      "district": {
+        "zh-HK": "九龍城",
+        "en": "KWOLOON CITY"
+      },
+      "address": {
+        "zh-HK": "九龍紅磡紅菱街",
+        "en": "Hung Ling Street, Hung Hom, Kowloon"
+      },
+      "coordinate": {
+        "longitude": 114.1838037379,
+        "latitude": 22.3056463394
+      },
+      "listingEvidence": {
+        "clpssTableId": "1227",
+        "geoInfoMapId": "zFG2Qu9TqK",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "紅菱街休憩處",
+          "en": "Hung Ling Street Sitting-out Area"
+        },
+        "address": {
+          "zh-HK": "九龍紅磡紅菱街",
+          "en": "Hung Ling Street, Hung Hom, Kowloon"
+        },
+        "olderOpenDataOffsetMetres": 13
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 28
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 26
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 24
+        }
+      ],
+      "reviewedFieldsSha256": "e1ba295cccb4c7e1ab4042ba41a11932229a1965a408d07693f48f8a97f27fe5"
+    },
+    {
+      "id": "pet-garden-027",
+      "name": {
+        "zh-HK": "興華街西遊樂場",
+        "en": "Hing Wah Street West Playground"
+      },
+      "district": {
+        "zh-HK": "深水埗",
+        "en": "SHAM SHUI PO"
+      },
+      "address": {
+        "zh-HK": "九龍深水埗興華街西5號",
+        "en": "5 Hing Wah Street West, Sham Shui Po, Kowloon"
+      },
+      "coordinate": {
+        "longitude": 114.1506627134,
+        "latitude": 22.3334432551
+      },
+      "listingEvidence": {
+        "clpssTableId": "2103",
+        "geoInfoMapId": "MCHQFBK5c3",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "興華街西遊樂場",
+          "en": "Hing Wah Street West Playground"
+        },
+        "address": {
+          "zh-HK": "九龍深水埗興華街西5號",
+          "en": "5 Hing Wah Street West, Sham Shui Po, Kowloon"
+        },
+        "olderOpenDataOffsetMetres": 59
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 33
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 31
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 29
+        }
+      ],
+      "reviewedFieldsSha256": "6daf58279864c4617d5d1eddf9fb434a6082439cdee7c735fc6bd95eb77d8497",
+      "remarks": {
+        "zh-HK": "請從通州街進入寵物活動區。",
+        "en": "Use the Tung Chau Street entrance for the pet area."
+      }
+    },
+    {
+      "id": "pet-garden-028",
+      "name": {
+        "zh-HK": "葵涌公園",
+        "en": "Kwai Chung Park"
+      },
+      "district": {
+        "zh-HK": "葵青",
+        "en": "KWAI TSING"
+      },
+      "address": {
+        "zh-HK": "新界葵涌葵裕街18號",
+        "en": "18 Kwai Yue Street, Kwai Chung, New Territories"
+      },
+      "coordinate": {
+        "longitude": 114.1176961425,
+        "latitude": 22.353964148
+      },
+      "listingEvidence": {
+        "clpssTableId": "3175",
+        "geoInfoMapId": "aNS7JSZaWJ",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "葵涌公園",
+          "en": "Kwai Chung Park"
+        },
+        "address": {
+          "zh-HK": "新界葵涌葵裕街18號",
+          "en": "18 Kwai Yue Street, Kwai Chung, New Territories"
+        }
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 2
+        }
+      ],
+      "reviewedFieldsSha256": "cd81472782cc05e3ebfedaa9010b1f40253ef28e0f83da399898253ccf9ac9b7"
+    },
+    {
+      "id": "pet-garden-029",
+      "name": {
+        "zh-HK": "葵涌青山公路休憩處",
+        "en": "Kwai Chung Castle Peak Road Sitting-out Area"
+      },
+      "district": {
+        "zh-HK": "葵青",
+        "en": "KWAI TSING"
+      },
+      "address": {
+        "zh-HK": "新界葵涌青山公路",
+        "en": "Castle Peak Road, Kwai Chung, New Territories"
+      },
+      "coordinate": {
+        "longitude": 114.134188953,
+        "latitude": 22.3689144957
+      },
+      "listingEvidence": {
+        "clpssTableId": "783",
+        "geoInfoMapId": "Y3XH7DBwMm",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "葵涌青山公路休憩處",
+          "en": "Kwai Chung Castle Peak Road Sitting-out Area"
+        },
+        "address": {
+          "zh-HK": "新界葵涌青山公路",
+          "en": "Castle Peak Road, Kwai Chung, New Territories"
+        },
+        "olderOpenDataOffsetMetres": 42
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 45
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 43
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 41
+        }
+      ],
+      "reviewedFieldsSha256": "5e2b6f9a7d10c847861cf6c0ad0cc53117d8961b1e48d509ab34b6f26c8e3143"
+    },
+    {
+      "id": "pet-garden-030",
+      "name": {
+        "zh-HK": "蒲崗村道/崇華街休憩處",
+        "en": "Po Kong Village Road/Shung Wah Street Sitting-out Area"
+      },
+      "district": {
+        "zh-HK": "黃大仙",
+        "en": "WONG TAI SIN"
+      },
+      "address": {
+        "zh-HK": "蒲崗村道 / 崇華街交界",
+        "en": "J/O Po Kong Village Road / Shung Wah Street"
+      },
+      "coordinate": {
+        "longitude": 114.1995867321,
+        "latitude": 22.3459082662
+      },
+      "listingEvidence": {
+        "clpssTableId": "1263",
+        "geoInfoMapId": "4XSWqBdJGh",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "蒲崗村道 / 崇華街休憩處",
+          "en": "Po Kong Village Road / Shung Wah Street Sitting-out Area"
+        },
+        "address": {
+          "zh-HK": "蒲崗村道 / 崇華街交界",
+          "en": "J/O Po Kong Village Road / Shung Wah Street"
+        },
+        "olderOpenDataOffsetMetres": 16
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 17
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 15
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 12
+        }
+      ],
+      "reviewedFieldsSha256": "c12ac7066d857ec6fd14f44e299b88ed6c59761fd6ba6ddbcc95dbe60b7dab2f"
+    },
+    {
+      "id": "pet-garden-031",
+      "name": {
+        "zh-HK": "藍地寵物公園",
+        "en": "Lam Tei Pet Garden"
+      },
+      "district": {
+        "zh-HK": "屯門",
+        "en": "TUEN MUN"
+      },
+      "address": {
+        "zh-HK": "青山公路與黃崗圍路交界 (港深西部公路橋底)",
+        "en": "Junction of Castle Peak Road and Wong Kong Wai Road (Underneath the Kong Sham Western Highway)"
+      },
+      "coordinate": {
+        "longitude": 113.9857695704,
+        "latitude": 22.4213972128
+      },
+      "listingEvidence": {
+        "clpssTableId": "1260",
+        "geoInfoMapId": "QCazsqb10G",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "藍地寵物公園",
+          "en": "Lam Tei Pet Garden"
+        },
+        "address": {
+          "zh-HK": "青山公路藍地段與黃崗圍路交界 (港深西部公路橋底)",
+          "en": "Junction of Castle Peak Road- Lam Tei and Wong Kong Wai Road (Underneath the Kong Sham Western Highway)"
+        },
+        "olderOpenDataOffsetMetres": 7
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 54
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 52
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 50
+        }
+      ],
+      "reviewedFieldsSha256": "256d12f7e1ae6c052a296f017c887f3de70ca55b2b3075554da76e74207328b6"
+    },
+    {
+      "id": "pet-garden-032",
+      "name": {
+        "zh-HK": "蝴蝶谷道寵物公園",
+        "en": "Butterfly Valley Road Pet Garden"
+      },
+      "district": {
+        "zh-HK": "深水埗",
+        "en": "SHAM SHUI PO"
+      },
+      "address": {
+        "zh-HK": "深水埗蝴蝶谷道2號",
+        "en": "No. 2 Butterfly Valley Road, Sham Shui Po"
+      },
+      "coordinate": {
+        "longitude": 114.1439790166,
+        "latitude": 22.339590053
+      },
+      "listingEvidence": {
+        "clpssTableId": "1228",
+        "geoInfoMapId": "iqZ1GX3jkL",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "蝴蝶谷道寵物公園",
+          "en": "Butterfly Valley Road Pet Garden"
+        },
+        "address": {
+          "zh-HK": "深水埗蝴蝶谷道2號",
+          "en": "No. 2 Butterfly Valley Road, Sham Shui Po"
+        },
+        "olderOpenDataOffsetMetres": 91
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 34
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 32
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 30
+        }
+      ],
+      "reviewedFieldsSha256": "7e12a097082921d7e188022ff75535516c4cb37467bc20a82b6dd5c9b8cfaa28"
+    },
+    {
+      "id": "pet-garden-033",
+      "name": {
+        "zh-HK": "賽馬會興盛路遊樂場",
+        "en": "Jockey Club Hing Shing Road Playground"
+      },
+      "district": {
+        "zh-HK": "葵青",
+        "en": "KWAI TSING"
+      },
+      "address": {
+        "zh-HK": "葵涌興盛路",
+        "en": "Hing Shing Road, Kwai Chung, New Territories"
+      },
+      "coordinate": {
+        "longitude": 114.1242416682,
+        "latitude": 22.358597787
+      },
+      "listingEvidence": {
+        "clpssTableId": "781",
+        "geoInfoMapId": "KuLR0S4A4i",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "賽馬會興盛路遊樂場",
+          "en": "Jockey Club Hing Shing Road Playground"
+        },
+        "address": {
+          "zh-HK": "葵涌興盛路",
+          "en": "Hing Shing Road, Kwai Chung, New Territories"
+        },
+        "olderOpenDataOffsetMetres": 49
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 39
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 37
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 35
+        }
+      ],
+      "reviewedFieldsSha256": "06bf8fcde62b4da12444f25a13a5de5f162095b3eb01bde18fe913b18c38cea7"
+    },
+    {
+      "id": "pet-garden-034",
+      "name": {
+        "zh-HK": "長環街休憩花園",
+        "en": "Cheung Wan Street Rest Garden"
+      },
+      "district": {
+        "zh-HK": "葵青",
+        "en": "KWAI TSING"
+      },
+      "address": {
+        "zh-HK": "青衣長環街",
+        "en": "Cheung Wan Street, Tsing Yi"
+      },
+      "coordinate": {
+        "longitude": 114.1089139571,
+        "latitude": 22.3518670326
+      },
+      "listingEvidence": {
+        "clpssTableId": "772",
+        "geoInfoMapId": "9pOsJLw0kX",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "長環街休憩花園",
+          "en": "Cheung Wan Street Rest Garden"
+        },
+        "address": {
+          "zh-HK": "青衣長環街",
+          "en": "Cheung Wan Street, Tsing Yi"
+        },
+        "olderOpenDataOffsetMetres": 9
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 40
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 38
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 36
+        }
+      ],
+      "reviewedFieldsSha256": "2a97adb140c75f07036657e90e7027cf518772508460658bc8c0adf5214f96a0"
+    },
+    {
+      "id": "pet-garden-035",
+      "name": {
+        "zh-HK": "頌雅路兒童遊樂場",
+        "en": "Chung Nga Road Children's Playground"
+      },
+      "district": {
+        "zh-HK": "大埔",
+        "en": "TAI PO"
+      },
+      "address": {
+        "zh-HK": "大埔頌雅路",
+        "en": "Chung Nga Road, Tai Po"
+      },
+      "coordinate": {
+        "longitude": 114.1692404887,
+        "latitude": 22.4571803432
+      },
+      "listingEvidence": {
+        "clpssTableId": "1157",
+        "geoInfoMapId": "8LIunXMsR1",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "頌雅路兒童遊樂場",
+          "en": "Chung Nga Road Children's Playground"
+        },
+        "address": {
+          "zh-HK": "大埔頌雅路",
+          "en": "Chung Nga Road, Tai Po"
+        },
+        "olderOpenDataOffsetMetres": 56
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 15
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 13
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 10
+        }
+      ],
+      "reviewedFieldsSha256": "4cffea49438f23c2a5df25cde3f2bdb97345c707d058760350dcb12019dd2e19",
+      "remarks": {
+        "zh-HK": "寵物活動區可由汀角路的獨立入口進入。",
+        "en": "The pet area has a separate entrance on Ting Kok Road."
+      }
+    },
+    {
+      "id": "pet-garden-036",
+      "name": {
+        "zh-HK": "馬鞍山西沙路寵物公園",
+        "en": "Ma On Shan Sai Sha Road Pet Garden"
+      },
+      "district": {
+        "zh-HK": "沙田",
+        "en": "SHA TIN"
+      },
+      "address": {
+        "zh-HK": "馬鞍山西沙路與恆輝街交界港鐵橋底",
+        "en": "At the junction of Sai Sha Road and Hang Fai Street underneath MTRC via duct in Ma On Shan"
+      },
+      "coordinate": {
+        "longitude": 114.2250300036,
+        "latitude": 22.4155999974
+      },
+      "listingEvidence": {
+        "clpssTableId": "1054",
+        "geoInfoMapId": "ZfxFqWO9ZT",
+        "basis": "bilingual_dedicated_listing_district_address_and_current_official_wgs84",
+        "name": {
+          "zh-HK": "馬鞍山西沙路寵物公園",
+          "en": "Ma On Shan Sai Sha Road Pet Garden"
+        },
+        "address": {
+          "zh-HK": "馬鞍山西沙路與恆輝街交界港鐵橋底",
+          "en": "At the junction of Sai Sha Road and Hang Fai Street underneath MTRC via duct in Ma On Shan"
+        },
+        "olderOpenDataOffsetMetres": 26
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 13
+        },
+        {
+          "snapshotDate": "2026-08-30",
+          "objectId": 11
+        },
+        {
+          "snapshotDate": "2026-05-10",
+          "objectId": 8
+        }
+      ],
+      "reviewedFieldsSha256": "1678ebe41d11de32c94ea95f65662b392b23bb4157f40a3a5810f9605376ff62"
+    }
+  ]
+}

@@ -110,7 +110,8 @@ export function NearbySearchSheet({ onChoose, onClose, onEdit, onLocate, locatin
               {local.facilities.map((facility) => (
                 <SearchRow key={facilityId(facility)} icon={facilityVisuals[facility.category].icon} title={facilityText(facility.name, locale)}
                   detail={addressLine(facility.area ?? facility.district, facility.address)}
-                  source={facility.sourceName ? facilityText(facility.sourceName, locale) : undefined}
+                  source={facility.category === 'pets' ? labels.petGardenType
+                    : facility.sourceName ? facilityText(facility.sourceName, locale) : undefined}
                   onPress={() => choose({ kind: 'facility', facility })} />
               ))}
             </SearchGroup>
