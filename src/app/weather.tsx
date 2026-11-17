@@ -1,7 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
 
+import { ForecastDayRow } from '@/components/forecast-day-row';
 import { AppText, Icon, Screen } from '@/components/ui';
 import { useLanguage } from '@/language';
 import { colors, homeColors, radius, space, touchTarget, weatherColors } from '@/theme';
@@ -9,10 +11,11 @@ import {
   formatWeatherTime, primaryWeather, weatherCondition, weatherDatasetUrl, weatherStaleAge,
   weatherTermsUrl, weatherWarningUrl,
 } from '@/weather';
-import { useWeather } from '@/weather-hooks';
+import { useForecast, useWeather } from '@/weather-hooks';
 
 export default function WeatherScreen() {
   const { copy, locale } = useLanguage();
+  const router = useRouter();
   const labels = copy.weather;
   const weather = useWeather(locale);
   const [showStations, setShowStations] = useState(false);
@@ -43,13 +46,7 @@ export default function WeatherScreen() {
         <Icon name="arrow.up.right" color={weatherColors.warningInk} size={14} />
       </Pressable>
 
-      <View style={styles.section}>
-        <AppText variant="homeHeading" accessibilityRole="header">{labels.forecast}</AppText>
-        <View style={[styles.panel, styles.forecast]}>
-          <Icon name="calendar" size={19} />
-          <AppText variant="detail" tone="muted" style={styles.grow}>{labels.forecastSoon}</AppText>
-        </View>
-      </View>
+      <ForecastPreview onOpen={() => router.push('/weather/forecast')} />
 
       <View style={styles.section}>
         <View style={styles.sectionHeading}>
@@ -124,6 +121,53 @@ export default function WeatherScreen() {
         </Pressable>
       </View>
     </Screen>
+  );
+}
+
+function ForecastPreview({ onOpen }: { onOpen: () => void }) {
+  const { copy, locale } = useLanguage();
+  const weather = copy.weather;
+  const labels = weather.forecastDetail;
+  const forecast = useForecast(locale);
+  const days = forecast.days.slice(0, 3);
+  const failure = forecast.failure === 'invalid' ? labels.invalid
+    : forecast.failure === 'outdated' ? labels.outdated
+      : forecast.failure ? weather.issues[forecast.failure] : undefined;
+  const empty = forecast.loading ? labels.loading : forecast.expired ? labels.expired : labels.unavailable;
+
+  return (
+    <View style={styles.section}>
+      <View style={styles.forecastHeading}>
+        <AppText variant="homeHeading" accessibilityRole="header" style={styles.grow}>{labels.previewTitle}</AppText>
+        <Pressable accessibilityRole="button" onPress={onOpen}
+          style={({ pressed }) => [styles.forecastLink, pressed && styles.pressed]}>
+          <AppText variant="caption" tone="primary" style={styles.forecastRight}>{labels.open}</AppText>
+          <Icon name="chevron.right" size={12} />
+        </Pressable>
+      </View>
+      <View style={styles.panel}>
+        {days.length ? days.map((day, index) => (
+          <View key={day.date} style={index > 0 ? styles.separator : undefined}>
+            <ForecastDayRow day={day} now={forecast.now} />
+          </View>
+        )) : (
+          <View style={styles.forecastRow} accessibilityLiveRegion="polite">
+            {forecast.loading ? <ActivityIndicator size="small" color={colors.primary} /> : <Icon name="calendar" size={18} />}
+            <AppText variant="detail" tone="muted" style={styles.grow}>{empty}</AppText>
+          </View>
+        )}
+      </View>
+      {forecast.updateTime !== undefined && (
+        <AppText variant="brandSubtitle" tone="muted">
+          {forecast.stale ? `${labels.previewPrevious} · ` : ''}
+          {weather.updated(formatWeatherTime(forecast.updateTime, locale, true))}
+        </AppText>
+      )}
+      {days.length > 0 && days.length < 3 && (
+        <AppText variant="brandSubtitle" tone="muted">{labels.previewCount(days.length)}</AppText>
+      )}
+      {failure && <AppText variant="brandSubtitle" tone="error" accessibilityRole="alert">{failure}</AppText>}
+    </View>
   );
 }
 
@@ -240,7 +284,13 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, borderRadius: radius.largeCard,
     backgroundColor: colors.surface, overflow: 'hidden',
   },
-  forecast: { flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.md },
+  forecastHeading: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  forecastLink: { minHeight: touchTarget, maxWidth: '51%', flexDirection: 'row', alignItems: 'center', gap: space.xs },
+  forecastRight: { flexShrink: 1, textAlign: 'right' },
+  forecastRow: {
+    minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: space.sm,
+    paddingHorizontal: space.md, paddingVertical: space.sm,
+  },
   listRow: {
     flexDirection: 'row', alignItems: 'center', minHeight: touchTarget,
     paddingHorizontal: space.md, paddingVertical: space.sm, gap: space.sm,

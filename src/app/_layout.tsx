@@ -34,6 +34,11 @@ function RootStack() {
         headerStyle: { backgroundColor: colors.tintedBackground },
         headerShadowVisible: false,
       }} />
+      <Stack.Screen name="weather/forecast" options={{
+        title: copy.weather.forecast,
+        headerStyle: { backgroundColor: colors.tintedBackground },
+        headerShadowVisible: false,
+      }} />
       <Stack.Screen name="bus" options={{ headerShown: false }} />
       <Stack.Screen name="bus/nearby" options={{
         title: copy.bus.shortcuts.nearby,

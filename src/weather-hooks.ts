@@ -2,11 +2,13 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { AppState } from 'react-native';
 
-import { getWeatherState, nextWeatherCheck, refreshWeather, subscribeWeather, weatherRetryInterval } from '@/weather-data';
-import { hasOtherLanguageWeatherText, weatherHideAge, weatherStaleAge, type WeatherLocale } from '@/weather';
+import { forecastFeed, observationFeed, weatherRetryInterval, type WeatherFeed } from '@/weather-data';
+import {
+  forecastDaysForDisplay, forecastStaleAge, hasOtherLanguageWeatherText, weatherHideAge, weatherStaleAge, type WeatherLocale,
+} from '@/weather';
 
-export function useWeather(locale: WeatherLocale) {
-  const { hydrated, entries } = useSyncExternalStore(subscribeWeather, getWeatherState, getWeatherState);
+function useWeatherFeed<Report extends { updateTime: number }>(feed: WeatherFeed<Report>, locale: WeatherLocale) {
+  const { hydrated, entries } = useSyncExternalStore(feed.subscribe, feed.getState, feed.getState);
   const [now, setNow] = useState(Date.now);
   const [active, setActive] = useState(false);
   const focused = useRef(false);
@@ -20,9 +22,9 @@ export function useWeather(locale: WeatherLocale) {
       const current = ++generation;
       clearTimeout(timer);
       setNow(Date.now());
-      void refreshWeather(locale, () => focused.current && generation === current).then(() => {
+      void feed.refresh(locale, () => focused.current && generation === current).then(() => {
         if (generation === current && focused.current && AppState.currentState === 'active') {
-          timer = setTimeout(check, Math.max(1000, nextWeatherCheck(locale) - Date.now()));
+          timer = setTimeout(check, Math.max(1000, feed.nextCheck(locale) - Date.now()));
         }
       });
     }
@@ -46,9 +48,32 @@ export function useWeather(locale: WeatherLocale) {
       clearTimeout(timer);
       subscription.remove();
     };
-  }, [locale]));
+  }, [feed, locale]));
 
   const entry = entries[locale];
+  const retryAt = (entry.attemptedAt ?? 0) + weatherRetryInterval;
+  return {
+    hydrated, entries, entry, now, active, setNow, retryAt,
+    failure: entry.failure, refreshing: Boolean(entry.refreshing),
+    canRefresh: active && hydrated && !entry.refreshing && now >= retryAt,
+    refresh: () => {
+      setNow(Date.now());
+      void feed.refresh(locale, () => focused.current, true);
+    },
+  };
+}
+
+function useWeatherDeadline(active: boolean, deadline: number, setNow: (time: number) => void) {
+  useEffect(() => {
+    if (!active || !Number.isFinite(deadline)) return;
+    const timer = setTimeout(() => setNow(Date.now()), Math.max(1, deadline - Date.now()));
+    return () => clearTimeout(timer);
+  }, [active, deadline, setNow]);
+}
+
+export function useWeather(locale: WeatherLocale) {
+  const { entries, entry, now, retryAt, active, setNow, hydrated, failure, refreshing, canRefresh, refresh } =
+    useWeatherFeed(observationFeed, locale);
   const isHidden = (time: number) => now - time >= weatherHideAge;
   const alternate = entries[locale === 'en' ? 'zh-HK' : 'en'].snapshot;
   const snapshot = alternate && !isHidden(alternate.report.updateTime)
@@ -67,26 +92,31 @@ export function useWeather(locale: WeatherLocale) {
     || (raw.temperature && now - raw.temperature.recordTime >= weatherStaleAge)
     || (raw.humidity && now - raw.humidity.recordTime >= weatherStaleAge)
   ));
-  const retryAt = (entry.attemptedAt ?? 0) + weatherRetryInterval;
   const nextDeadline = Math.min(retryAt > now ? retryAt : Infinity,
     ...observationTimes.flatMap((time) => time === undefined ? [] : [time + weatherStaleAge, time + weatherHideAge])
       .filter((deadline) => deadline > now));
 
-  useEffect(() => {
-    if (!active || !Number.isFinite(nextDeadline)) return;
-    const timer = setTimeout(() => setNow(Date.now()), Math.max(1, nextDeadline - Date.now()));
-    return () => clearTimeout(timer);
-  }, [active, nextDeadline]);
+  useWeatherDeadline(active, nextDeadline, setNow);
 
   return {
-    report, raw, stale, now,
-    failure: entry.failure, refreshing: Boolean(entry.refreshing),
-    loading: !hydrated || (!raw && !entry.failure),
+    report, raw, stale, now, failure, refreshing, canRefresh, refresh,
+    loading: !hydrated || (!raw && !failure),
     languageFallback: Boolean(snapshot && (snapshot.locale !== locale || hasOtherLanguageWeatherText(snapshot.report, locale))),
-    canRefresh: active && hydrated && !entry.refreshing && now >= retryAt,
-    refresh: () => {
-      setNow(Date.now());
-      void refreshWeather(locale, () => focused.current, true);
-    },
+  };
+}
+
+export function useForecast(locale: WeatherLocale) {
+  const { entry, now, retryAt, active, setNow, hydrated, failure, refreshing, canRefresh, refresh } =
+    useWeatherFeed(forecastFeed, locale);
+  const report = entry.snapshot?.report;
+  const { days, nextDay, incomplete } = forecastDaysForDisplay(report, now);
+  const staleAt = report ? report.updateTime + forecastStaleAge : Infinity;
+  useWeatherDeadline(active, Math.min(nextDay, retryAt > now ? retryAt : Infinity, staleAt > now ? staleAt : Infinity), setNow);
+
+  return {
+    days, incomplete, now, failure, refreshing, canRefresh, refresh, updateTime: report?.updateTime,
+    loading: !hydrated || (!report && !failure),
+    stale: Boolean(report && (failure || now >= staleAt)),
+    expired: days.length === 0 && Boolean(report || failure === 'outdated'),
   };
 }

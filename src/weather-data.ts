@@ -1,24 +1,22 @@
 import { AppState } from 'react-native';
 
 import { getDatabase } from '@/database';
-import { parseWeatherReport, weatherApiType, type WeatherLocale, type WeatherReport } from '@/weather';
+import {
+  forecastApiType, hongKongForecastDay, parseForecastReport, parseWeatherReport, weatherApiType, type WeatherLocale,
+} from '@/weather';
 
 export type WeatherFailure = 'network' | 'tls' | 'http' | 'timeout' | 'json' | 'invalid' | 'outdated';
-export type WeatherSnapshot = { locale: WeatherLocale; report: WeatherReport; fetchedAt: number };
-
-type Entry = { snapshot?: WeatherSnapshot; failure?: WeatherFailure; refreshing?: boolean; attemptedAt?: number };
+type ReportTime = { updateTime: number };
+type WeatherApiType = typeof weatherApiType | typeof forecastApiType;
+type Snapshot<Report> = { locale: WeatherLocale; report: Report; fetchedAt: number };
+type Entry<Report> = { snapshot?: Snapshot<Report>; failure?: WeatherFailure; refreshing?: boolean; attemptedAt?: number };
 type CacheRow = { language: WeatherLocale; update_time: number; fetched_at: number; payload: string };
-type WeatherState = { hydrated: boolean; entries: Record<WeatherLocale, Entry> };
+type WeatherState<Report> = { hydrated: boolean; entries: Record<WeatherLocale, Entry<Report>> };
 
 const refreshInterval = 20 * 60_000;
 export const weatherRetryInterval = 15_000;
 const requestTimeout = 12_000;
 const baseUrl = 'https://data.weather.gov.hk/weatherAPI/opendata/weather.php';
-
-let state: WeatherState = { hydrated: false, entries: { 'zh-HK': {}, en: {} } };
-let hydration: Promise<void> | undefined;
-const listeners = new Set<() => void>();
-const pending = new Map<WeatherLocale, Promise<void>>();
 
 class WeatherRequestError extends Error {
   constructor(readonly kind: WeatherFailure) {
@@ -26,52 +24,8 @@ class WeatherRequestError extends Error {
   }
 }
 
-export function subscribeWeather(listener: () => void) {
-  listeners.add(listener);
-  return () => { listeners.delete(listener); };
-}
-
-export function getWeatherState() {
-  return state;
-}
-
-function publish(next: WeatherState) {
-  state = next;
-  for (const notify of listeners) notify();
-}
-
-function change(locale: WeatherLocale, entry: Entry) {
-  publish({ ...state, entries: { ...state.entries, [locale]: { ...state.entries[locale], ...entry } } });
-}
-
-function hydrateWeather() {
-  hydration ??= (async () => {
-    const entries = { ...state.entries };
-    try {
-      const db = await getDatabase();
-      const rows = await db.getAllAsync<CacheRow>(
-        'SELECT language, update_time, fetched_at, payload FROM weather_cache WHERE api_type = ?', weatherApiType,
-      );
-      for (const row of rows) {
-        if (!Object.hasOwn(entries, row.language) || !Number.isSafeInteger(row.fetched_at) || row.fetched_at <= 0) continue;
-        try {
-          const report = parseWeatherReport(JSON.parse(row.payload));
-          if (report && report.updateTime === row.update_time) {
-            entries[row.language] = { snapshot: { locale: row.language, report, fetchedAt: row.fetched_at } };
-          }
-        } catch {
-          // The other language can still be read if a single saved report is corrupt.
-        }
-      }
-    } catch {
-      // Weather can still be fetched when local storage is unavailable.
-    }
-    publish({ hydrated: true, entries });
-  })();
-  return hydration;
-}
-
-async function requestWeather(locale: WeatherLocale, signal: AbortSignal) {
+async function requestWeather<Report>(apiType: WeatherApiType, locale: WeatherLocale, signal: AbortSignal,
+  parse: (payload: unknown) => Report | undefined) {
   const controller = new AbortController();
   const cancel = () => controller.abort();
   if (signal.aborted) cancel();
@@ -83,7 +37,7 @@ async function requestWeather(locale: WeatherLocale, signal: AbortSignal) {
   }, requestTimeout);
   let payload: string;
   try {
-    const response = await fetch(`${baseUrl}?dataType=${weatherApiType}&lang=${locale === 'en' ? 'en' : 'tc'}`,
+    const response = await fetch(`${baseUrl}?dataType=${apiType}&lang=${locale === 'en' ? 'en' : 'tc'}`,
       { signal: controller.signal });
     if (!response.ok) throw new WeatherRequestError('http');
     payload = await response.text();
@@ -105,12 +59,12 @@ async function requestWeather(locale: WeatherLocale, signal: AbortSignal) {
   } catch {
     throw new WeatherRequestError('json');
   }
-  const report = parseWeatherReport(json);
+  const report = parse(json);
   if (!report) throw new WeatherRequestError('invalid');
   return { report, payload };
 }
 
-async function saveSnapshot({ locale, report, fetchedAt }: WeatherSnapshot, payload: string) {
+async function saveSnapshot(apiType: WeatherApiType, { locale, report, fetchedAt }: Snapshot<ReportTime>, payload: string) {
   const db = await getDatabase();
   await db.runAsync(
     `INSERT INTO weather_cache (api_type, language, update_time, fetched_at, payload)
@@ -118,53 +72,114 @@ async function saveSnapshot({ locale, report, fetchedAt }: WeatherSnapshot, payl
      ON CONFLICT(api_type, language) DO UPDATE SET
        update_time = excluded.update_time, fetched_at = excluded.fetched_at, payload = excluded.payload
      WHERE excluded.update_time >= weather_cache.update_time`,
-    weatherApiType, locale, report.updateTime, fetchedAt, payload,
+    apiType, locale, report.updateTime, fetchedAt, payload,
   );
 }
 
-export function nextWeatherCheck(locale: WeatherLocale, now = Date.now()) {
-  const { snapshot, attemptedAt } = state.entries[locale];
-  const checks = [snapshot?.fetchedAt ?? 0, attemptedAt ?? 0].filter((value) => value <= now);
-  return Math.max(0, ...checks) + refreshInterval;
-}
+function createWeatherFeed<Report extends ReportTime>(apiType: WeatherApiType, parse: (payload: unknown) => Report | undefined,
+  isUsable?: (report: Report, now: number) => boolean) {
+  let state: WeatherState<Report> = { hydrated: false, entries: { 'zh-HK': {}, en: {} } };
+  let hydration: Promise<void> | undefined;
+  const listeners = new Set<() => void>();
+  const pending = new Map<WeatherLocale, Promise<void>>();
 
-export async function refreshWeather(locale: WeatherLocale, canStart: () => boolean, manual = false) {
-  await hydrateWeather();
-  if (!canStart() || AppState.currentState !== 'active') return;
-  const existing = pending.get(locale);
-  if (existing) return existing;
-  const now = Date.now();
-  const attempt = state.entries[locale].attemptedAt;
-  const due = manual ? (attempt !== undefined && attempt <= now ? attempt : 0) + weatherRetryInterval : nextWeatherCheck(locale, now);
-  if (now < due) return;
+  function publish(next: WeatherState<Report>) {
+    state = next;
+    for (const notify of listeners) notify();
+  }
 
-  const controller = new AbortController();
-  const activity = AppState.addEventListener('change', (next) => {
-    if (next !== 'active') controller.abort();
-  });
-  change(locale, { refreshing: true, attemptedAt: now });
-  const work = (async () => {
-    try {
-      const { report, payload } = await requestWeather(locale, controller.signal);
-      if (controller.signal.aborted) return;
-      const priorTime = state.entries[locale].snapshot?.report.updateTime;
-      if (priorTime !== undefined && report.updateTime < priorTime) throw new WeatherRequestError('outdated');
-      const snapshot = { locale, report, fetchedAt: Date.now() };
-      change(locale, { snapshot, failure: undefined });
-      await saveSnapshot(snapshot, payload).catch(() => {});
-    } catch (error) {
-      if (!controller.signal.aborted) {
-        change(locale, { failure: error instanceof WeatherRequestError ? error.kind : 'network' });
+  function change(locale: WeatherLocale, entry: Entry<Report>) {
+    publish({ ...state, entries: { ...state.entries, [locale]: { ...state.entries[locale], ...entry } } });
+  }
+
+  function hydrate() {
+    hydration ??= (async () => {
+      const entries = { ...state.entries };
+      try {
+        const db = await getDatabase();
+        const rows = await db.getAllAsync<CacheRow>(
+          'SELECT language, update_time, fetched_at, payload FROM weather_cache WHERE api_type = ?', apiType,
+        );
+        for (const row of rows) {
+          if (!Object.hasOwn(entries, row.language) || !Number.isSafeInteger(row.fetched_at) || row.fetched_at <= 0) continue;
+          try {
+            const report = parse(JSON.parse(row.payload));
+            if (report && report.updateTime === row.update_time) {
+              entries[row.language] = { snapshot: { locale: row.language, report, fetchedAt: row.fetched_at } };
+            }
+          } catch {
+            // A corrupt row in one language does not invalidate the other.
+          }
+        }
+      } catch {
+        // Weather can still be fetched when local storage is unavailable.
       }
-    } finally {
-      activity.remove();
-      pending.delete(locale);
-      change(locale, {
-        refreshing: false,
-        ...(controller.signal.aborted ? { attemptedAt: attempt } : {}),
-      });
-    }
-  })();
-  pending.set(locale, work);
-  return work;
+      publish({ hydrated: true, entries });
+    })();
+    return hydration;
+  }
+
+  function nextCheck(locale: WeatherLocale, now = Date.now()) {
+    const { snapshot, attemptedAt } = state.entries[locale];
+    const checks = [snapshot?.fetchedAt ?? 0, attemptedAt ?? 0].filter((value) => value <= now);
+    return Math.max(0, ...checks) + refreshInterval;
+  }
+
+  async function refresh(locale: WeatherLocale, canStart: () => boolean, manual = false) {
+    await hydrate();
+    if (!canStart() || AppState.currentState !== 'active') return;
+    const existing = pending.get(locale);
+    if (existing) return existing;
+    const now = Date.now();
+    const attempt = state.entries[locale].attemptedAt;
+    const due = manual ? (attempt !== undefined && attempt <= now ? attempt : 0) + weatherRetryInterval : nextCheck(locale, now);
+    if (now < due) return;
+
+    const controller = new AbortController();
+    const activity = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') controller.abort();
+    });
+    change(locale, { refreshing: true, attemptedAt: now });
+    const work = (async () => {
+      try {
+        const { report, payload } = await requestWeather(apiType, locale, controller.signal, parse);
+        if (controller.signal.aborted) return;
+        const priorTime = state.entries[locale].snapshot?.report.updateTime;
+        const fetchedAt = Date.now();
+        if ((priorTime !== undefined && report.updateTime < priorTime) || (isUsable && !isUsable(report, fetchedAt))) {
+          throw new WeatherRequestError('outdated');
+        }
+        const snapshot = { locale, report, fetchedAt };
+        change(locale, { snapshot, failure: undefined });
+        await saveSnapshot(apiType, snapshot, payload).catch(() => {});
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          change(locale, { failure: error instanceof WeatherRequestError ? error.kind : 'network' });
+        }
+      } finally {
+        activity.remove();
+        pending.delete(locale);
+        change(locale, {
+          refreshing: false,
+          ...(controller.signal.aborted ? { attemptedAt: attempt } : {}),
+        });
+      }
+    })();
+    pending.set(locale, work);
+    return work;
+  }
+
+  function subscribe(listener: () => void) {
+    listeners.add(listener);
+    return () => { listeners.delete(listener); };
+  }
+
+  return { subscribe, getState: () => state, refresh, nextCheck };
 }
+
+export type WeatherFeed<Report extends ReportTime> = ReturnType<typeof createWeatherFeed<Report>>;
+export const observationFeed = createWeatherFeed(weatherApiType, parseWeatherReport);
+export const forecastFeed = createWeatherFeed(forecastApiType, parseForecastReport, (report, now) => {
+  const today = hongKongForecastDay(now);
+  return report.days.some(({ date }) => date >= today);
+});

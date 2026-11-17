@@ -12,10 +12,33 @@ export type WeatherReport = {
   icons: number[];
   iconUpdateTime?: number;
 };
+export type ForecastDay = {
+  date: number;
+  week?: string;
+  description?: string;
+  wind?: string;
+  maxTemp?: number;
+  minTemp?: number;
+  maxRh?: number;
+  minRh?: number;
+  icon?: number;
+  psr?: ForecastPsr;
+};
+export type ForecastReport = { updateTime: number; days: ForecastDay[] };
+
+const significantRain = {
+  高: 'high', 中高: 'mediumHigh', 中: 'medium', 中低: 'mediumLow', 低: 'low',
+  High: 'high', 'Medium High': 'mediumHigh', Medium: 'medium', 'Medium Low': 'mediumLow', Low: 'low',
+} as const;
+type ForecastPsr = (typeof significantRain)[keyof typeof significantRain];
 
 export const weatherApiType = 'rhrread';
+export const forecastApiType = 'fnd';
 export const weatherStaleAge = 90 * 60_000;
 export const weatherHideAge = 6 * 60 * 60_000;
+export const forecastStaleAge = 24 * 60 * 60_000;
+const dayLength = 24 * 60 * 60_000;
+const hongKongOffset = 8 * 60 * 60_000;
 
 function record(value: unknown) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
@@ -98,6 +121,76 @@ export function parseWeatherReport(payload: unknown): WeatherReport | undefined 
     ? [...new Set(root.icon.filter((code): code is number => Number.isSafeInteger(code) && code >= 0))]
     : [];
   return { updateTime, temperature, humidity, uv, rainfall, icons, iconUpdateTime: time(root.iconUpdateTime) };
+}
+
+function dateOfForecast(value: unknown) {
+  if (typeof value !== 'string' || !/^\d{8}$/.test(value)) return;
+  return time(`${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6)}T00:00:00+08:00`);
+}
+
+function forecastRange(minField: unknown, maxField: unknown, unit: string, lower: number, upper: number) {
+  const minRow = record(minField);
+  const maxRow = record(maxField);
+  const min = minRow?.unit === unit ? number(minRow.value, lower, upper) : undefined;
+  const max = maxRow?.unit === unit ? number(maxRow.value, lower, upper) : undefined;
+  return min !== undefined && max !== undefined && min > max ? {} : { min, max };
+}
+
+export function parseForecastReport(payload: unknown): ForecastReport | undefined {
+  const root = record(payload);
+  const updateTime = time(root?.updateTime);
+  if (updateTime === undefined || !Array.isArray(root?.weatherForecast)) return;
+
+  const days = new Map<number, ForecastDay>();
+  for (const value of root.weatherForecast) {
+    const row = record(value);
+    const date = dateOfForecast(row?.forecastDate);
+    if (!row || date === undefined || days.has(date)) continue;
+    const description = string(row.forecastWeather);
+    const wind = string(row.forecastWind);
+    const { min: minTemp, max: maxTemp } = forecastRange(row.forecastMintemp, row.forecastMaxtemp, 'C', -100, 100);
+    const { min: minRh, max: maxRh } = forecastRange(row.forecastMinrh, row.forecastMaxrh, 'percent', 0, 100);
+    const code = row.ForecastIcon;
+    const icon = typeof code === 'number' && Number.isSafeInteger(code) && code >= 0 ? code : undefined;
+    const psrText = string(row.PSR);
+    const psr = psrText && Object.hasOwn(significantRain, psrText)
+      ? significantRain[psrText as keyof typeof significantRain] : undefined;
+    if ([description, wind, minTemp, maxTemp, minRh, maxRh, psr].every((field) => field === undefined)
+      && weatherCondition(icon)[1] === 'unknown') continue;
+    days.set(date, { date, week: string(row.week), description, wind, minTemp, maxTemp, minRh, maxRh, icon, psr });
+  }
+  return days.size ? { updateTime, days: [...days.values()].sort((a, b) => a.date - b.date) } : undefined;
+}
+
+export function hongKongForecastDay(timestamp: number) {
+  return Math.floor((timestamp + hongKongOffset) / dayLength) * dayLength - hongKongOffset;
+}
+
+export function forecastDaysForDisplay(report: ForecastReport | undefined, now: number) {
+  const today = hongKongForecastDay(now);
+  const days = report?.days.filter(({ date }) => date >= today) ?? [];
+  return {
+    days, nextDay: today + dayLength,
+    incomplete: days.length > 0 && (days.length < 9 || days.some(({ date }, index) => index > 0
+      && date - days[index - 1].date !== dayLength)),
+  };
+}
+
+export function formatForecastDate(date: number, locale: WeatherLocale, now: number) {
+  const year = (timestamp: number) => new Date(timestamp + hongKongOffset).getUTCFullYear();
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: 'Asia/Hong_Kong', month: 'short', day: 'numeric',
+    ...(year(date) !== year(now) ? { year: 'numeric' as const } : {}),
+  }).format(date);
+}
+
+export function forecastWeekday(day: ForecastDay, locale: WeatherLocale) {
+  const weekday = new Intl.DateTimeFormat(locale, { timeZone: 'Asia/Hong_Kong', weekday: 'long' }).format(day.date);
+  return day.week?.toLowerCase() === weekday.toLowerCase() ? day.week : weekday;
+}
+
+export function forecastSourceUrl(locale: WeatherLocale) {
+  return `https://www.hko.gov.hk/${locale === 'en' ? 'en' : 'tc'}/wxinfo/currwx/fnd.htm?tablenote=true`;
 }
 
 function stationKey(place: string) {
