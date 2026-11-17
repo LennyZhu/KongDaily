@@ -1,14 +1,16 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, type Href } from 'expo-router';
 import type { PropsWithChildren } from 'react';
-import { Image, Pressable, StyleSheet, View, type ImageSourcePropType, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  ActivityIndicator, Image, Pressable, StyleSheet, useWindowDimensions, View,
+  type ImageSourcePropType, type StyleProp, type ViewStyle,
+} from 'react-native';
 
 import { AppText, Icon, type IconName } from '@/components/ui';
-import { WeatherWarningLink } from '@/components/weather-warning-ui';
 import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
 import { colors, homeColors, homeLayout, radius, shadows, space, touchTarget } from '@/theme';
-import { formatWeatherTime, primaryWeather, weatherCondition } from '@/weather';
+import { primaryWeather, weatherCondition } from '@/weather';
 import { useWeather } from '@/weather-hooks';
 
 type HomeCopy = Messages['home'];
@@ -58,6 +60,9 @@ export function HarbourBackdrop() {
 }
 
 export function HomeHero({ name, subtitle, search }: Pick<HomeCopy, 'name' | 'subtitle' | 'search'>) {
+  const { width, fontScale } = useWindowDimensions();
+  const displayName = width / fontScale < 375 ? name.replace(' · ', '\n') : name;
+
   return (
     <View style={styles.hero}>
       <HarbourBackdrop />
@@ -71,10 +76,10 @@ export function HomeHero({ name, subtitle, search }: Pick<HomeCopy, 'name' | 'su
           <Icon name="water.waves" color={colors.onPrimary} size={28} />
         </LinearGradient>
         <View style={styles.brandCopy}>
-          <AppText variant="brand" accessibilityRole="header">{name}</AppText>
+          <AppText variant="brand" accessibilityRole="header" accessibilityLabel={name}>{displayName}</AppText>
           <AppText variant="brandSubtitle" tone="muted">{subtitle}</AppText>
         </View>
-        <Icon name="bell" color={colors.text} size={21} />
+        <WeatherCapsule />
       </View>
 
       <HomeLink href="/search" label={search} style={styles.search}>
@@ -94,78 +99,31 @@ export function HomeHero({ name, subtitle, search }: Pick<HomeCopy, 'name' | 'su
   );
 }
 
-export function WeatherCard() {
+function WeatherCapsule() {
   const { copy, locale } = useLanguage();
   const labels = copy.weather;
-  const { report, raw, stale, loading, failure, languageFallback } = useWeather(locale);
-  const { temperature, humidity, sameObservation } = primaryWeather(report);
+  const { report, raw, stale, loading } = useWeather(locale);
+  const { temperature } = primaryWeather(report);
   const [icon, condition] = weatherCondition(report?.icons[0]);
-  const observedAt = raw?.temperature?.recordTime;
-  const statusTime = stale ? observedAt ?? raw?.updateTime : raw?.updateTime;
-  const value = temperature ? `${temperature.value}°C`
-    : report ? labels.temperatureUnavailable : raw ? labels.expired : loading ? labels.loading : labels.unavailable;
-  const secondaryHumidity = humidity && report?.humidity && !sameObservation
-    ? labels.humidityAt(humidity.value, humidity.place, formatWeatherTime(report.humidity.recordTime, locale)) : undefined;
-  const status = stale ? labels.lastData : languageFallback ? labels.languageFallbackShort : undefined;
-  const timeLabel = stale && observedAt !== undefined ? labels.observedShort : labels.updatedShort;
-  const formattedTime = statusTime === undefined ? undefined : formatWeatherTime(statusTime, locale, stale);
+  const waiting = loading && !raw;
+  const value = temperature ? `${temperature.value}°C` : '--°';
+  const reading = temperature ? value : waiting ? labels.loading
+    : report ? labels.temperatureUnavailable : raw ? labels.expired : labels.unavailable;
+  const appearance = temperature && !stale ? 'primary' : 'muted';
   const accessibilityLabel = [
-    labels.title, status, stale && languageFallback && labels.languageFallbackShort,
-    value, report && labels.conditions[condition], temperature?.place,
-    humidity && (sameObservation ? labels.humidityShort(humidity.value) : secondaryHumidity),
-    formattedTime && `${timeLabel} ${formattedTime}`, labels.attribution,
+    labels.title, temperature && stale && labels.lastData, reading,
+    temperature && condition !== 'unknown' && labels.conditions[condition],
   ].filter(Boolean).join(' · ');
 
   return (
-    <View style={styles.weatherCard}>
-      <HomeLink href="/weather" label={accessibilityLabel}>
-        <LinearGradient
-          colors={[homeColors.weatherBright, colors.primary, homeColors.weatherDeep]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0.84 }}
-          style={styles.weather}
-        >
-          <View pointerEvents="none" style={[styles.weatherWave, styles.weatherWaveLeft]} />
-          <View pointerEvents="none" style={[styles.weatherWave, styles.weatherWaveRight]} />
-          <View style={styles.weatherIcon}>
-            <Icon name={icon} size={35} color={homeColors.weatherIcon} />
-          </View>
-          <View style={styles.weatherCopy}>
-            <AppText variant="caption" tone="onPrimaryMuted" numberOfLines={1}>{labels.title}</AppText>
-            <View style={styles.weatherReading}>
-              <AppText variant={temperature ? 'section' : 'homeCardTitle'} tone="onPrimary" numberOfLines={2}>
-                {value}
-              </AppText>
-              {humidity && sameObservation && (
-                <AppText variant="caption" tone="onPrimaryMuted">{labels.humidityShort(humidity.value)}</AppText>
-              )}
-            </View>
-            {temperature && <AppText variant="brandSubtitle" tone="onPrimaryMuted" numberOfLines={1}>{temperature.place}</AppText>}
-            {secondaryHumidity && (
-              <AppText variant="caption" tone="onPrimaryMuted" numberOfLines={1}>{secondaryHumidity}</AppText>
-            )}
-          </View>
-          <View style={styles.weatherStatus}>
-            {status && <AppText variant="caption" tone="onPrimary" numberOfLines={2}>{status}</AppText>}
-            {stale && report && languageFallback && (
-              <AppText variant="caption" tone="onPrimaryMuted" numberOfLines={1}>{labels.languageFallbackShort}</AppText>
-            )}
-            {formattedTime ? (
-              <>
-                {!stale && <AppText variant="caption" tone="onPrimaryMuted">{timeLabel}</AppText>}
-                <AppText variant="caption" tone="onPrimaryMuted" numberOfLines={2}>{formattedTime}</AppText>
-              </>
-            ) : (
-              <AppText variant="caption" tone="onPrimaryMuted">{failure ? labels.homeRetry : labels.details}</AppText>
-            )}
-          </View>
-          <View style={styles.weatherArrow}>
-            <Icon name="chevron.right" size={12} color={colors.onPrimary} />
-          </View>
-        </LinearGradient>
-      </HomeLink>
-      <WeatherWarningLink compact />
-    </View>
+    <HomeLink href="/weather" label={accessibilityLabel} style={styles.weatherCapsule}>
+      <Icon name={temperature ? (stale ? 'clock' : icon) : 'cloud'} size={22} color={colors[appearance]} />
+      {waiting ? <ActivityIndicator color={colors.muted} size="small" /> : (
+        <AppText variant="title" tone={appearance} maxFontSizeMultiplier={1.35} style={styles.weatherCapsuleValue}>
+          {value}
+        </AppText>
+      )}
+    </HomeLink>
   );
 }
 
@@ -257,7 +215,7 @@ const styles = StyleSheet.create({
   },
   heroPhoto: { ...StyleSheet.absoluteFill, top: space.xl },
   photo: { ...StyleSheet.absoluteFill, width: '100%', height: '100%' },
-  brand: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   brandMark: {
     width: homeLayout.brandMark,
     height: homeLayout.brandMark,
@@ -279,34 +237,14 @@ const styles = StyleSheet.create({
     ...shadows.search,
   },
   searchLabel: { flex: 1, minWidth: 0 },
-  weatherCard: { borderRadius: radius.largeCard, overflow: 'hidden' },
-  weather: {
-    minHeight: homeLayout.weatherHeight,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.md,
-    padding: space.lg,
-    overflow: 'hidden',
-    backgroundColor: colors.primary,
+  weatherCapsule: {
+    minWidth: homeLayout.weatherCapsuleWidth, minHeight: touchTarget, flexShrink: 0,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.xs,
+    paddingHorizontal: space.sm, paddingVertical: space.xs,
+    borderRadius: radius.pill, borderWidth: 0,
+    backgroundColor: 'rgba(218, 236, 244, 0.72)', ...shadows.weatherCapsule,
   },
-  weatherIcon: {
-    width: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  weatherCopy: { flex: 1, minWidth: 0, gap: space.xs },
-  weatherReading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: space.sm },
-  weatherStatus: {
-    maxWidth: '28%',
-    paddingLeft: space.sm,
-    gap: space.xs,
-    borderLeftWidth: StyleSheet.hairlineWidth,
-    borderLeftColor: homeColors.weatherDivider,
-  },
-  weatherArrow: { marginLeft: -space.xs },
-  weatherWave: { position: 'absolute', bottom: -49, width: '73%', height: 63, borderRadius: '50%' },
-  weatherWaveLeft: { left: '-10%', backgroundColor: homeColors.weatherWaveLight, transform: [{ rotate: '4deg' }] },
-  weatherWaveRight: { right: '-9%', backgroundColor: homeColors.weatherWave, transform: [{ rotate: '-8deg' }] },
+  weatherCapsuleValue: { fontVariant: ['tabular-nums'] },
   section: { gap: space.xs },
   sectionHeader: {
     flexDirection: 'row',

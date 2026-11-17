@@ -5,9 +5,10 @@ import { StyleSheet, View } from 'react-native';
 import { loadBusFavorites, useBusFavorites, useUnavailableFavorites } from '@/bus-favorite-hooks';
 import { pinnedBuses } from '@/bus-favorites';
 import { BusAction } from '@/components/bus-ui';
-import { FeaturedCard, HomeHero, HomeLink, HomeSection, QuickLinkCard, WeatherCard } from '@/components/home-ui';
+import { FeaturedCard, HomeHero, HomeLink, HomeSection, QuickLinkCard } from '@/components/home-ui';
 import { HomeFavoriteBus } from '@/components/saved-bus-ui';
 import { AppText, EmptyState, Icon, Screen, type IconName } from '@/components/ui';
+import { WeatherWarningLink } from '@/components/weather-warning-ui';
 import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
 import { colors, homeColors, homeLayout, radius, space, touchTarget } from '@/theme';
@@ -47,7 +48,7 @@ export default function HomeScreen() {
     <Screen contentStyle={styles.screenContent} topBackgroundColor={homeColors.harbourSky}>
       <HomeHero name={home.name} subtitle={home.subtitle} search={home.search} />
       <View style={styles.sections}>
-        <WeatherCard />
+        <WeatherWarningLink compact />
 
         <HomeSection title={home.buses} icon="bus"
           action={{ label: items.length ? copy.busFavorites.manage : home.viewAll, href: '/saved?category=buses' }}>

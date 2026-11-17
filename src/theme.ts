@@ -58,7 +58,7 @@ export const homeLayout = {
   sectionGap: space.xl,
   brandMark: 46,
   searchHeight: 54,
-  weatherHeight: 112,
+  weatherCapsuleWidth: 88,
   quickLinkHeight: 90,
   featuredHeight: 156,
   featuredCaptionTop: 92,
@@ -74,6 +74,7 @@ export const floatingTab = {
 
 export const shadows = {
   search: { shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.13, shadowRadius: 9 },
+  weatherCapsule: { shadowColor: '#21535A', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6 },
   tabBar: { shadowColor: colors.text, shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.16, shadowRadius: 13 },
 };
 
