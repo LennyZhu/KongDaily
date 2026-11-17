@@ -2,12 +2,15 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { AppState } from 'react-native';
 
-import { forecastFeed, observationFeed, weatherRetryInterval, type WeatherFeed } from '@/weather-data';
+import {
+  forecastFeed, observationFeed, warningDetailsFeed, warningSummaryFeed, weatherRetryInterval, type WeatherFeed,
+} from '@/weather-data';
 import {
   forecastDaysForDisplay, forecastStaleAge, hasOtherLanguageWeatherText, weatherHideAge, weatherStaleAge, type WeatherLocale,
 } from '@/weather';
+import { warningMaxAge, warningStatus } from '@/weather-warnings';
 
-function useWeatherFeed<Report extends { updateTime: number }>(feed: WeatherFeed<Report>, locale: WeatherLocale) {
+function useWeatherFeed<Report>(feed: WeatherFeed<Report>, locale: WeatherLocale, poll = true) {
   const { hydrated, entries } = useSyncExternalStore(feed.subscribe, feed.getState, feed.getState);
   const [now, setNow] = useState(Date.now);
   const [active, setActive] = useState(false);
@@ -24,7 +27,8 @@ function useWeatherFeed<Report extends { updateTime: number }>(feed: WeatherFeed
       setNow(Date.now());
       void feed.refresh(locale, () => focused.current && generation === current).then(() => {
         if (generation === current && focused.current && AppState.currentState === 'active') {
-          timer = setTimeout(check, Math.max(1000, feed.nextCheck(locale) - Date.now()));
+          setNow(Date.now());
+          if (poll) timer = setTimeout(check, Math.max(1000, feed.nextCheck(locale) - Date.now()));
         }
       });
     }
@@ -48,7 +52,7 @@ function useWeatherFeed<Report extends { updateTime: number }>(feed: WeatherFeed
       clearTimeout(timer);
       subscription.remove();
     };
-  }, [feed, locale]));
+  }, [feed, locale, poll]));
 
   const entry = entries[locale];
   const retryAt = (entry.attemptedAt ?? 0) + weatherRetryInterval;
@@ -58,7 +62,9 @@ function useWeatherFeed<Report extends { updateTime: number }>(feed: WeatherFeed
     canRefresh: active && hydrated && !entry.refreshing && now >= retryAt,
     refresh: () => {
       setNow(Date.now());
-      void feed.refresh(locale, () => focused.current, true);
+      void feed.refresh(locale, () => focused.current, true).then(() => {
+        if (focused.current) setNow(Date.now());
+      });
     },
   };
 }
@@ -118,5 +124,34 @@ export function useForecast(locale: WeatherLocale) {
     loading: !hydrated || (!report && !failure),
     stale: Boolean(report && (failure || now >= staleAt)),
     expired: days.length === 0 && Boolean(report || failure === 'outdated'),
+  };
+}
+
+export function useWeatherWarnings(locale: WeatherLocale) {
+  const { entry, now, retryAt, active, setNow, hydrated, failure, refreshing, canRefresh, refresh } =
+    useWeatherFeed(warningSummaryFeed, locale);
+  const snapshot = entry.snapshot;
+  const warnings = snapshot?.report.warnings ?? [];
+  const status = warningStatus(snapshot, Boolean(failure), !hydrated || refreshing || entry.attemptedAt === undefined, now);
+  const deadlines = [retryAt, snapshot ? snapshot.fetchedAt + warningMaxAge : undefined,
+    ...warnings.map(({ expireTime }) => expireTime)];
+
+  useWeatherDeadline(active, Math.min(Infinity, ...deadlines
+    .filter((time): time is number => time !== undefined && time > now)), setNow);
+  return { status, warnings, checkedAt: snapshot?.fetchedAt, failure, refreshing, canRefresh, refresh };
+}
+
+export function useWarningDetails(locale: WeatherLocale) {
+  const { entry, now, active, setNow, hydrated, failure, refreshing, refresh } =
+    useWeatherFeed(warningDetailsFeed, locale, false);
+  const snapshot = entry.snapshot;
+  const expires = snapshot ? snapshot.fetchedAt + warningMaxAge : Infinity;
+  useWeatherDeadline(active, expires > now ? expires : Infinity, setNow);
+  const fresh = snapshot?.verified && !failure && now >= snapshot.fetchedAt && now < expires;
+  return {
+    details: fresh ? snapshot.report.details : [],
+    loading: !hydrated || refreshing || entry.attemptedAt === undefined,
+    now,
+    refresh,
   };
 }

@@ -4,6 +4,7 @@ import type { PropsWithChildren } from 'react';
 import { Image, Pressable, StyleSheet, View, type ImageSourcePropType, type StyleProp, type ViewStyle } from 'react-native';
 
 import { AppText, Icon, type IconName } from '@/components/ui';
+import { WeatherWarningLink } from '@/components/weather-warning-ui';
 import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
 import { colors, homeColors, homeLayout, radius, shadows, space, touchTarget } from '@/theme';
@@ -14,7 +15,7 @@ type HomeCopy = Messages['home'];
 
 export function HomeLink({ href, style, label, children }: PropsWithChildren<{
   href: Href;
-  style: StyleProp<ViewStyle>;
+  style?: StyleProp<ViewStyle>;
   label?: string;
 }>) {
   const router = useRouter();
@@ -116,52 +117,55 @@ export function WeatherCard() {
   ].filter(Boolean).join(' · ');
 
   return (
-    <HomeLink href="/weather" label={accessibilityLabel} style={styles.weatherLink}>
-      <LinearGradient
-        colors={[homeColors.weatherBright, colors.primary, homeColors.weatherDeep]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0.84 }}
-        style={styles.weather}
-      >
-        <View pointerEvents="none" style={[styles.weatherWave, styles.weatherWaveLeft]} />
-        <View pointerEvents="none" style={[styles.weatherWave, styles.weatherWaveRight]} />
-        <View style={styles.weatherIcon}>
-          <Icon name={icon} size={35} color={homeColors.weatherIcon} />
-        </View>
-        <View style={styles.weatherCopy}>
-          <AppText variant="caption" tone="onPrimaryMuted" numberOfLines={1}>{labels.title}</AppText>
-          <View style={styles.weatherReading}>
-            <AppText variant={temperature ? 'section' : 'homeCardTitle'} tone="onPrimary" numberOfLines={2}>
-              {value}
-            </AppText>
-            {humidity && sameObservation && (
-              <AppText variant="caption" tone="onPrimaryMuted">{labels.humidityShort(humidity.value)}</AppText>
+    <View style={styles.weatherCard}>
+      <HomeLink href="/weather" label={accessibilityLabel}>
+        <LinearGradient
+          colors={[homeColors.weatherBright, colors.primary, homeColors.weatherDeep]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0.84 }}
+          style={styles.weather}
+        >
+          <View pointerEvents="none" style={[styles.weatherWave, styles.weatherWaveLeft]} />
+          <View pointerEvents="none" style={[styles.weatherWave, styles.weatherWaveRight]} />
+          <View style={styles.weatherIcon}>
+            <Icon name={icon} size={35} color={homeColors.weatherIcon} />
+          </View>
+          <View style={styles.weatherCopy}>
+            <AppText variant="caption" tone="onPrimaryMuted" numberOfLines={1}>{labels.title}</AppText>
+            <View style={styles.weatherReading}>
+              <AppText variant={temperature ? 'section' : 'homeCardTitle'} tone="onPrimary" numberOfLines={2}>
+                {value}
+              </AppText>
+              {humidity && sameObservation && (
+                <AppText variant="caption" tone="onPrimaryMuted">{labels.humidityShort(humidity.value)}</AppText>
+              )}
+            </View>
+            {temperature && <AppText variant="brandSubtitle" tone="onPrimaryMuted" numberOfLines={1}>{temperature.place}</AppText>}
+            {secondaryHumidity && (
+              <AppText variant="caption" tone="onPrimaryMuted" numberOfLines={1}>{secondaryHumidity}</AppText>
             )}
           </View>
-          {temperature && <AppText variant="brandSubtitle" tone="onPrimaryMuted" numberOfLines={1}>{temperature.place}</AppText>}
-          {secondaryHumidity && (
-            <AppText variant="caption" tone="onPrimaryMuted" numberOfLines={1}>{secondaryHumidity}</AppText>
-          )}
-        </View>
-        <View style={styles.weatherStatus}>
-          {status && <AppText variant="caption" tone="onPrimary" numberOfLines={2}>{status}</AppText>}
-          {stale && report && languageFallback && (
-            <AppText variant="caption" tone="onPrimaryMuted" numberOfLines={1}>{labels.languageFallbackShort}</AppText>
-          )}
-          {formattedTime ? (
-            <>
-              {!stale && <AppText variant="caption" tone="onPrimaryMuted">{timeLabel}</AppText>}
-              <AppText variant="caption" tone="onPrimaryMuted" numberOfLines={2}>{formattedTime}</AppText>
-            </>
-          ) : (
-            <AppText variant="caption" tone="onPrimaryMuted">{failure ? labels.homeRetry : labels.details}</AppText>
-          )}
-        </View>
-        <View style={styles.weatherArrow}>
-          <Icon name="chevron.right" size={12} color={colors.onPrimary} />
-        </View>
-      </LinearGradient>
-    </HomeLink>
+          <View style={styles.weatherStatus}>
+            {status && <AppText variant="caption" tone="onPrimary" numberOfLines={2}>{status}</AppText>}
+            {stale && report && languageFallback && (
+              <AppText variant="caption" tone="onPrimaryMuted" numberOfLines={1}>{labels.languageFallbackShort}</AppText>
+            )}
+            {formattedTime ? (
+              <>
+                {!stale && <AppText variant="caption" tone="onPrimaryMuted">{timeLabel}</AppText>}
+                <AppText variant="caption" tone="onPrimaryMuted" numberOfLines={2}>{formattedTime}</AppText>
+              </>
+            ) : (
+              <AppText variant="caption" tone="onPrimaryMuted">{failure ? labels.homeRetry : labels.details}</AppText>
+            )}
+          </View>
+          <View style={styles.weatherArrow}>
+            <Icon name="chevron.right" size={12} color={colors.onPrimary} />
+          </View>
+        </LinearGradient>
+      </HomeLink>
+      <WeatherWarningLink compact />
+    </View>
   );
 }
 
@@ -275,14 +279,13 @@ const styles = StyleSheet.create({
     ...shadows.search,
   },
   searchLabel: { flex: 1, minWidth: 0 },
-  weatherLink: { borderRadius: radius.largeCard },
+  weatherCard: { borderRadius: radius.largeCard, overflow: 'hidden' },
   weather: {
     minHeight: homeLayout.weatherHeight,
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.md,
     padding: space.lg,
-    borderRadius: radius.largeCard,
     overflow: 'hidden',
     backgroundColor: colors.primary,
   },

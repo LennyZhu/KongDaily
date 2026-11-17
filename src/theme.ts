@@ -42,10 +42,11 @@ export const homeColors = {
   photoInk: 'rgba(13, 29, 24, 0.90)',
 };
 
-export const weatherColors = {
-  warningSurface: '#FFF6E5',
-  warningBorder: '#F0DFBC',
-  warningInk: '#664C26',
+export const weatherWarningColors = {
+  neutral: { surface: colors.tint, border: colors.border, ink: colors.text },
+  caution: { surface: '#FFF6E5', border: '#F0DFBC', ink: '#664C26' },
+  severe: { surface: '#FCEDE9', border: '#EDCDC7', ink: '#962F29' },
+  intense: { surface: '#EBEAEE', border: '#DAD7E0', ink: '#30273C' },
 };
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, section: 32 };

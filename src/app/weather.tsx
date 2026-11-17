@@ -5,11 +5,12 @@ import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, View } from '
 
 import { ForecastDayRow } from '@/components/forecast-day-row';
 import { AppText, Icon, Screen } from '@/components/ui';
+import { WeatherWarningLink } from '@/components/weather-warning-ui';
 import { useLanguage } from '@/language';
-import { colors, homeColors, radius, space, touchTarget, weatherColors } from '@/theme';
+import { colors, homeColors, radius, space, touchTarget } from '@/theme';
 import {
   formatWeatherTime, primaryWeather, weatherCondition, weatherDatasetUrl, weatherStaleAge,
-  weatherTermsUrl, weatherWarningUrl,
+  weatherTermsUrl,
 } from '@/weather';
 import { useForecast, useWeather } from '@/weather-hooks';
 
@@ -36,15 +37,7 @@ export default function WeatherScreen() {
     <Screen hasHeader contentStyle={styles.screen}>
       <ObservationCard weather={weather} />
 
-      <Pressable accessibilityRole="link" onPress={() => openOfficial(weatherWarningUrl(locale))}
-        style={({ pressed }) => [styles.warning, pressed && styles.pressed]}>
-        <Icon name="info.circle" color={weatherColors.warningInk} size={21} />
-        <View style={styles.grow}>
-          <AppText variant="homeCardTitle" style={styles.warningText}>{labels.warnings}</AppText>
-          <AppText variant="brandSubtitle" style={styles.warningText}>{labels.warningsLink}</AppText>
-        </View>
-        <Icon name="arrow.up.right" color={weatherColors.warningInk} size={14} />
-      </Pressable>
+      <WeatherWarningLink />
 
       <ForecastPreview onOpen={() => router.push('/weather/forecast')} />
 
@@ -223,12 +216,16 @@ function ObservationCard({ weather }: { weather: ReturnType<typeof useWeather> }
         <WeatherMetric label={labels.humidity} value={humidity ? `${humidity.value}%` : labels.noValue}
           note={humidity && weather.report?.humidity
             ? labels.humidityObservation(humidity.place, time(weather.report.humidity.recordTime)) : undefined} />
-        <WeatherMetric label={labels.uv} value={uv ? String(uv.value) : labels.noValue}
-          note={uv && [labels.uvAt(uv.place), uv.intensity, uvGroup?.period,
-            uvGroup?.recordTime !== undefined ? time(uvGroup.recordTime) : undefined].filter(Boolean).join(' · ')} />
+        <WeatherMetric label={labels.uv} value={uv ? String(uv.value) : labels.noValue} qualifier={uv?.intensity} />
         <WeatherMetric label={labels.temperatureTime}
           value={temperatureTime === undefined ? labels.noValue : time(temperatureTime)} />
       </View>
+      {uv && uvGroup && (
+        <AppText variant="brandSubtitle" tone="onPrimaryMuted">
+          {[labels.uvAt(uv.place), uvGroup.period, uvGroup.recordTime !== undefined ? time(uvGroup.recordTime) : undefined]
+            .filter(Boolean).join(' · ')}
+        </AppText>
+      )}
       {weather.raw && (
         <AppText variant="brandSubtitle" tone="onPrimaryMuted">{labels.updated(time(weather.raw.updateTime, true))}</AppText>
       )}
@@ -241,11 +238,14 @@ function ObservationCard({ weather }: { weather: ReturnType<typeof useWeather> }
   );
 }
 
-function WeatherMetric({ label, value, note }: { label: string; value: string; note?: string }) {
+function WeatherMetric({ label, value, qualifier, note }: { label: string; value: string; qualifier?: string; note?: string }) {
   return (
     <View style={styles.metric}>
       <AppText variant="caption" tone="onPrimaryMuted">{label}</AppText>
-      <AppText variant="title" tone="onPrimary" style={styles.number}>{value}</AppText>
+      <AppText variant="title" tone="onPrimary" style={styles.number}>
+        {value}
+        {qualifier && <AppText variant="caption" tone="onPrimaryMuted">{` ${qualifier}`}</AppText>}
+      </AppText>
       {note && <AppText variant="brandSubtitle" tone="onPrimaryMuted">{note}</AppText>}
     </View>
   );
@@ -267,19 +267,13 @@ const styles = StyleSheet.create({
   },
   refreshDisabled: { opacity: 0.62 },
   metrics: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, paddingTop: space.sm, marginTop: space.sm,
+    flexDirection: 'row', gap: space.sm, paddingTop: space.sm, marginTop: space.sm,
     borderTopColor: homeColors.weatherDivider, borderTopWidth: StyleSheet.hairlineWidth,
   },
-  metric: { flexGrow: 1, flexBasis: 86, gap: space.xs },
+  metric: { flex: 1, minWidth: 0, gap: space.xs },
   wave: { position: 'absolute', bottom: -55, width: '78%', height: 108, borderRadius: '50%' },
   waveLeft: { left: '-10%', backgroundColor: homeColors.weatherWaveLight, transform: [{ rotate: '4deg' }] },
   waveRight: { right: '-12%', backgroundColor: homeColors.weatherWave, transform: [{ rotate: '-8deg' }] },
-  warning: {
-    flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md,
-    borderRadius: radius.card, backgroundColor: weatherColors.warningSurface,
-    borderColor: weatherColors.warningBorder, borderWidth: StyleSheet.hairlineWidth,
-  },
-  warningText: { color: weatherColors.warningInk },
   panel: {
     borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border, borderRadius: radius.largeCard,
     backgroundColor: colors.surface, overflow: 'hidden',

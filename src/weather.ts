@@ -64,6 +64,8 @@ function time(value: unknown) {
   return parsed;
 }
 
+export { record as weatherRecord, string as weatherString, time as weatherTimestamp };
+
 function readings<T extends { place: string }>(group: unknown, parse: (row: Record<string, unknown>) => T | undefined) {
   const data = record(group)?.data;
   if (!Array.isArray(data)) return [];

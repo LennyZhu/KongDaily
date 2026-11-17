@@ -4,11 +4,13 @@ import { getDatabase } from '@/database';
 import {
   forecastApiType, hongKongForecastDay, parseForecastReport, parseWeatherReport, weatherApiType, type WeatherLocale,
 } from '@/weather';
+import {
+  parseWarningDetails, parseWarningSummary, warningCheckInterval, warningDetailsApiType, warningSummaryApiType,
+} from '@/weather-warnings';
 
 export type WeatherFailure = 'network' | 'tls' | 'http' | 'timeout' | 'json' | 'invalid' | 'outdated';
-type ReportTime = { updateTime: number };
-type WeatherApiType = typeof weatherApiType | typeof forecastApiType;
-type Snapshot<Report> = { locale: WeatherLocale; report: Report; fetchedAt: number };
+type WeatherApiType = typeof weatherApiType | typeof forecastApiType | typeof warningSummaryApiType | typeof warningDetailsApiType;
+type Snapshot<Report> = { locale: WeatherLocale; report: Report; fetchedAt: number; verified?: boolean };
 type Entry<Report> = { snapshot?: Snapshot<Report>; failure?: WeatherFailure; refreshing?: boolean; attemptedAt?: number };
 type CacheRow = { language: WeatherLocale; update_time: number; fetched_at: number; payload: string };
 type WeatherState<Report> = { hydrated: boolean; entries: Record<WeatherLocale, Entry<Report>> };
@@ -64,20 +66,28 @@ async function requestWeather<Report>(apiType: WeatherApiType, locale: WeatherLo
   return { report, payload };
 }
 
-async function saveSnapshot(apiType: WeatherApiType, { locale, report, fetchedAt }: Snapshot<ReportTime>, payload: string) {
+async function saveSnapshot(apiType: WeatherApiType, locale: WeatherLocale, fetchedAt: number,
+  officialTime: number | undefined, payload: string) {
   const db = await getDatabase();
   await db.runAsync(
     `INSERT INTO weather_cache (api_type, language, update_time, fetched_at, payload)
      VALUES (?, ?, ?, ?, ?)
      ON CONFLICT(api_type, language) DO UPDATE SET
        update_time = excluded.update_time, fetched_at = excluded.fetched_at, payload = excluded.payload
-     WHERE excluded.update_time >= weather_cache.update_time`,
-    apiType, locale, report.updateTime, fetchedAt, payload,
+     WHERE ? OR excluded.update_time >= weather_cache.update_time`,
+    apiType, locale, officialTime ?? fetchedAt, fetchedAt, payload, officialTime === undefined ? 1 : 0,
   );
 }
 
-function createWeatherFeed<Report extends ReportTime>(apiType: WeatherApiType, parse: (payload: unknown) => Report | undefined,
-  isUsable?: (report: Report, now: number) => boolean) {
+function createWeatherFeed<Report>(apiType: WeatherApiType, parse: (payload: unknown) => Report | undefined, {
+  officialTime, isUsable, interval = refreshInterval, verifyOnLaunch = false, checkBy,
+}: {
+  officialTime?: (report: Report) => number;
+  isUsable?: (report: Report, now: number) => boolean;
+  interval?: number;
+  verifyOnLaunch?: boolean;
+  checkBy?: (report: Report, receivedAt: number) => number;
+}) {
   let state: WeatherState<Report> = { hydrated: false, entries: { 'zh-HK': {}, en: {} } };
   let hydration: Promise<void> | undefined;
   const listeners = new Set<() => void>();
@@ -104,7 +114,7 @@ function createWeatherFeed<Report extends ReportTime>(apiType: WeatherApiType, p
           if (!Object.hasOwn(entries, row.language) || !Number.isSafeInteger(row.fetched_at) || row.fetched_at <= 0) continue;
           try {
             const report = parse(JSON.parse(row.payload));
-            if (report && report.updateTime === row.update_time) {
+            if (report && (officialTime?.(report) ?? row.fetched_at) === row.update_time) {
               entries[row.language] = { snapshot: { locale: row.language, report, fetchedAt: row.fetched_at } };
             }
           } catch {
@@ -121,8 +131,12 @@ function createWeatherFeed<Report extends ReportTime>(apiType: WeatherApiType, p
 
   function nextCheck(locale: WeatherLocale, now = Date.now()) {
     const { snapshot, attemptedAt } = state.entries[locale];
-    const checks = [snapshot?.fetchedAt ?? 0, attemptedAt ?? 0].filter((value) => value <= now);
-    return Math.max(0, ...checks) + refreshInterval;
+    const lastFetch = snapshot && (!verifyOnLaunch || snapshot.verified) ? snapshot.fetchedAt : 0;
+    const checks = [lastFetch, attemptedAt ?? 0].filter((value) => value <= now);
+    const scheduled = Math.max(0, ...checks) + interval;
+    const deadline = snapshot?.verified && checkBy ? checkBy(snapshot.report, snapshot.fetchedAt) : Infinity;
+    return (attemptedAt ?? 0) < deadline
+      ? Math.min(scheduled, Math.max(deadline, (attemptedAt ?? 0) + weatherRetryInterval)) : scheduled;
   }
 
   async function refresh(locale: WeatherLocale, canStart: () => boolean, manual = false) {
@@ -144,14 +158,17 @@ function createWeatherFeed<Report extends ReportTime>(apiType: WeatherApiType, p
       try {
         const { report, payload } = await requestWeather(apiType, locale, controller.signal, parse);
         if (controller.signal.aborted) return;
-        const priorTime = state.entries[locale].snapshot?.report.updateTime;
+        const prior = state.entries[locale].snapshot;
+        const officialUpdateTime = officialTime?.(report);
+        const priorTime = prior && officialTime?.(prior.report);
         const fetchedAt = Date.now();
-        if ((priorTime !== undefined && report.updateTime < priorTime) || (isUsable && !isUsable(report, fetchedAt))) {
+        if ((priorTime !== undefined && officialUpdateTime !== undefined && officialUpdateTime < priorTime)
+          || (isUsable && !isUsable(report, fetchedAt))) {
           throw new WeatherRequestError('outdated');
         }
-        const snapshot = { locale, report, fetchedAt };
+        const snapshot = { locale, report, fetchedAt, verified: true };
         change(locale, { snapshot, failure: undefined });
-        await saveSnapshot(apiType, snapshot, payload).catch(() => {});
+        await saveSnapshot(apiType, locale, fetchedAt, officialUpdateTime, payload).catch(() => {});
       } catch (error) {
         if (!controller.signal.aborted) {
           change(locale, { failure: error instanceof WeatherRequestError ? error.kind : 'network' });
@@ -177,9 +194,25 @@ function createWeatherFeed<Report extends ReportTime>(apiType: WeatherApiType, p
   return { subscribe, getState: () => state, refresh, nextCheck };
 }
 
-export type WeatherFeed<Report extends ReportTime> = ReturnType<typeof createWeatherFeed<Report>>;
-export const observationFeed = createWeatherFeed(weatherApiType, parseWeatherReport);
-export const forecastFeed = createWeatherFeed(forecastApiType, parseForecastReport, (report, now) => {
-  const today = hongKongForecastDay(now);
-  return report.days.some(({ date }) => date >= today);
+export type WeatherFeed<Report> = ReturnType<typeof createWeatherFeed<Report>>;
+export const observationFeed = createWeatherFeed(weatherApiType, parseWeatherReport, {
+  officialTime: (report) => report.updateTime,
+});
+export const forecastFeed = createWeatherFeed(forecastApiType, parseForecastReport, {
+  officialTime: (report) => report.updateTime,
+  isUsable: (report, now) => {
+    const today = hongKongForecastDay(now);
+    return report.days.some(({ date }) => date >= today);
+  },
+});
+// The warning feeds have no report-wide official timestamp. A newer response may remove every warning.
+export const warningSummaryFeed = createWeatherFeed(warningSummaryApiType, parseWarningSummary, {
+  interval: warningCheckInterval,
+  verifyOnLaunch: true,
+  checkBy: (report, receivedAt) => Math.min(Infinity, ...report.warnings
+    .flatMap(({ expireTime }) => expireTime !== undefined && expireTime > receivedAt ? [expireTime] : [])),
+});
+export const warningDetailsFeed = createWeatherFeed(warningDetailsApiType, parseWarningDetails, {
+  interval: warningCheckInterval,
+  verifyOnLaunch: true,
 });
