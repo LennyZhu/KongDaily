@@ -1,3 +1,4 @@
+import afcd from '../assets/data/afcd-toilets.json';
 import fehd from '../assets/data/fehd-toilets.json';
 
 import { distanceBetween, isNearHongKong, type Coordinates } from '@/nearby-bus-data';
@@ -20,6 +21,7 @@ export type Facility = {
   name: FacilityText;
   address?: FacilityText;
   district?: FacilityText;
+  area?: FacilityText;
   coordinate: Coordinates;
   updatedAt?: string;
   openingHours?: FacilityText;
@@ -32,17 +34,29 @@ export type NearbyFacility = { id: string; facility: Facility; distance: number 
 type FehdRecord = Omit<Facility, 'source' | 'sourceUrl' | 'sourceName' | 'typeName' | 'category'> & { officialType: string };
 const fehdRecords: readonly FehdRecord[] = fehd.records;
 const fehdTypeLabels: Record<string, FacilityText> = fehd.typeLabels;
-const fehdSourceUrl = fehd.sources[fehd.primaryLocale === 'zh-HK' ? 'zh-HK' : 'en'].url;
+const fehdSource = {
+  source: 'fehd',
+  sourceName: fehd.sourceName,
+  sourceUrl: fehd.sources[fehd.primaryLocale === 'zh-HK' ? 'zh-HK' : 'en'].url,
+  category: 'toilets',
+} as const;
+const afcdSource = {
+  source: 'afcd',
+  sourceName: afcd.sourceName,
+  sourceUrl: afcd.source.url,
+  category: 'toilets',
+} as const;
 
-export const nearbyFacilities: readonly Facility[] = fehdRecords.flatMap((record) =>
-  Object.hasOwn(fehdTypeLabels, record.officialType) ? [{
-    ...record,
-    source: 'fehd',
-    sourceName: fehd.sourceName,
-    sourceUrl: fehdSourceUrl,
-    category: 'toilets',
-    typeName: fehdTypeLabels[record.officialType],
-  }] : []);
+export const nearbyFacilitySources = [
+  { ...fehdSource, snapshotDate: fehd.snapshotDate },
+  { ...afcdSource, snapshotDate: afcd.snapshotDate },
+] as const;
+
+export const nearbyFacilities: readonly Facility[] = [
+  ...fehdRecords.flatMap((record) => Object.hasOwn(fehdTypeLabels, record.officialType)
+    ? [{ ...record, ...fehdSource, typeName: fehdTypeLabels[record.officialType] }] : []),
+  ...afcd.records.map((record) => ({ ...record, ...afcdSource })),
+];
 
 export function facilityFilter(value: unknown): FacilityFilter {
   return facilityCategories.find((category) => category === value) ?? 'all';

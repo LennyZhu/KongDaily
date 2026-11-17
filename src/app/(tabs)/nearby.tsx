@@ -8,7 +8,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { facilityVisuals, NearbyFacilitiesMap } from '@/components/nearby-facilities-map';
 import { AppText, Icon } from '@/components/ui';
 import { showFacilityDirections } from '@/facility-navigation';
-import { facilityCategories, facilityFilter, facilityText, facilityTextUsesFallback, indexNearbyFacilities, nearbyFacilities,
+import { facilityCategories, facilityFilter, facilityText, facilityTextUsesFallback, indexNearbyFacilities, nearbyFacilities, nearbyFacilitySources,
   type Facility, type FacilityFilter, type FacilityLocale, type NearbyFacility } from '@/facilities';
 import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
@@ -16,8 +16,6 @@ import type { Coordinates } from '@/nearby-bus-data';
 import { nearbyBusLandmarks, type NearbyLandmark } from '@/nearby-bus-landmarks';
 import { locateNearbyBusStops, type NearbyLocationIssue } from '@/nearby-bus-location';
 import { colors, floatingTab, homeColors, homeLayout, radius, space, touchTarget } from '@/theme';
-
-import fehd from '../../../assets/data/fehd-toilets.json';
 
 type Reference = { kind: 'default' | 'landmark'; landmark: NearbyLandmark } | { kind: 'device'; point: Coordinates };
 const defaultReference = { kind: 'default', landmark: 'central' } satisfies Reference;
@@ -300,21 +298,23 @@ function FacilitySourceInfo() {
   const labels = copy.nearby;
 
   function showSource() {
+    const datasets = nearbyFacilitySources.map(({ sourceName, snapshotDate }) =>
+      [labels.source(facilityText(sourceName, locale)), labels.snapshotDate(snapshotDate)].join('\n'));
     const details = [
-      labels.source(facilityText(fehd.sourceName, locale)), labels.snapshotDate(fehd.snapshotDate),
-      labels.sourceNote, labels.navigation.coordinateNote,
+      ...datasets, labels.sourceNote, labels.navigation.coordinateNote, labels.csdiCredit,
     ];
-    const source = fehd.sources[fehd.primaryLocale === 'zh-HK' ? 'zh-HK' : 'en'];
+    function openSource(url: string) {
+      void Linking.openURL(url).catch(() => {
+        Alert.alert(labels.openSourceFailed, undefined, [{ text: labels.navigation.ok }]);
+      });
+    }
     Alert.alert(labels.sourceInformation, details.join('\n\n'), [
+      ...nearbyFacilitySources.map(({ source, sourceUrl }) => ({
+        text: labels.openOfficialSource(source.toUpperCase()),
+        onPress: () => openSource(sourceUrl),
+      })),
+      { text: labels.csdiTerms, onPress: () => openSource('https://portal.csdi.gov.hk/csdi-webpage/doc/TNC') },
       { text: labels.close, style: 'cancel' },
-      {
-        text: labels.openOfficialSource,
-        onPress: () => {
-          void Linking.openURL(source.url).catch(() => {
-            Alert.alert(labels.openSourceFailed, undefined, [{ text: labels.navigation.ok }]);
-          });
-        },
-      },
     ]);
   }
 
@@ -327,8 +327,16 @@ function FacilitySourceInfo() {
 }
 
 function facilityPlace(facility: Facility, locale: FacilityLocale) {
-  return [facility.district, facility.address]
+  return [facility.area ?? facility.district, facility.address]
     .flatMap((value) => value ? [facilityText(value, locale)] : []).filter(Boolean).join(' · ');
+}
+
+function facilityType(facility: Facility, locale: FacilityLocale, labels: Messages['nearby']) {
+  const subtype = facility.typeName && facilityText(facility.typeName, locale);
+  if (facility.source === 'afcd') {
+    return subtype ? `${labels.countryParkToilet} · ${subtype}` : labels.countryParkToilet;
+  }
+  return subtype || labels.categories[facility.category];
 }
 
 function facilityDistance(distance: number, labels: Messages['nearbyBus']) {
@@ -342,12 +350,15 @@ function FacilityListRow({ item: { facility, distance }, expanded, onPress }: {
   const labels = copy.nearby;
   const visual = facilityVisuals[facility.category];
   const place = facilityPlace(facility, locale);
+  const isAfcd = facility.source === 'afcd';
   const source = facility.source === 'fehd' ? labels.fehdShort
-    : facility.sourceName ? facilityText(facility.sourceName, locale) : facility.source;
-  const usesFallback = [facility.name, facility.district, facility.address].some((field) => facilityTextUsesFallback(field, locale));
-  const type = facility.typeName ? facilityText(facility.typeName, locale) : labels.categories[facility.category];
+    : isAfcd ? undefined : facility.sourceName ? facilityText(facility.sourceName, locale) : facility.source;
+  const usesFallback = [facility.name, facility.area ?? facility.district, facility.address]
+    .some((field) => facilityTextUsesFallback(field, locale));
+  const type = facilityType(facility, locale, labels);
   const showSpecialType = !expanded && facility.category === 'toilets' && facility.officialType !== 'toilet' && facility.typeName;
-  const caption = [showSpecialType && type, !expanded && source, labels.straightLineDistance, usesFallback && labels.originalLanguageShort]
+  const compactType = isAfcd ? labels.countryParkToilet : showSpecialType && type;
+  const caption = [!expanded && compactType, !expanded && source, labels.straightLineDistance, usesFallback && labels.originalLanguageShort]
     .filter(Boolean).join(' · ');
 
   return (
@@ -383,7 +394,7 @@ function FacilityListRow({ item: { facility, distance }, expanded, onPress }: {
 function FacilityDirections({ facility }: { facility: Facility }) {
   const { copy, locale } = useLanguage();
   const labels = copy.nearby.navigation;
-  if (facility.source !== 'fehd' || facility.category !== 'toilets') return null;
+  if (facility.category !== 'toilets' || (facility.source !== 'fehd' && facility.source !== 'afcd')) return null;
 
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={labels.directions}
@@ -435,10 +446,9 @@ function FacilitySummary({ facility, distance, onClose }: { facility: Facility; 
   const labels = copy.nearby;
   const visual = facilityVisuals[facility.category];
   const name = facilityText(facility.name, locale);
-  const type = facility.officialType === 'toilet' ? undefined
-    : facility.typeName ? facilityText(facility.typeName, locale) : labels.categories[facility.category];
+  const type = facility.officialType === 'toilet' ? undefined : facilityType(facility, locale, labels);
   const place = facilityPlace(facility, locale);
-  const usesFallback = [facility.name, facility.district, facility.address, facility.typeName,
+  const usesFallback = [facility.name, facility.area ?? facility.district, facility.address, facility.typeName,
     facility.openingHours, facility.remarks].some((field) => facilityTextUsesFallback(field, locale));
   return (
     <>
