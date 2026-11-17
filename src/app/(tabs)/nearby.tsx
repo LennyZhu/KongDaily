@@ -1,20 +1,23 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, FlatList, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, FlatList, Linking, Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import type MapView from 'react-native-maps';
 import type { Region } from 'react-native-maps';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { facilityVisuals, NearbyFacilitiesMap } from '@/components/nearby-facilities-map';
 import { AppText, Icon } from '@/components/ui';
-import { facilityCategories, facilityFilter, facilityText, indexNearbyFacilities, nearbyFacilities,
-  type Facility, type FacilityFilter, type NearbyFacility } from '@/facilities';
+import { showFacilityDirections } from '@/facility-navigation';
+import { facilityCategories, facilityFilter, facilityText, facilityTextUsesFallback, indexNearbyFacilities, nearbyFacilities,
+  type Facility, type FacilityFilter, type FacilityLocale, type NearbyFacility } from '@/facilities';
 import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
 import type { Coordinates } from '@/nearby-bus-data';
 import { nearbyBusLandmarks, type NearbyLandmark } from '@/nearby-bus-landmarks';
 import { locateNearbyBusStops, type NearbyLocationIssue } from '@/nearby-bus-location';
-import { colors, floatingTab, homeLayout, radius, space, touchTarget } from '@/theme';
+import { colors, floatingTab, homeColors, homeLayout, radius, space, touchTarget } from '@/theme';
+
+import fehd from '../../../assets/data/fehd-toilets.json';
 
 type Reference = { kind: 'default' | 'landmark'; landmark: NearbyLandmark } | { kind: 'device'; point: Coordinates };
 const defaultReference = { kind: 'default', landmark: 'central' } satisfies Reference;
@@ -27,7 +30,7 @@ function regionAround(point: Coordinates): Region {
 }
 
 export default function NearbyScreen() {
-  const { copy } = useLanguage();
+  const { copy, locale } = useLanguage();
   const labels = copy.nearby;
   const router = useRouter();
   const { height } = useWindowDimensions();
@@ -51,6 +54,9 @@ export default function NearbyScreen() {
     : reference.kind === 'landmark' ? labels.browseArea : copy.nearbyBus.reference;
   const items = useMemo(() => indexNearbyFacilities(nearbyFacilities, category, point), [category, point]);
   const selected = items.find(({ id }) => id === selectedId);
+  const samePointFacilities = mode === 'map' && selected ? items.filter(({ id, facility: { coordinate } }) =>
+    id !== selected.id && coordinate.latitude === selected.facility.coordinate.latitude
+    && coordinate.longitude === selected.facility.coordinate.longitude) : [];
 
   const cancelLocation = useCallback(() => {
     locationRequest.current?.abort();
@@ -111,6 +117,7 @@ export default function NearbyScreen() {
             <AppText variant="moduleTitle" accessibilityRole="header">{labels.title}</AppText>
             <AppText variant="detail" tone="muted">{labels.intro}</AppText>
           </View>
+          <FacilitySourceInfo />
         </View>
 
         <View style={styles.locationBar}>
@@ -187,6 +194,7 @@ export default function NearbyScreen() {
         {mode === 'map' ? (
           <NearbyFacilitiesMap mapRef={mapRef} initialRegion={viewport.current} items={items}
             devicePoint={reference.kind === 'device' ? reference.point : undefined} selectedId={selected?.id}
+            emptyMessage={items.length ? labels.noFacilitiesInView : facilityEmptyMessage(category, labels)}
             onRegionChange={(region) => { viewport.current = region; }}
             onSelect={({ id }) => setSelectedId(id)} onDismiss={() => setSelectedId(undefined)}
             onRecenter={() => moveCamera(point)} onShowList={() => router.setParams({ view: 'list' })} />
@@ -195,26 +203,28 @@ export default function NearbyScreen() {
             initialOffset={listOffsets.current[category] ?? 0}
             onScroll={(offset) => { listOffsets.current[category] = offset; }}
             onSelect={(item) => {
-              setSelectedId(item.id);
-              moveCamera(item.facility.coordinate);
+              setSelectedId((current) => current === item.id ? undefined : item.id);
+              if (selected?.id !== item.id) moveCamera(item.facility.coordinate);
             }} />
         )}
 
-        {selected ? (
+        {mode === 'map' && selected && (
           <View style={[styles.selectedCard, { maxHeight: height * 0.3 }]}>
             <ScrollView contentContainerStyle={styles.selectedContents}>
-              <FacilitySummary facility={selected.facility} />
-              <Pressable accessibilityRole="button" accessibilityLabel={labels.closeFacility}
-                onPress={() => setSelectedId(undefined)}
-                style={({ pressed }) => [styles.close, pressed && styles.pressed]}>
-                <Icon name="xmark" size={15} />
-              </Pressable>
+              <FacilitySummary facility={selected.facility} distance={selected.distance} onClose={() => setSelectedId(undefined)} />
+              {samePointFacilities.length > 0 && (
+                <View>
+                  <AppText variant="caption" tone="muted">{labels.sameOfficialCoordinate}</AppText>
+                  {samePointFacilities.map(({ id, facility }) => (
+                    <Pressable key={id} accessibilityRole="button" onPress={() => setSelectedId(id)}
+                      style={({ pressed }) => [styles.samePointChoice, pressed && styles.pressed]}>
+                      <AppText variant="detail" tone="primary" style={styles.grow}>{facilityText(facility.name, locale)}</AppText>
+                      <Icon name="chevron.right" size={13} />
+                    </Pressable>
+                  ))}
+                </View>
+              )}
             </ScrollView>
-          </View>
-        ) : mode === 'map' && (
-          <View style={styles.mapFooter}>
-            {!items.length && <AppText variant="caption" tone="muted">{facilityEmptyMessage(labels)}</AppText>}
-            <AppText variant="caption" tone="muted">{labels.mapHelp}</AppText>
           </View>
         )}
       </View>
@@ -224,7 +234,7 @@ export default function NearbyScreen() {
           <View style={styles.sheetHeader}>
             <AppText variant="homeHeading" accessibilityRole="header" style={styles.grow}>{labels.chooseArea}</AppText>
             <Pressable accessibilityRole="button" accessibilityLabel={labels.close} onPress={() => setPicking(false)}
-              style={({ pressed }) => [styles.close, pressed && styles.pressed]}>
+              style={({ pressed }) => [styles.roundAction, pressed && styles.pressed]}>
               <Icon name="xmark" size={16} />
             </Pressable>
           </View>
@@ -250,7 +260,9 @@ export default function NearbyScreen() {
   );
 }
 
-function facilityEmptyMessage(labels: Messages['nearby']) {
+function facilityEmptyMessage(category: FacilityFilter, labels: Messages['nearby']) {
+  if (category === 'toilets') return labels.noToilets;
+  if (category === 'pets' || category === 'parks') return labels.pending[category];
   return nearbyFacilities.length ? labels.noMatches : labels.empty;
 }
 
@@ -268,48 +280,180 @@ function NearbyFacilitiesList({ items, category, selectedId, initialOffset, onSc
   const visual = category === 'all' ? { icon: 'map' as const, color: colors.primary, surface: colors.tint } : facilityVisuals[category];
 
   return (
-    <FlatList data={items} keyExtractor={({ id }) => id} contentOffset={contentOffset}
+    <FlatList data={items} extraData={selectedId} keyExtractor={({ id }) => id} contentOffset={contentOffset}
       scrollEventThrottle={32} onScroll={({ nativeEvent }) => onScroll(nativeEvent.contentOffset.y)}
       contentContainerStyle={items.length ? styles.list : styles.emptyList}
       ListEmptyComponent={(
         <View style={styles.empty}>
           <View style={[styles.emptyIcon, { backgroundColor: visual.surface }]}><Icon name={visual.icon} color={visual.color} size={28} /></View>
-          <AppText variant="homeHeading" accessibilityRole="header" style={styles.centered}>{facilityEmptyMessage(labels)}</AppText>
+          <AppText variant="homeHeading" accessibilityRole="header" style={styles.centered}>{facilityEmptyMessage(category, labels)}</AppText>
           <AppText variant="detail" tone="muted" style={styles.centered}>{labels.emptyDetail}</AppText>
         </View>
       )}
-      renderItem={({ item }) => {
-        const active = item.id === selectedId;
-        const distance = item.distance < 1000 ? copy.nearbyBus.metres(Math.round(item.distance))
-          : copy.nearbyBus.kilometres(Math.round(item.distance / 100) / 10);
-        return (
-          <Pressable accessibilityRole="button" accessibilityState={{ selected: active }} onPress={() => onSelect(item)}
-            style={({ pressed }) => [styles.listRow, active && styles.activeLandmark, pressed && styles.pressed]}>
-            <FacilitySummary facility={item.facility} distance={labels.directDistance(distance)} />
-            <Icon name={active ? 'checkmark' : 'chevron.right'} size={15} />
-          </Pressable>
-        );
-      }}
+      renderItem={({ item }) => <FacilityListRow item={item} expanded={item.id === selectedId} onPress={() => onSelect(item)} />}
     />
   );
 }
 
-function FacilitySummary({ facility, distance }: { facility: Facility; distance?: string }) {
+function FacilitySourceInfo() {
+  const { copy, locale } = useLanguage();
+  const labels = copy.nearby;
+
+  function showSource() {
+    const details = [
+      labels.source(facilityText(fehd.sourceName, locale)), labels.snapshotDate(fehd.snapshotDate),
+      labels.sourceNote, labels.navigation.coordinateNote,
+    ];
+    const source = fehd.sources[fehd.primaryLocale === 'zh-HK' ? 'zh-HK' : 'en'];
+    Alert.alert(labels.sourceInformation, details.join('\n\n'), [
+      { text: labels.close, style: 'cancel' },
+      {
+        text: labels.openOfficialSource,
+        onPress: () => {
+          void Linking.openURL(source.url).catch(() => {
+            Alert.alert(labels.openSourceFailed, undefined, [{ text: labels.navigation.ok }]);
+          });
+        },
+      },
+    ]);
+  }
+
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={labels.sourceInformation} onPress={showSource}
+      style={({ pressed }) => [styles.sourceAction, pressed && styles.pressed]}>
+      <Icon name="info.circle" size={24} />
+    </Pressable>
+  );
+}
+
+function facilityPlace(facility: Facility, locale: FacilityLocale) {
+  return [facility.district, facility.address]
+    .flatMap((value) => value ? [facilityText(value, locale)] : []).filter(Boolean).join(' · ');
+}
+
+function facilityDistance(distance: number, labels: Messages['nearbyBus']) {
+  return distance < 1000 ? labels.metres(Math.round(distance)) : labels.kilometres(Math.round(distance / 100) / 10);
+}
+
+function FacilityListRow({ item: { facility, distance }, expanded, onPress }: {
+  item: NearbyFacility; expanded: boolean; onPress: () => void;
+}) {
   const { copy, locale } = useLanguage();
   const labels = copy.nearby;
   const visual = facilityVisuals[facility.category];
-  const place = [facility.district, facility.address]
-    .flatMap((value) => value ? [facilityText(value, locale)] : []).filter(Boolean).join(' · ');
+  const place = facilityPlace(facility, locale);
+  const source = facility.source === 'fehd' ? labels.fehdShort
+    : facility.sourceName ? facilityText(facility.sourceName, locale) : facility.source;
+  const usesFallback = [facility.name, facility.district, facility.address].some((field) => facilityTextUsesFallback(field, locale));
+  const type = facility.typeName ? facilityText(facility.typeName, locale) : labels.categories[facility.category];
+  const showSpecialType = !expanded && facility.category === 'toilets' && facility.officialType !== 'toilet' && facility.typeName;
+  const caption = [showSpecialType && type, !expanded && source, labels.straightLineDistance, usesFallback && labels.originalLanguageShort]
+    .filter(Boolean).join(' · ');
+
+  return (
+    <View style={[styles.listRow, expanded && styles.activeLandmark]}>
+      <Pressable accessibilityRole="button" accessibilityState={{ selected: expanded, expanded }} onPress={onPress}
+        style={({ pressed }) => [styles.listRowButton, pressed && styles.pressed]}>
+        <View style={[styles.listIcon, { backgroundColor: visual.surface }]}>
+          <Icon name={visual.icon} color={visual.color} size={21} />
+        </View>
+        <View style={styles.grow}>
+          <View style={styles.listNameLine}>
+            <AppText variant="homeCardTitle" style={styles.listName}>{facilityText(facility.name, locale)}</AppText>
+            <View style={styles.listDistance}>
+              <AppText variant="caption" tone="primary" style={styles.shrink}>{facilityDistance(distance, copy.nearbyBus)}</AppText>
+              <Icon name={expanded ? 'chevron.up' : 'chevron.down'} size={13} />
+            </View>
+          </View>
+          {place !== '' && <AppText variant="detail" tone="muted" numberOfLines={expanded ? undefined : 2}>{place}</AppText>}
+          <AppText variant="caption" tone="muted">{caption}</AppText>
+          {!expanded && facility.serviceNotice && <FacilityServiceNotice />}
+        </View>
+      </Pressable>
+      {expanded && (
+        <View style={styles.listDetails}>
+          <FacilityDetails facility={facility} type={facility.officialType === 'toilet' ? undefined : type}
+            usesFallback={!usesFallback && [facility.openingHours, facility.remarks].some((field) => facilityTextUsesFallback(field, locale))} />
+        </View>
+      )}
+    </View>
+  );
+}
+
+function FacilityDirections({ facility }: { facility: Facility }) {
+  const { copy, locale } = useLanguage();
+  const labels = copy.nearby.navigation;
+  if (facility.source !== 'fehd' || facility.category !== 'toilets') return null;
+
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={labels.directions}
+      onPress={() => void showFacilityDirections(facility, locale, labels)}
+      style={({ pressed }) => [styles.roundAction, styles.directionsButton, pressed && styles.pressed]}>
+      <Icon name="location" size={18} />
+    </Pressable>
+  );
+}
+
+function FacilityServiceNotice({ remarks }: { remarks?: string }) {
+  const { copy } = useLanguage();
+  return (
+    <View style={[styles.serviceNotice, !remarks && styles.serviceNoticeBadge]}>
+      <AppText variant="caption">{copy.nearby.serviceNotice}</AppText>
+      {remarks && <AppText variant="detail">{remarks}</AppText>}
+    </View>
+  );
+}
+
+function FacilityDetails({ facility, distance, type, usesFallback }: {
+  facility: Facility; distance?: number; type?: string; usesFallback: boolean;
+}) {
+  const { copy, locale } = useLanguage();
+  const labels = copy.nearby;
+  const openingHours = facility.openingHours && facilityText(facility.openingHours, locale);
+  const remarks = facility.remarks && facilityText(facility.remarks, locale);
   return (
     <>
-      <View style={[styles.facilityIcon, { backgroundColor: visual.surface }]}><Icon name={visual.icon} color={visual.color} size={23} /></View>
-      <View style={styles.grow}>
-        <AppText variant="homeCardTitle">{facilityText(facility.name, locale)}</AppText>
-        <AppText variant="detail" tone="muted">{labels.categories[facility.category]}</AppText>
-        {place !== '' && <AppText variant="detail" tone="muted">{place}</AppText>}
-        <AppText variant="caption" tone="muted">{labels.source(facility.source)}</AppText>
-        {distance && <AppText variant="caption" tone="primary">{distance}</AppText>}
+      {facility.serviceNotice ? <FacilityServiceNotice remarks={remarks} />
+        : remarks && <AppText variant="detail" tone="muted">{labels.officialRemarks(remarks)}</AppText>}
+      <View style={styles.directionsRow}>
+        <View style={styles.grow}>
+          {type && <AppText variant="caption" tone="muted">{type}</AppText>}
+          {distance !== undefined && (
+            <AppText variant="caption" tone="primary">{labels.directDistance(facilityDistance(distance, copy.nearbyBus))}</AppText>
+          )}
+          {openingHours && <AppText variant="detail" tone="muted">{labels.officialHours(openingHours)}</AppText>}
+          {usesFallback && <AppText variant="caption" tone="muted">{labels.originalLanguage}</AppText>}
+        </View>
+        <FacilityDirections facility={facility} />
       </View>
+    </>
+  );
+}
+
+function FacilitySummary({ facility, distance, onClose }: { facility: Facility; distance: number; onClose: () => void }) {
+  const { copy, locale } = useLanguage();
+  const labels = copy.nearby;
+  const visual = facilityVisuals[facility.category];
+  const name = facilityText(facility.name, locale);
+  const type = facility.officialType === 'toilet' ? undefined
+    : facility.typeName ? facilityText(facility.typeName, locale) : labels.categories[facility.category];
+  const place = facilityPlace(facility, locale);
+  const usesFallback = [facility.name, facility.district, facility.address, facility.typeName,
+    facility.openingHours, facility.remarks].some((field) => facilityTextUsesFallback(field, locale));
+  return (
+    <>
+      <View style={styles.selectedSummary}>
+        <View style={[styles.facilityIcon, { backgroundColor: visual.surface }]}><Icon name={visual.icon} color={visual.color} size={23} /></View>
+        <View style={styles.grow}>
+          <AppText variant="homeCardTitle">{name}</AppText>
+          {place !== '' && <AppText variant="detail" tone="muted">{place}</AppText>}
+        </View>
+        <Pressable accessibilityRole="button" accessibilityLabel={labels.closeFacility} onPress={onClose}
+          style={({ pressed }) => [styles.roundAction, pressed && styles.pressed]}>
+          <Icon name="xmark" size={15} />
+        </Pressable>
+      </View>
+      <FacilityDetails facility={facility} distance={distance} type={type} usesFallback={usesFallback} />
     </>
   );
 }
@@ -317,10 +461,13 @@ function FacilitySummary({ facility, distance }: { facility: Facility; distance?
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
   headerScroll: { flexGrow: 0, flexShrink: 1 },
-  header: { paddingTop: space.md, paddingBottom: space.xs, gap: space.sm },
+  header: { paddingTop: space.md, gap: space.sm },
   heading: {
     flexDirection: 'row', alignItems: 'flex-start', gap: space.md, paddingHorizontal: homeLayout.gutter,
     paddingBottom: space.xs,
+  },
+  sourceAction: {
+    width: touchTarget, height: touchTarget, flexShrink: 0, alignItems: 'center', justifyContent: 'center',
   },
   grow: { flex: 1, minWidth: 0, gap: space.xs },
   shrink: { flexShrink: 1 },
@@ -343,13 +490,13 @@ const styles = StyleSheet.create({
   filters: { paddingHorizontal: homeLayout.gutter, alignItems: 'stretch', gap: space.xs },
   filter: {
     flexDirection: 'row', minHeight: touchTarget, alignItems: 'center', gap: space.xs, paddingHorizontal: space.sm,
-    paddingVertical: space.xs, borderRadius: radius.pill, backgroundColor: colors.surface,
+    paddingVertical: space.xs / 2, borderRadius: radius.pill, backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
   },
   activeFilter: { backgroundColor: colors.primary, borderColor: colors.primary },
   modeSwitch: {
-    marginHorizontal: homeLayout.gutter, marginTop: space.xs, marginBottom: space.sm, flexDirection: 'row',
-    backgroundColor: colors.surface, borderRadius: radius.pill, padding: space.xs,
+    marginHorizontal: homeLayout.gutter, marginTop: space.md, marginBottom: space.sm, flexDirection: 'row',
+    backgroundColor: colors.surface, borderRadius: radius.pill, paddingHorizontal: space.xs, paddingVertical: space.xs / 4,
     borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
   },
   segment: {
@@ -358,8 +505,7 @@ const styles = StyleSheet.create({
   },
   activeSegment: { backgroundColor: colors.tint },
   body: { flex: 1, minHeight: 0, borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
-  mapFooter: { paddingTop: space.xs, paddingHorizontal: homeLayout.gutter, gap: space.xs },
-  list: { paddingHorizontal: homeLayout.gutter, paddingVertical: space.md, gap: space.sm },
+  list: { paddingHorizontal: homeLayout.gutter, paddingTop: space.xs, paddingBottom: space.md, gap: space.sm },
   emptyList: { flexGrow: 1, paddingHorizontal: homeLayout.gutter, paddingVertical: space.lg },
   empty: { alignItems: 'center', gap: space.sm, paddingTop: space.xxl },
   emptyIcon: {
@@ -367,16 +513,33 @@ const styles = StyleSheet.create({
   },
   centered: { textAlign: 'center' },
   listRow: {
-    flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.card,
+    borderRadius: radius.card,
     backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
   },
+  listRowButton: { minHeight: touchTarget, flexDirection: 'row', alignItems: 'flex-start', gap: space.sm, padding: space.sm },
+  listIcon: {
+    width: 36, height: 36, borderRadius: radius.control, alignItems: 'center', justifyContent: 'center',
+  },
+  listNameLine: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: space.xs },
+  listName: { flexBasis: 120, flexGrow: 1, flexShrink: 1 },
+  listDistance: { flexDirection: 'row', alignItems: 'center', flexShrink: 1, marginLeft: 'auto', gap: space.xs },
+  listDetails: {
+    borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
+    padding: space.sm, marginHorizontal: space.sm, gap: space.xs,
+  },
+  directionsRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  directionsButton: { alignSelf: 'flex-end' },
   facilityIcon: { width: touchTarget, height: touchTarget, borderRadius: radius.control, alignItems: 'center', justifyContent: 'center' },
+  serviceNotice: { gap: space.xs, padding: space.sm, borderRadius: radius.control, backgroundColor: homeColors.cream },
+  serviceNoticeBadge: { alignSelf: 'flex-start', paddingVertical: space.xs },
   selectedCard: {
     marginHorizontal: homeLayout.gutter, marginTop: space.sm, borderRadius: radius.largeCard, backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border,
   },
-  selectedContents: { flexDirection: 'row', alignItems: 'flex-start', padding: space.md, gap: space.sm },
-  close: {
+  selectedContents: { padding: space.md, gap: space.sm },
+  selectedSummary: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },
+  samePointChoice: { minHeight: touchTarget, flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  roundAction: {
     width: touchTarget, height: touchTarget, alignItems: 'center', justifyContent: 'center',
     borderRadius: radius.pill, backgroundColor: colors.tint,
   },
