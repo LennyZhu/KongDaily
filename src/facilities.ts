@@ -1,5 +1,6 @@
 import afcd from '../assets/data/afcd-toilets.json';
 import fehd from '../assets/data/fehd-toilets.json';
+import lcsdParks from '../assets/data/lcsd-parks.json';
 
 import { distanceBetween, isNearHongKong, type Coordinates } from '@/nearby-bus-data';
 
@@ -25,6 +26,7 @@ export type Facility = {
   coordinate: Coordinates;
   updatedAt?: string;
   openingHours?: FacilityText;
+  details?: FacilityText;
   remarks?: FacilityText;
   serviceNotice?: boolean;
 };
@@ -46,16 +48,30 @@ const afcdSource = {
   sourceUrl: afcd.source.url,
   category: 'toilets',
 } as const;
+const lcsdParkSource = {
+  source: 'lcsd-parks',
+  sourceName: lcsdParks.sourceName,
+  sourceUrl: lcsdParks.source.url,
+  category: 'parks',
+} as const;
 
 export const nearbyFacilitySources = [
   { ...fehdSource, snapshotDate: fehd.snapshotDate },
   { ...afcdSource, snapshotDate: afcd.snapshotDate },
+  {
+    ...lcsdParkSource,
+    snapshotDate: lcsdParks.snapshotDate,
+    revisionDate: lcsdParks.revisionDate,
+    fetchedAt: lcsdParks.source.fetchedAt,
+    recordCount: lcsdParks.records.length,
+  },
 ] as const;
 
 export const nearbyFacilities: readonly Facility[] = [
   ...fehdRecords.flatMap((record) => Object.hasOwn(fehdTypeLabels, record.officialType)
     ? [{ ...record, ...fehdSource, typeName: fehdTypeLabels[record.officialType] }] : []),
   ...afcd.records.map((record) => ({ ...record, ...afcdSource })),
+  ...lcsdParks.records.map((record) => ({ ...record, ...lcsdParkSource })),
 ];
 
 export function facilityFilter(value: unknown): FacilityFilter {

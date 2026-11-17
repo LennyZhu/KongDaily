@@ -30,7 +30,7 @@ export async function showFacilityDirections(facility: Facility, locale: Facilit
     const choice = await new Promise<number>((resolve) => {
       ActionSheetIOS.showActionSheetWithOptions({
         title: facilityText(facility.name, locale),
-        message: labels.coordinateNote,
+        message: facility.category === 'parks' ? labels.parkCoordinateNote : labels.coordinateNote,
         options: [labels.appleMaps, labels.googleMaps, labels.cancel],
         cancelButtonIndex: 2,
       }, resolve);

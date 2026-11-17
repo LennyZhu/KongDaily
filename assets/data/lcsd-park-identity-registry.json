@@ -1,0 +1,1593 @@
+{
+  "schemaVersion": 1,
+  "source": "lcsd-parks",
+  "layer": "PARKS",
+  "description": "KongDaily permanent venue keys, assigned once. Keep IDs on reorder or OBJECTID changes. Reviewed anchors are bilingual name, district and address with the WGS84 venue point. Keep historical OBJECTID with its snapshot only after the anchors match.",
+  "sourceEvidence": {
+    "datasetUrl": "https://portal.csdi.gov.hk/csdi-webpage/dataset/lcsd_rcd_1629267205215_19292",
+    "metadataUrl": "https://portal.csdi.gov.hk/csdi-webpage/metadata/lcsd_rcd_1629267205215_19292/html",
+    "archivesUrl": "https://portal.csdi.gov.hk/csdi-webpage/archivedDatasetFileListPage/lcsd_rcd_1629267205215_19292",
+    "snapshotSha256": {
+      "2026-10-25": "6666b7785fa1c6ca7cb003cb932c6155e0befc1885c1b05e8f01c3df05fdc7df",
+      "2026-05-25": "adc5d69c97f346a76ba36fe209a92c641cc112f7ac0074220baae75bb426d26f",
+      "2026-09-27": "ff67dc2d0533c71da2ba08b758f4e9383af432e1be68d4f95519a1ed17fa10af"
+    }
+  },
+  "reviewedSnapshot": {
+    "snapshotDate": "2026-10-25",
+    "revisionDate": "2026-10-15",
+    "sha256": "6666b7785fa1c6ca7cb003cb932c6155e0befc1885c1b05e8f01c3df05fdc7df",
+    "rawCount": 124,
+    "parkCount": 48
+  },
+  "records": [
+    {
+      "id": "park-001",
+      "name": {
+        "zh-HK": "中葵涌公園",
+        "en": "Central Kwai Chung Park"
+      },
+      "district": {
+        "zh-HK": "葵青",
+        "en": "KWAI TSING"
+      },
+      "address": {
+        "zh-HK": "葵涌新葵街",
+        "en": "San Kwai Street, Kwai Chung"
+      },
+      "coordinate": {
+        "latitude": 22.3571961239,
+        "longitude": 114.1329245798
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 16
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 14
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 113
+        }
+      ]
+    },
+    {
+      "id": "park-002",
+      "name": {
+        "zh-HK": "九龍公園",
+        "en": "Kowloon Park"
+      },
+      "district": {
+        "zh-HK": "油尖旺",
+        "en": "YAU TSIM MONG"
+      },
+      "address": {
+        "zh-HK": "尖沙咀柯士甸道22號",
+        "en": "22 Austin Road, Tsim Sha Tsui"
+      },
+      "coordinate": {
+        "latitude": 22.3001178132,
+        "longitude": 114.1702101794
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 14
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 12
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 22
+        }
+      ]
+    },
+    {
+      "id": "park-003",
+      "name": {
+        "zh-HK": "九龍寨城公園",
+        "en": "Kowloon Walled City Park"
+      },
+      "district": {
+        "zh-HK": "九龍城",
+        "en": "KOWLOON CITY"
+      },
+      "address": {
+        "zh-HK": "九龍城東正道",
+        "en": "Tung Tsing Road,Kowloon City"
+      },
+      "coordinate": {
+        "latitude": 22.3316558889,
+        "longitude": 114.1898271393
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 120
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 119
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 118
+        }
+      ]
+    },
+    {
+      "id": "park-004",
+      "name": {
+        "zh-HK": "佐敦谷公園",
+        "en": "Jordan Valley Park"
+      },
+      "district": {
+        "zh-HK": "觀塘",
+        "en": "KWUN TONG"
+      },
+      "address": {
+        "zh-HK": "觀塘新清水灣道71號",
+        "en": "No.71, New Clear Water Bay Road"
+      },
+      "coordinate": {
+        "latitude": 22.3298422474,
+        "longitude": 114.2218066332
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 10
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 8
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 103
+        }
+      ]
+    },
+    {
+      "id": "park-005",
+      "name": {
+        "zh-HK": "元朗公園",
+        "en": "Yuen Long Park"
+      },
+      "district": {
+        "zh-HK": "元朗",
+        "en": "YUEN LONG"
+      },
+      "address": {
+        "zh-HK": "元朗元朗公園北路",
+        "en": "Town Park Road North, Yuen Long"
+      },
+      "coordinate": {
+        "latitude": 22.4424992425,
+        "longitude": 114.0189263103
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 17
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 15
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 114
+        }
+      ]
+    },
+    {
+      "id": "park-006",
+      "name": {
+        "zh-HK": "北區公園",
+        "en": "North District Park"
+      },
+      "district": {
+        "zh-HK": "北區",
+        "en": "NORTH"
+      },
+      "address": {
+        "zh-HK": "上水馬會道",
+        "en": "Jockey Club Road, Sheung Shui"
+      },
+      "coordinate": {
+        "latitude": 22.4989224699,
+        "longitude": 114.1341113049
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 5
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 2
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 27
+        }
+      ]
+    },
+    {
+      "id": "park-007",
+      "name": {
+        "zh-HK": "北角海濱花園",
+        "en": "North Point Promenade"
+      },
+      "district": {
+        "zh-HK": "東區",
+        "en": "EASTERN"
+      },
+      "address": {
+        "zh-HK": "香港北角渡輪碼頭",
+        "en": "North Point Ferry Pier, Hong Kong"
+      },
+      "coordinate": {
+        "latitude": 22.2934830843,
+        "longitude": 114.2014909392
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 117
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 116
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 112
+        }
+      ]
+    },
+    {
+      "id": "park-008",
+      "name": {
+        "zh-HK": "南蓮園池",
+        "en": "Nan Lian Garden"
+      },
+      "district": {
+        "zh-HK": "黃大仙",
+        "en": "WONG TAI SIN"
+      },
+      "address": {
+        "zh-HK": "黃大仙鑽石山鳳德道60號",
+        "en": "Fung Tak Road, Diamond Hill, Wong Tai Sin"
+      },
+      "coordinate": {
+        "latitude": 22.3391295546,
+        "longitude": 114.2045257056
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 121
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 120
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 119
+        }
+      ]
+    },
+    {
+      "id": "park-009",
+      "name": {
+        "zh-HK": "告士打道花園",
+        "en": "Gloucester Road Garden"
+      },
+      "district": {
+        "zh-HK": "灣仔",
+        "en": "WAN CHAI"
+      },
+      "address": {
+        "zh-HK": "灣仔告士打道",
+        "en": "Gloucester Road, Wan Chai"
+      },
+      "coordinate": {
+        "latitude": 22.2797807984,
+        "longitude": 114.1724088975
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 100
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 99
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 93
+        }
+      ]
+    },
+    {
+      "id": "park-010",
+      "name": {
+        "zh-HK": "園圃街雀鳥花園",
+        "en": "Yuen Po Street Bird Garden"
+      },
+      "district": {
+        "zh-HK": "油尖旺",
+        "en": "YAU TSIM MONG"
+      },
+      "address": {
+        "zh-HK": "旺角園圃街",
+        "en": "Yuen Po Street, Mongkok"
+      },
+      "coordinate": {
+        "latitude": 22.3257747622,
+        "longitude": 114.1738032533
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 123
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 122
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 121
+        }
+      ]
+    },
+    {
+      "id": "park-011",
+      "name": {
+        "zh-HK": "城門谷公園",
+        "en": "Shing Mun Valley Park"
+      },
+      "district": {
+        "zh-HK": "荃灣",
+        "en": "TSUEN WAN"
+      },
+      "address": {
+        "zh-HK": "荃灣城門道",
+        "en": "Shing Mun Road, Tsuen Wan"
+      },
+      "coordinate": {
+        "latitude": 22.374749174,
+        "longitude": 114.1250725867
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 31
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 30
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 10
+        }
+      ]
+    },
+    {
+      "id": "park-012",
+      "name": {
+        "zh-HK": "大埔海濱公園",
+        "en": "Tai Po Waterfront Park"
+      },
+      "district": {
+        "zh-HK": "大埔",
+        "en": "TAI PO"
+      },
+      "address": {
+        "zh-HK": "大埔大發街",
+        "en": "Dai Fat Street, Tai Po"
+      },
+      "coordinate": {
+        "latitude": 22.4518272522,
+        "longitude": 114.1790049317
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 9
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 7
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 20
+        }
+      ]
+    },
+    {
+      "id": "park-013",
+      "name": {
+        "zh-HK": "天業路公園",
+        "en": "Tin Yip Road Park"
+      },
+      "district": {
+        "zh-HK": "元朗",
+        "en": "YUEN LONG"
+      },
+      "address": {
+        "zh-HK": "新界天水圍天業路",
+        "en": "Tin Yip Road, Tin Shui Wai"
+      },
+      "coordinate": {
+        "latitude": 22.4632340896,
+        "longitude": 114.007449692
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 11
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 9
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 102
+        }
+      ]
+    },
+    {
+      "id": "park-014",
+      "name": {
+        "zh-HK": "天水圍公園",
+        "en": "Tin Shui Wai Park"
+      },
+      "district": {
+        "zh-HK": "元朗",
+        "en": "YUEN LONG"
+      },
+      "address": {
+        "zh-HK": "天水圍天瑞路6號",
+        "en": "6 Tin Shui Road, Tin Shui Wai, Yuen Long"
+      },
+      "coordinate": {
+        "latitude": 22.4556587504,
+        "longitude": 114.0034542112
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 28
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 26
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 5
+        }
+      ]
+    },
+    {
+      "id": "park-015",
+      "name": {
+        "zh-HK": "安睦街花園",
+        "en": "On Muk Street Garden"
+      },
+      "district": {
+        "zh-HK": "沙田",
+        "en": "SHA TIN"
+      },
+      "address": {
+        "zh-HK": "沙田安睦街",
+        "en": "On Muk Street, Sha Tin"
+      },
+      "coordinate": {
+        "latitude": 22.389400253,
+        "longitude": 114.2051161903
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 99
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 98
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 92
+        }
+      ]
+    },
+    {
+      "id": "park-016",
+      "name": {
+        "zh-HK": "寶康公園",
+        "en": "Po Hong Park"
+      },
+      "district": {
+        "zh-HK": "西貢",
+        "en": "SAI KUNG"
+      },
+      "address": {
+        "zh-HK": "將軍澳運隆路",
+        "en": "Wan Lung Road, Tseung Kwan O"
+      },
+      "coordinate": {
+        "latitude": 22.3187749014,
+        "longitude": 114.2576567608
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 18
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 16
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 117
+        }
+      ]
+    },
+    {
+      "id": "park-017",
+      "name": {
+        "zh-HK": "寶翠公園",
+        "en": "Po Tsui Park"
+      },
+      "district": {
+        "zh-HK": "西貢",
+        "en": "SAI KUNG"
+      },
+      "address": {
+        "zh-HK": "新界將軍澳毓雅里",
+        "en": "Yuk Nga Lane, Tseung Kwan O, N.T."
+      },
+      "coordinate": {
+        "latitude": 22.3250172949,
+        "longitude": 114.2529916009
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 19
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 17
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 44
+        }
+      ]
+    },
+    {
+      "id": "park-018",
+      "name": {
+        "zh-HK": "寶雲道公園",
+        "en": "Bowen Road Park"
+      },
+      "district": {
+        "zh-HK": "灣仔",
+        "en": "WAN CHAI"
+      },
+      "address": {
+        "zh-HK": "灣仔寶雲道",
+        "en": "Bowen Road, Wan Chai"
+      },
+      "coordinate": {
+        "latitude": 22.2700284827,
+        "longitude": 114.1715661562
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 75
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 74
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 66
+        }
+      ]
+    },
+    {
+      "id": "park-019",
+      "name": {
+        "zh-HK": "屯門公園",
+        "en": "Tuen Mun Park"
+      },
+      "district": {
+        "zh-HK": "屯門",
+        "en": "TUEN MUN"
+      },
+      "address": {
+        "zh-HK": "屯門屯門鄉事會路",
+        "en": "Tuen Mun Heung Sze Wui Road, Tuen Mun"
+      },
+      "coordinate": {
+        "latitude": 22.3919338489,
+        "longitude": 113.9734439193
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 26
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 24
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 2
+        }
+      ]
+    },
+    {
+      "id": "park-020",
+      "name": {
+        "zh-HK": "新廈街遊樂場",
+        "en": "San Ha Street Playground"
+      },
+      "district": {
+        "zh-HK": "東區",
+        "en": "EASTERN"
+      },
+      "address": {
+        "zh-HK": "新廈街",
+        "en": "San Ha Street"
+      },
+      "coordinate": {
+        "latitude": 22.2643379108,
+        "longitude": 114.2447633067
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 107
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 106
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 100
+        }
+      ]
+    },
+    {
+      "id": "park-021",
+      "name": {
+        "zh-HK": "東岸公園 (第一期)",
+        "en": "East Coast Park (Phase 1)"
+      },
+      "district": {
+        "zh-HK": "灣仔",
+        "en": "WAN CHAI"
+      },
+      "address": {
+        "zh-HK": "東岸公園 (第一期)",
+        "en": "East Coast Park (Phase 1)"
+      },
+      "coordinate": {
+        "latitude": 22.2879294155,
+        "longitude": 114.189184453
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 93
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 92
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 85
+        }
+      ]
+    },
+    {
+      "id": "park-022",
+      "name": {
+        "zh-HK": "東涌小炮台公園(2區)",
+        "en": "Tung Chung Battery Park (Zone 2)"
+      },
+      "district": {
+        "zh-HK": "離島",
+        "en": "ISLANDS"
+      },
+      "address": {
+        "zh-HK": "東涌道北26 號",
+        "en": "26 Tung Chung Road North"
+      },
+      "coordinate": {
+        "latitude": 22.287053827,
+        "longitude": 113.9366407004
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 12
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 10
+        }
+      ]
+    },
+    {
+      "id": "park-023",
+      "name": {
+        "zh-HK": "柴灣公園",
+        "en": "Chai Wan Park"
+      },
+      "district": {
+        "zh-HK": "東區",
+        "en": "EASTERN"
+      },
+      "address": {
+        "zh-HK": "柴灣翠灣街柴灣公園",
+        "en": "Chai Wan Park, Tsui Wan Street, Chai Wan"
+      },
+      "coordinate": {
+        "latitude": 22.2662774888,
+        "longitude": 114.2384868569
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 21
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 19
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 43
+        }
+      ]
+    },
+    {
+      "id": "park-024",
+      "name": {
+        "zh-HK": "歌和老街公園",
+        "en": "Cornwall Street Park"
+      },
+      "district": {
+        "zh-HK": "深水埗",
+        "en": "SHAM SHUI PO"
+      },
+      "address": {
+        "zh-HK": "九龍塘歌和老街17號",
+        "en": "17 Cornwall Street, Kowloon Tong, Kowloon"
+      },
+      "coordinate": {
+        "latitude": 22.3388790404,
+        "longitude": 114.1739903216
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 112
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 111
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 107
+        }
+      ]
+    },
+    {
+      "id": "park-025",
+      "name": {
+        "zh-HK": "沙田公園",
+        "en": "Sha Tin Park"
+      },
+      "district": {
+        "zh-HK": "沙田",
+        "en": "SHA TIN"
+      },
+      "address": {
+        "zh-HK": "沙田源禾路2號",
+        "en": "2 Yuen Wo Road, Shatin"
+      },
+      "coordinate": {
+        "latitude": 22.3794916337,
+        "longitude": 114.1898733301
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 41
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 40
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 25
+        }
+      ]
+    },
+    {
+      "id": "park-026",
+      "name": {
+        "zh-HK": "添馬公園",
+        "en": "Tamar Park"
+      },
+      "district": {
+        "zh-HK": "中西區",
+        "en": "CENTRAL AND WESTERN"
+      },
+      "address": {
+        "zh-HK": "金鐘夏慤道",
+        "en": "Harcourt Road, Admiralty"
+      },
+      "coordinate": {
+        "latitude": 22.2813582386,
+        "longitude": 114.1655786875
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 40
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 39
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 21
+        }
+      ]
+    },
+    {
+      "id": "park-027",
+      "name": {
+        "zh-HK": "湖景路花園",
+        "en": "Wu King Road Garden"
+      },
+      "district": {
+        "zh-HK": "屯門",
+        "en": "TUEN MUN"
+      },
+      "address": {
+        "zh-HK": "屯門湖景路",
+        "en": "Wu King Road, Tuen Mun"
+      },
+      "coordinate": {
+        "latitude": 22.37546018,
+        "longitude": 113.9664275813
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 47
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 46
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 34
+        }
+      ]
+    },
+    {
+      "id": "park-028",
+      "name": {
+        "zh-HK": "灣仔峽公園",
+        "en": "Wan Chai Gap Park"
+      },
+      "district": {
+        "zh-HK": "灣仔",
+        "en": "WAN CHAI"
+      },
+      "address": {
+        "zh-HK": "灣仔司徒拔道",
+        "en": "Stubbs Road , Wan Chai"
+      },
+      "coordinate": {
+        "latitude": 22.2671001159,
+        "longitude": 114.1693645823
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 91
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 90
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 82
+        }
+      ]
+    },
+    {
+      "id": "park-029",
+      "name": {
+        "zh-HK": "牛池灣公園",
+        "en": "Ngau Chi Wan Park"
+      },
+      "district": {
+        "zh-HK": "黃大仙",
+        "en": "WONG TAI SIN"
+      },
+      "address": {
+        "zh-HK": "黃大仙牛池灣豐盛街71號",
+        "en": "71 Fung Shing Street, Ngau Chi Wan, Wong Tai Sin"
+      },
+      "coordinate": {
+        "latitude": 22.3361512267,
+        "longitude": 114.2138022185
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 23
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 21
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 36
+        }
+      ]
+    },
+    {
+      "id": "park-030",
+      "name": {
+        "zh-HK": "獅子山公園",
+        "en": "Lion Rock Park"
+      },
+      "district": {
+        "zh-HK": "黃大仙",
+        "en": "WONG TAI SIN"
+      },
+      "address": {
+        "zh-HK": "九龍黃大仙竹園道",
+        "en": "Chuk Yuen Road, Wong Tai Sin, Kowloon"
+      },
+      "coordinate": {
+        "latitude": 22.3448454107,
+        "longitude": 114.1838474294
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 115
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 114
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 110
+        }
+      ]
+    },
+    {
+      "id": "park-031",
+      "name": {
+        "zh-HK": "石硤尾公園",
+        "en": "Shek Kip Mei Park"
+      },
+      "district": {
+        "zh-HK": "深水埗",
+        "en": "SHAM SHUI PO"
+      },
+      "address": {
+        "zh-HK": "深水埗南昌街270號",
+        "en": "270 Nam Cheong Street, Sham Shui Po"
+      },
+      "coordinate": {
+        "latitude": 22.3355141123,
+        "longitude": 114.1694914642
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 20
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 18
+        }
+      ]
+    },
+    {
+      "id": "park-032",
+      "name": {
+        "zh-HK": "荃灣公園",
+        "en": "Tsuen Wan Park"
+      },
+      "district": {
+        "zh-HK": "荃灣",
+        "en": "TSUEN WAN"
+      },
+      "address": {
+        "zh-HK": "荃灣永順街59號",
+        "en": "59 Wing Shun Street, Tsuen Wan"
+      },
+      "coordinate": {
+        "latitude": 22.3671139917,
+        "longitude": 114.112822312
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 42
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 41
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 26
+        }
+      ]
+    },
+    {
+      "id": "park-033",
+      "name": {
+        "zh-HK": "荃灣海濱公園",
+        "en": "Tsuen Wan Riviera Park"
+      },
+      "district": {
+        "zh-HK": "荃灣",
+        "en": "TSUEN WAN"
+      },
+      "address": {
+        "zh-HK": "荃灣怡康街2A號",
+        "en": "2A Yi Hong Street, Tsuen Wan"
+      },
+      "coordinate": {
+        "latitude": 22.3633750828,
+        "longitude": 114.1121540994
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 124
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 123
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 122
+        }
+      ]
+    },
+    {
+      "id": "park-034",
+      "name": {
+        "zh-HK": "荔枝角公園",
+        "en": "Lai Chi Kok Park"
+      },
+      "district": {
+        "zh-HK": "深水埗",
+        "en": "SHAM SHUI PO"
+      },
+      "address": {
+        "zh-HK": "荔枝角荔灣道1號",
+        "en": "1 Lai Wan Road, Lai Chi Kok"
+      },
+      "coordinate": {
+        "latitude": 22.3394756018,
+        "longitude": 114.1369848931
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 24
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 22
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 24
+        }
+      ]
+    },
+    {
+      "id": "park-035",
+      "name": {
+        "zh-HK": "葵涌公園",
+        "en": "Kwai Chung Park"
+      },
+      "district": {
+        "zh-HK": "葵青",
+        "en": "KWAI TSING"
+      },
+      "address": {
+        "zh-HK": "新界葵涌葵裕街18號",
+        "en": "18 Kwai Yue Street, Kwai Chung, New Territories"
+      },
+      "coordinate": {
+        "latitude": 22.3537700875,
+        "longitude": 114.1173377457
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 33
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 32
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 12
+        }
+      ]
+    },
+    {
+      "id": "park-036",
+      "name": {
+        "zh-HK": "西九龍海濱長廊",
+        "en": "West Kowloon Waterfront Promenade"
+      },
+      "district": {
+        "zh-HK": "油尖旺",
+        "en": "YAU TSIM MONG"
+      },
+      "address": {
+        "zh-HK": "西九龍填海區 (九龍柯士甸道西/雅翔道交界)",
+        "en": "West Kowloon Reclamation Area (J/O Austin Road West/ Nga Cheung Road)"
+      },
+      "coordinate": {
+        "latitude": 22.3006970899,
+        "longitude": 114.1545691258
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 119
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 118
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 116
+        }
+      ]
+    },
+    {
+      "id": "park-037",
+      "name": {
+        "zh-HK": "西營盤海濱公園",
+        "en": "Sai Ying Pun Harbourfront Park"
+      },
+      "district": {
+        "zh-HK": "中西區",
+        "en": "CENTRAL AND WESTERN"
+      },
+      "address": {
+        "zh-HK": "香港西營盤東邊街北",
+        "en": "Eastern Street North, Sai Ying Pun, Hong Kong"
+      },
+      "coordinate": {
+        "latitude": 22.2904164252,
+        "longitude": 114.1404038614
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 35
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 34
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 14
+        }
+      ]
+    },
+    {
+      "id": "park-038",
+      "name": {
+        "zh-HK": "觀塘上配水庫花園",
+        "en": "Kwun Tong High Level Service Reservoir Garden"
+      },
+      "district": {
+        "zh-HK": "觀塘",
+        "en": "KWUN TONG"
+      },
+      "address": {
+        "zh-HK": "九龍觀塘佐敦谷",
+        "en": "Jordan Valley Kwun Tong, Kowloon"
+      },
+      "coordinate": {
+        "latitude": 22.3242327043,
+        "longitude": 114.2233202003
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 36
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 35
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 15
+        }
+      ]
+    },
+    {
+      "id": "park-039",
+      "name": {
+        "zh-HK": "青衣公園",
+        "en": "Tsing Yi Park"
+      },
+      "district": {
+        "zh-HK": "葵青",
+        "en": "KWAI TSING"
+      },
+      "address": {
+        "zh-HK": "青衣青綠街",
+        "en": "Tsing Luk Street, Tsing Yi"
+      },
+      "coordinate": {
+        "latitude": 22.3561642706,
+        "longitude": 114.1058721402
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 8
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 5
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 23
+        }
+      ]
+    },
+    {
+      "id": "park-040",
+      "name": {
+        "zh-HK": "香港公園",
+        "en": "Hong Kong Park"
+      },
+      "district": {
+        "zh-HK": "中西區",
+        "en": "CENTRAL AND WESTERN"
+      },
+      "address": {
+        "zh-HK": "中環紅棉路19號",
+        "en": "19 Cotton Tree Drive, Central"
+      },
+      "coordinate": {
+        "latitude": 22.2773076528,
+        "longitude": 114.1613882592
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 122
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 121
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 120
+        }
+      ]
+    },
+    {
+      "id": "park-041",
+      "name": {
+        "zh-HK": "馬窩路花園",
+        "en": "Ma Wo Road Garden"
+      },
+      "district": {
+        "zh-HK": "大埔",
+        "en": "TAI PO"
+      },
+      "address": {
+        "zh-HK": "新界大埔馬窩路2號",
+        "en": "2 Ma Wo Road, Tai Po, New Territories"
+      },
+      "coordinate": {
+        "latitude": 22.4427386254,
+        "longitude": 114.1655569701
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 94
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 93
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 86
+        }
+      ]
+    },
+    {
+      "id": "park-042",
+      "name": {
+        "zh-HK": "馬鞍山公園",
+        "en": "Ma On Shan Park"
+      },
+      "district": {
+        "zh-HK": "沙田",
+        "en": "SHA TIN"
+      },
+      "address": {
+        "zh-HK": "馬鞍山鞍駿街12號",
+        "en": "12 On Chun Street, Ma On Shan"
+      },
+      "coordinate": {
+        "latitude": 22.4272941015,
+        "longitude": 114.2311852126
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 116
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 115
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 111
+        }
+      ]
+    },
+    {
+      "id": "park-043",
+      "name": {
+        "zh-HK": "馬鞍山海濱長廊",
+        "en": "Ma On Shan Promenade"
+      },
+      "district": {
+        "zh-HK": "沙田",
+        "en": "SHA TIN"
+      },
+      "address": {
+        "zh-HK": "馬鞍山寧泰路",
+        "en": "Ning Tai Road, Ma On Shan"
+      },
+      "coordinate": {
+        "latitude": 22.4088327389,
+        "longitude": 114.2204091796
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 15
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 13
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 9
+        }
+      ]
+    },
+    {
+      "id": "park-044",
+      "name": {
+        "zh-HK": "鰂魚涌公園",
+        "en": "Quarry Bay Park"
+      },
+      "district": {
+        "zh-HK": "東區",
+        "en": "EASTERN"
+      },
+      "address": {
+        "zh-HK": "鰂魚涌近海堤街",
+        "en": "Near Hoi Tai Street, Quarry Bay"
+      },
+      "coordinate": {
+        "latitude": 22.288690986,
+        "longitude": 114.2151235939
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 38
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 37
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 17
+        }
+      ]
+    },
+    {
+      "id": "park-045",
+      "name": {
+        "zh-HK": "鳳德公園",
+        "en": "Fung Tak Park"
+      },
+      "district": {
+        "zh-HK": "黃大仙",
+        "en": "WONG TAI SIN"
+      },
+      "address": {
+        "zh-HK": "九龍黃大仙鳳德道42號",
+        "en": "42, Fung Tak Road, Wong Tai Sin, Kowloon"
+      },
+      "coordinate": {
+        "latitude": 22.3423851489,
+        "longitude": 114.1980552899
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 114
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 113
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 109
+        }
+      ]
+    },
+    {
+      "id": "park-046",
+      "name": {
+        "zh-HK": "鴨脷洲風之塔公園",
+        "en": "Ap Lei Chau Wind Tower Park"
+      },
+      "district": {
+        "zh-HK": "南區",
+        "en": "SOUTHERN"
+      },
+      "address": {
+        "zh-HK": "香港鴨脷洲利枝道",
+        "en": "Lei Chi Road, Ap Lei Chau, Hong Kong"
+      },
+      "coordinate": {
+        "latitude": 22.2446120362,
+        "longitude": 114.1529579619
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 101
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 100
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 94
+        }
+      ]
+    },
+    {
+      "id": "park-047",
+      "name": {
+        "zh-HK": "黃泥涌道新月花園",
+        "en": "Wong Nai Chung Road Crescent Garden"
+      },
+      "district": {
+        "zh-HK": "灣仔",
+        "en": "WAN CHAI"
+      },
+      "address": {
+        "zh-HK": "香港跑馬地黃泥涌道",
+        "en": "Wong Nai Chung Road, Happy Valley, Hong Kong"
+      },
+      "coordinate": {
+        "latitude": 22.2702092254,
+        "longitude": 114.1842851678
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 103
+        },
+        {
+          "snapshotDate": "2026-09-27",
+          "objectId": 102
+        },
+        {
+          "snapshotDate": "2026-05-25",
+          "objectId": 96
+        }
+      ]
+    },
+    {
+      "id": "park-048",
+      "name": {
+        "zh-HK": "龍津石橋公園",
+        "en": "Lung Tsun Stone Bridge Park"
+      },
+      "district": {
+        "zh-HK": "九龍城",
+        "en": "KOWLOON CITY"
+      },
+      "address": {
+        "zh-HK": "九龍世運道18號",
+        "en": "18 Olympic Avenue, Kowloon"
+      },
+      "coordinate": {
+        "latitude": 22.328598327,
+        "longitude": 114.1950743136
+      },
+      "upstreamRecords": [
+        {
+          "snapshotDate": "2026-10-25",
+          "objectId": 2
+        }
+      ]
+    }
+  ]
+}

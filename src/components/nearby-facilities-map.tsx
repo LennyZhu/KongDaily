@@ -13,7 +13,7 @@ import { colors, homeColors, radius, shadows, space, touchTarget } from '@/theme
 export const facilityVisuals = {
   toilets: { icon: 'figure.dress.line.vertical.figure', color: colors.primary, surface: colors.tint },
   pets: { icon: 'pawprint', color: homeColors.rustInk, surface: homeColors.peach },
-  parks: { icon: 'tree', color: homeColors.greenInk, surface: homeColors.green },
+  parks: { icon: 'tree', color: colors.primary, surface: colors.tint },
 } satisfies Record<FacilityCategory, { icon: IconName; color: string; surface: string }>;
 
 export type NearbyFacilitiesMapHandle = { moveTo: (region: Region) => void };

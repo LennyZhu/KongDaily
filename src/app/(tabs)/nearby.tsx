@@ -318,7 +318,8 @@ function NearbyHeading() {
 
 function facilityEmptyMessage(category: FacilityFilter, labels: Messages['nearby']) {
   if (category === 'toilets') return labels.noToilets;
-  if (category === 'pets' || category === 'parks') return labels.pending[category];
+  if (category === 'parks') return labels.noParks;
+  if (category === 'pets') return labels.pending.pets;
   return nearbyFacilities.length ? labels.noMatches : labels.empty;
 }
 
@@ -363,10 +364,19 @@ function FacilitySourceInfo() {
   const labels = copy.nearby;
 
   function showSource() {
-    const datasets = nearbyFacilitySources.map(({ sourceName, snapshotDate }) =>
-      [labels.source(facilityText(sourceName, locale)), labels.snapshotDate(snapshotDate)].join('\n'));
+    const datasets = nearbyFacilitySources.map((dataset) => {
+      const lines = [labels.source(facilityText(dataset.sourceName, locale)), labels.snapshotDate(dataset.snapshotDate)];
+      if (dataset.source === 'lcsd-parks') {
+        const acquired = new Intl.DateTimeFormat(locale, {
+          dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Hong_Kong',
+        }).format(new Date(dataset.fetchedAt));
+        lines.push(labels.revisionDate(dataset.revisionDate), labels.acquiredAt(acquired), labels.parkCoverage(dataset.recordCount));
+      }
+      return lines.join('\n');
+    });
     const details = [
-      ...datasets, labels.sourceNote, labels.navigation.coordinateNote, labels.csdiCredit, labels.placeSearch.credit,
+      ...datasets, labels.sourceNote, labels.navigation.coordinateNote, labels.navigation.parkCoordinateNote, labels.csdiCredit,
+      labels.placeSearch.credit,
     ];
     function openSource(url: string) {
       void Linking.openURL(url).catch(() => {
@@ -375,7 +385,7 @@ function FacilitySourceInfo() {
     }
     Alert.alert(labels.sourceInformation, details.join('\n\n'), [
       ...nearbyFacilitySources.map(({ source, sourceUrl }) => ({
-        text: labels.openOfficialSource(source.toUpperCase()),
+        text: labels.openOfficialSource(source === 'lcsd-parks' ? 'LCSD' : source.toUpperCase()),
         onPress: () => openSource(sourceUrl),
       })),
       { text: labels.csdiTerms, onPress: () => openSource('https://portal.csdi.gov.hk/csdi-webpage/doc/TNC') },
@@ -416,13 +426,14 @@ function FacilityListRow({ item: { facility, distance }, expanded, onPress }: {
   const visual = facilityVisuals[facility.category];
   const place = facilityPlace(facility, locale);
   const isAfcd = facility.source === 'afcd';
+  const isPark = facility.category === 'parks';
   const source = facility.source === 'fehd' ? labels.fehdShort
-    : isAfcd ? undefined : facility.sourceName ? facilityText(facility.sourceName, locale) : facility.source;
+    : isAfcd || isPark ? undefined : facility.sourceName ? facilityText(facility.sourceName, locale) : facility.source;
   const usesFallback = [facility.name, facility.area ?? facility.district, facility.address]
     .some((field) => facilityTextUsesFallback(field, locale));
   const type = facilityType(facility, locale, labels);
   const showSpecialType = !expanded && facility.category === 'toilets' && facility.officialType !== 'toilet' && facility.typeName;
-  const compactType = isAfcd ? labels.countryParkToilet : showSpecialType && type;
+  const compactType = isAfcd ? labels.countryParkToilet : (isPark || showSpecialType) && type;
   const caption = [!expanded && compactType, !expanded && source, labels.straightLineDistance, usesFallback && labels.originalLanguageShort]
     .filter(Boolean).join(' · ');
 
@@ -449,7 +460,8 @@ function FacilityListRow({ item: { facility, distance }, expanded, onPress }: {
       {expanded && (
         <View style={styles.listDetails}>
           <FacilityDetails facility={facility} type={facility.officialType === 'toilet' ? undefined : type}
-            usesFallback={!usesFallback && [facility.openingHours, facility.remarks].some((field) => facilityTextUsesFallback(field, locale))} />
+            usesFallback={!usesFallback && [facility.openingHours, facility.remarks, facility.details]
+              .some((field) => facilityTextUsesFallback(field, locale))} />
         </View>
       )}
     </View>
@@ -459,7 +471,9 @@ function FacilityListRow({ item: { facility, distance }, expanded, onPress }: {
 function FacilityDirections({ facility }: { facility: Facility }) {
   const { copy, locale } = useLanguage();
   const labels = copy.nearby.navigation;
-  if (facility.category !== 'toilets' || (facility.source !== 'fehd' && facility.source !== 'afcd')) return null;
+  const isOfficialToilet = facility.category === 'toilets' && (facility.source === 'fehd' || facility.source === 'afcd');
+  const isLcsdPark = facility.category === 'parks' && facility.source === 'lcsd-parks';
+  if (!isOfficialToilet && !isLcsdPark) return null;
 
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={labels.directions}
@@ -487,6 +501,7 @@ function FacilityDetails({ facility, distance, type, usesFallback }: {
   const labels = copy.nearby;
   const openingHours = facility.openingHours && facilityText(facility.openingHours, locale);
   const remarks = facility.remarks && facilityText(facility.remarks, locale);
+  const details = facility.details && facilityText(facility.details, locale);
   return (
     <>
       {facility.serviceNotice ? <FacilityServiceNotice remarks={remarks} />
@@ -497,7 +512,9 @@ function FacilityDetails({ facility, distance, type, usesFallback }: {
           {distance !== undefined && (
             <AppText variant="caption" tone="primary">{labels.directDistance(facilityDistance(distance, copy.nearbyBus))}</AppText>
           )}
-          {openingHours && <AppText variant="detail" tone="muted">{labels.officialHours(openingHours)}</AppText>}
+          {openingHours ? <AppText variant="detail" tone="muted">{labels.officialHours(openingHours)}</AppText>
+            : facility.category === 'parks' && <AppText variant="detail" tone="muted">{labels.parkHoursUnavailable}</AppText>}
+          {details && <AppText variant="detail" tone="muted">{labels.officialDetails(details)}</AppText>}
           {usesFallback && <AppText variant="caption" tone="muted">{labels.originalLanguage}</AppText>}
         </View>
         <FacilityDirections facility={facility} />
@@ -514,7 +531,7 @@ function FacilitySummary({ facility, distance, onClose }: { facility: Facility; 
   const type = facility.officialType === 'toilet' ? undefined : facilityType(facility, locale, labels);
   const place = facilityPlace(facility, locale);
   const usesFallback = [facility.name, facility.area ?? facility.district, facility.address, facility.typeName,
-    facility.openingHours, facility.remarks].some((field) => facilityTextUsesFallback(field, locale));
+    facility.openingHours, facility.remarks, facility.details].some((field) => facilityTextUsesFallback(field, locale));
   return (
     <>
       <View style={styles.selectedSummary}>

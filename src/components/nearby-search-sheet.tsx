@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, AppState, Keyboard, Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { facilityVisuals } from '@/components/nearby-facilities-map';
 import { AppText, Icon, type IconName } from '@/components/ui';
 import { facilityId, facilityText } from '@/facilities';
 import { useLanguage } from '@/language';
@@ -107,7 +108,7 @@ export function NearbySearchSheet({ onChoose, onClose, onEdit, onLocate, locatin
             <SearchGroup title={text.facilities} count={text.count(local.facilities.length, local.facilityCount)}>
               {local.facilities.length === 0 && <SearchStatus>{text.noFacilities}</SearchStatus>}
               {local.facilities.map((facility) => (
-                <SearchRow key={facilityId(facility)} icon="figure.dress.line.vertical.figure" title={facilityText(facility.name, locale)}
+                <SearchRow key={facilityId(facility)} icon={facilityVisuals[facility.category].icon} title={facilityText(facility.name, locale)}
                   detail={addressLine(facility.area ?? facility.district, facility.address)}
                   source={facility.sourceName ? facilityText(facility.sourceName, locale) : undefined}
                   onPress={() => choose({ kind: 'facility', facility })} />
