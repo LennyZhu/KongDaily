@@ -130,8 +130,13 @@ assert.deepEqual(plain(homeFeaturedPlaceIds), {
   dragon: 'dragons-back-to-tei-wan-tai-tam-gap',
   westKowloon: 'west-kowloon-art-park',
 });
-for (const locale of ['zh-HK', 'en']) {
-  assert.deepEqual(Object.keys(homeFeaturedPlaceIds), Object.keys(messages[locale].home.places));
+for (const id of Object.values(homeFeaturedPlaceIds)) {
+  const place = getExplorePlace(id);
+  assert.ok(place, 'Home featured card must resolve to a bundled Explore place: ' + id);
+  for (const locale of ['zh-HK', 'en']) {
+    assert.ok(messages[locale].explore.categoryButtonLabels[place.category]?.trim(),
+      'Home featured card needs a compact category label: ' + id + ' (' + locale + ')');
+  }
 }
 assert.equal(getExplorePlace(homeFeaturedPlaceIds.dragon), getExplorePlaces('hiking')[0]);
 assert.equal(getExplorePlace(homeFeaturedPlaceIds.westKowloon), getExplorePlaces('waterfront')[0]);

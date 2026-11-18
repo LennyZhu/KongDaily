@@ -178,13 +178,14 @@ export function QuickLinkCard({ href, icon, label, backgroundColor, iconColor }:
   );
 }
 
-export function FeaturedCard({ source, title, detail }: {
+export function FeaturedCard({ href, source, title, detail }: {
+  href: Href;
   source: ImageSourcePropType;
   title: string;
   detail: string;
 }) {
   return (
-    <View style={styles.featured}>
+    <HomeLink href={href} label={`${title} · ${detail}`} style={styles.featured}>
       <Image source={source} resizeMode="cover" style={styles.photo} accessible={false} />
       <LinearGradient
         colors={[homeColors.photoClear, homeColors.photoShade, homeColors.photoInk]}
@@ -200,7 +201,7 @@ export function FeaturedCard({ source, title, detail }: {
           {detail}
         </AppText>
       </View>
-    </View>
+    </HomeLink>
   );
 }
 

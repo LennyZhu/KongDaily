@@ -50,7 +50,7 @@ const places = (content.places as readonly ExplorePlace[]).slice().sort((a, b) =
 export const homeFeaturedPlaceIds = {
   dragon: 'dragons-back-to-tei-wan-tai-tam-gap',
   westKowloon: 'west-kowloon-art-park',
-} as const satisfies Record<keyof Messages['home']['places'], string>;
+} as const;
 
 export function getExplorePlaces(category?: ExploreCategory): readonly ExplorePlace[] {
   if (category === undefined) return places;

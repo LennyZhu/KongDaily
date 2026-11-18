@@ -9,6 +9,7 @@ import { FeaturedCard, HomeHero, HomeLink, HomeSection, QuickLinkCard } from '@/
 import { HomeFavoriteBus } from '@/components/saved-bus-ui';
 import { AppText, EmptyState, Icon, Screen, type IconName } from '@/components/ui';
 import { WeatherWarningLink } from '@/components/weather-warning-ui';
+import { getExplorePlace, homeFeaturedPlaceIds } from '@/explore-places';
 import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
 import { colors, homeColors, homeLayout, radius, space, touchTarget } from '@/theme';
@@ -37,8 +38,13 @@ const quickLinkRows = [
   ],
 ] as const satisfies readonly (readonly [QuickLink, QuickLink, QuickLink])[];
 
+const featuredCards = [
+  { id: homeFeaturedPlaceIds.dragon, source: require('../../../assets/home/dragons-back.jpg') },
+  { id: homeFeaturedPlaceIds.westKowloon, source: require('../../../assets/home/west-kowloon.jpg') },
+] as const;
+
 export default function HomeScreen() {
-  const { copy } = useLanguage();
+  const { copy, locale } = useLanguage();
   const { home } = copy;
   const { items, status } = useBusFavorites();
   const pins = useMemo(() => pinnedBuses(items), [items]);
@@ -105,14 +111,18 @@ export default function HomeScreen() {
 
         <HomeSection title={home.featured} icon="safari" action={{ label: home.browseExplore, href: '/explore?category=' }}>
           <View style={styles.row}>
-            <FeaturedCard
-              source={require('../../../assets/home/dragons-back.jpg')}
-              {...home.places.dragon}
-            />
-            <FeaturedCard
-              source={require('../../../assets/home/west-kowloon.jpg')}
-              {...home.places.westKowloon}
-            />
+            {featuredCards.map(({ id, source }) => {
+              const place = getExplorePlace(id);
+              if (!place) return null;
+              return (
+                <FeaturedCard key={place.id}
+                  href={{ pathname: '/explore/place/[id]', params: { id: place.id } }}
+                  source={source}
+                  title={place.title[locale]}
+                  detail={copy.explore.categoryButtonLabels[place.category]}
+                />
+              );
+            })}
           </View>
         </HomeSection>
       </View>

@@ -22,10 +22,6 @@ const zhHK = {
     nearbyDetail: '按所在地區或目前位置查看設施',
     featured: '精選探索',
     browseExplore: '瀏覽更多',
-    places: {
-      dragon: { title: '龍脊', detail: '山脊步道 · 俯瞰港島東岸' },
-      westKowloon: { title: '西九文化區', detail: '海濱散步 · 文化與藝術' },
-    },
   },
   weather: {
     title: '香港天氣',
@@ -537,10 +533,6 @@ const en: typeof zhHK = {
     nearbyDetail: 'Browse facilities by area or current location',
     featured: 'Featured places',
     browseExplore: 'Browse more',
-    places: {
-      dragon: { title: 'Dragon’s Back', detail: 'Ridge walk · Island views' },
-      westKowloon: { title: 'West Kowloon Cultural District', detail: 'Waterfront walks · Arts & culture' },
-    },
   },
   weather: {
     title: 'Hong Kong Weather',
