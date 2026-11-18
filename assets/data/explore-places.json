@@ -1,0 +1,1025 @@
+{
+  "schemaVersion": 1,
+  "places": [
+    {
+      "id": "dragons-back-to-tei-wan-tai-tam-gap",
+      "category": "hiking",
+      "additionalCategories": [],
+      "order": 10,
+      "title": {
+        "zh-HK": "龍脊",
+        "en": "Dragon’s Back"
+      },
+      "district": {
+        "zh-HK": "南區",
+        "en": "Southern District"
+      },
+      "summary": {
+        "zh-HK": "從土地灣踏上開揚山脊，經大潭灣和石澳方向的觀景位置，最後走往大潭峽。",
+        "en": "Follow the ridge from To Tei Wan, with views towards Tai Tam Bay and Shek O before finishing at Tai Tam Gap."
+      },
+      "highlights": [
+        {
+          "zh-HK": "初段觀景點可看大潭灣與大潭港。",
+          "en": "The early lookout faces Tai Tam Bay and Tai Tam Harbour.",
+          "sourceIds": [
+            "afcd-route"
+          ]
+        },
+        {
+          "zh-HK": "打爛埕頂山可俯看石澳灣一帶。",
+          "en": "Look over the coast by Shek O from Shek O Peak.",
+          "sourceIds": [
+            "afcd-peak",
+            "afcd-map"
+          ]
+        }
+      ],
+      "transport": {
+        "zh-HK": "乘城巴 9 號到石澳道土地灣站，下車後循港島徑標示步行往起點。走到大潭峽後，可前往歌連臣角站轉乘巴士。",
+        "en": "Take Citybus 9 to To Tei Wan on Shek O Road and follow signs for the Hong Kong Trail. On the Tai Tam Gap side, the route connects to the Cape Collinson bus stop.",
+        "sourceIds": [
+          "afcd-route",
+          "afcd-map"
+        ]
+      },
+      "cautions": {
+        "zh-HK": "按漁護署地圖確認大潭峽走法，出發前查看山徑公告、天氣和巴士安排。",
+        "en": "Check the AFCD map for the Tai Tam Gap itinerary and review trail notices, weather and bus service before setting out.",
+        "sourceIds": [
+          "afcd-notices",
+          "afcd-map"
+        ]
+      },
+      "sources": [
+        {
+          "id": "afcd-route",
+          "organization": {
+            "zh-HK": "漁農自然護理署",
+            "en": "Agriculture, Fisheries and Conservation Department"
+          },
+          "title": {
+            "zh-HK": "郊野樂行：龍脊",
+            "en": "Enjoy Hiking: Dragon’s Back"
+          },
+          "language": "zh-HK",
+          "url": "https://www.hiking.gov.hk/trail/info/id/UWgvZytZSlRrcnBJSU5DWVZUa2pyUT09"
+        },
+        {
+          "id": "afcd-map",
+          "organization": {
+            "zh-HK": "漁農自然護理署",
+            "en": "Agriculture, Fisheries and Conservation Department"
+          },
+          "title": {
+            "zh-HK": "龍脊路線圖",
+            "en": "Dragon’s Back route map"
+          },
+          "language": "bilingual",
+          "url": "https://www.hiking.gov.hk/console/public/uploads/others/file/68f933da5236fcc578458846059ce109ce87b211.pdf"
+        },
+        {
+          "id": "afcd-peak",
+          "organization": {
+            "zh-HK": "漁農自然護理署",
+            "en": "Agriculture, Fisheries and Conservation Department"
+          },
+          "title": {
+            "zh-HK": "打爛埕頂山",
+            "en": "Shek O Peak"
+          },
+          "language": "zh-HK",
+          "url": "https://www.hiking.gov.hk/promote/info/id/bGxMc2FyRXQvajBqQXFSNHlHOUlTZz09/map_type/1"
+        },
+        {
+          "id": "afcd-notices",
+          "organization": {
+            "zh-HK": "漁農自然護理署",
+            "en": "Agriculture, Fisheries and Conservation Department"
+          },
+          "title": {
+            "zh-HK": "郊野公園設施最新消息",
+            "en": "Country park notices"
+          },
+          "language": "zh-HK",
+          "url": "https://www.hiking.gov.hk/news"
+        }
+      ],
+      "reviewedAt": "2026-11-18",
+      "navigation": {
+        "status": "unverified"
+      }
+    },
+    {
+      "id": "peak-circle-walk",
+      "category": "hiking",
+      "additionalCategories": [],
+      "order": 20,
+      "title": {
+        "zh-HK": "山頂環迴步行徑",
+        "en": "Peak Circle Walk"
+      },
+      "district": {
+        "zh-HK": "中西區",
+        "en": "Central and Western District"
+      },
+      "summary": {
+        "zh-HK": "走盧吉道和夏力道繞山頂一圈，途中可看維港和林蔭。",
+        "en": "Circle the Peak via Lugard Road and Harlech Road, combining harbour views with shaded stretches."
+      },
+      "highlights": [
+        {
+          "zh-HK": "盧吉道向維港一側可眺望港島和九龍。",
+          "en": "The harbour-facing stretch of Lugard Road looks across to urban Hong Kong Island and Kowloon.",
+          "sourceIds": [
+            "hktb-tc",
+            "hktb-family-hikes"
+          ]
+        },
+        {
+          "zh-HK": "沿盧吉道可從路上欣賞 1 號及 27 號等早期香港住宅的外觀。",
+          "en": "Look for early Hong Kong residences along Lugard Road, including Nos. 1 and 27, from the road.",
+          "sourceIds": [
+            "hktb-en"
+          ]
+        }
+      ],
+      "transport": {
+        "zh-HK": "由花園道乘山頂纜車至凌霄閣，或按旅發局指引乘巴士到山頂廣場，再循盧吉道指示。",
+        "en": "Take the Peak Tram from Garden Road, or consult HKTB’s bus directions to Peak Galleria and follow signs for Lugard Road.",
+        "sourceIds": [
+          "hktb-tc",
+          "hktb-en"
+        ]
+      },
+      "cautions": {
+        "zh-HK": "運輸安排可能有變，出發前重查旅發局交通及現場告示。",
+        "en": "Check the visitor transport guide and on-site notices before walking the circuit.",
+        "sourceIds": [
+          "hktb-en"
+        ]
+      },
+      "sources": [
+        {
+          "id": "hktb-tc",
+          "organization": {
+            "zh-HK": "香港旅遊發展局",
+            "en": "Hong Kong Tourism Board"
+          },
+          "title": {
+            "zh-HK": "山頂環迴步行徑",
+            "en": "Peak Circle Walk"
+          },
+          "language": "zh-HK",
+          "url": "https://www.discoverhongkong.com/tc/place-to-go/travel.guide-peak-circle-walk.html"
+        },
+        {
+          "id": "hktb-en",
+          "organization": {
+            "zh-HK": "香港旅遊發展局",
+            "en": "Hong Kong Tourism Board"
+          },
+          "title": {
+            "zh-HK": "山頂環迴步行徑",
+            "en": "Peak Circle Walk"
+          },
+          "language": "en",
+          "url": "https://www.discoverhongkong.com/eng/place-to-go/travel.guide-peak-circle-walk.html"
+        },
+        {
+          "id": "hktb-family-hikes",
+          "organization": {
+            "zh-HK": "香港旅遊發展局",
+            "en": "Hong Kong Tourism Board"
+          },
+          "title": {
+            "zh-HK": "適合親子出遊的行山路線",
+            "en": "Family-friendly hikes in Hong Kong"
+          },
+          "language": "en",
+          "url": "https://www.discoverhongkong.com/eng/outdoors/family-friendly-hikes-in-hong-kong.html"
+        }
+      ],
+      "reviewedAt": "2026-11-18",
+      "navigation": {
+        "status": "unverified"
+      }
+    },
+    {
+      "id": "west-kowloon-art-park",
+      "category": "waterfront",
+      "additionalCategories": [
+        "pets"
+      ],
+      "order": 30,
+      "title": {
+        "zh-HK": "西九文化區藝術公園",
+        "en": "Art Park (West Kowloon Cultural District)"
+      },
+      "district": {
+        "zh-HK": "油尖旺區",
+        "en": "Yau Tsim Mong District"
+      },
+      "summary": {
+        "zh-HK": "沿西九藝術公園的海濱長廊散步，從草坪和觀景台一帶欣賞維港。",
+        "en": "Walk the Art Park promenade and enjoy harbour views from the lawns and viewing terrace."
+      },
+      "highlights": [
+        {
+          "zh-HK": "從海濱長廊看向對岸，途中有海旁草坪。",
+          "en": "Follow the promenade for cross-harbour views and lawns by the water.",
+          "sourceIds": [
+            "westk-guide-en"
+          ]
+        },
+        {
+          "zh-HK": "一樓觀景台提供較高的海濱視角。",
+          "en": "The first-floor viewing terrace offers a higher vantage point over the waterfront.",
+          "sourceIds": [
+            "westk-guide-tc"
+          ]
+        },
+        {
+          "zh-HK": "近西閘設有雙閘的指定寵物區，可把海濱散步與該處停留安排在一起。",
+          "en": "Pair a waterfront walk with a stop at the designated double-gated pet area near the West Gate.",
+          "sourceIds": [
+            "westk-guide-en"
+          ]
+        }
+      ],
+      "transport": {
+        "zh-HK": "由港鐵九龍站參考管理局地圖，經圓方和藝術廣場天橋前往。",
+        "en": "From MTR Kowloon Station, follow the district’s visitor map via Elements and Artist Square Bridge.",
+        "sourceIds": [
+          "westk-guide-tc",
+          "westk-station-walk"
+        ]
+      },
+      "cautions": {
+        "zh-HK": "在適用的戶外公眾休憩用地，指定寵物區外須繫牽繩或使用合適容器。只可在指定寵物區內解繩。請清理寵物便溺物，並在出發前查閱場地安排及現場告示。",
+        "en": "In the public outdoor areas covered by the rules, keep pets on a lead or in a suitable carrier outside the designated pet area. Off-lead access is limited to that area. Clean up after pets and check current access arrangements and posted signs.",
+        "sourceIds": [
+          "westk-rules",
+          "westk-guide-en"
+        ]
+      },
+      "sources": [
+        {
+          "id": "westk-guide-tc",
+          "organization": {
+            "zh-HK": "西九文化區管理局",
+            "en": "West Kowloon Cultural District Authority"
+          },
+          "title": {
+            "zh-HK": "藝術公園暢通易達指南",
+            "en": "Art Park Access Guide"
+          },
+          "language": "zh-HK",
+          "url": "https://webmedia.westkowloon.hk/documents/Art%20Park_Access%20Guide_TC_FINAL_tagged.pdf?VersionId=hTQaFLFDDDRDuniPkg.O3gdDisCepeZK"
+        },
+        {
+          "id": "westk-guide-en",
+          "organization": {
+            "zh-HK": "西九文化區管理局",
+            "en": "West Kowloon Cultural District Authority"
+          },
+          "title": {
+            "zh-HK": "藝術公園暢通易達指南",
+            "en": "Art Park Access Guide"
+          },
+          "language": "en",
+          "url": "https://webmedia.westkowloon.hk/documents/Art-Park-Access-Guide-202601-EN-tagged.pdf"
+        },
+        {
+          "id": "westk-rules",
+          "organization": {
+            "zh-HK": "西九文化區管理局",
+            "en": "West Kowloon Cultural District Authority"
+          },
+          "title": {
+            "zh-HK": "西九文化區公眾休憩用地守則",
+            "en": "West Kowloon Cultural District Public Open Spaces Rules and Regulations"
+          },
+          "language": "bilingual",
+          "url": "https://webmedia.westkowloon.hk/documents/WKCD%20POS%20Rules%20%26%20Regulations_TC%20%26%20ENG.pdf?VersionId=kNunCAKhd9bJ6OclDS9UdLdWWJTJuVIm"
+        },
+        {
+          "id": "westk-station-walk",
+          "organization": {
+            "zh-HK": "西九文化區管理局",
+            "en": "West Kowloon Cultural District Authority"
+          },
+          "title": {
+            "zh-HK": "由港鐵九龍站前往藝術廣場",
+            "en": "Walking route from MTR Kowloon Station to Artist Square"
+          },
+          "language": "en",
+          "url": "https://webmedia.westkowloon.hk/documents/BFA-route-MTR-Kowloon-Station-EN-tagged-20250219.pdf"
+        }
+      ],
+      "reviewedAt": "2026-11-18",
+      "navigation": {
+        "status": "unverified"
+      }
+    },
+    {
+      "id": "avenue-of-stars",
+      "category": "waterfront",
+      "additionalCategories": [],
+      "order": 40,
+      "title": {
+        "zh-HK": "星光大道",
+        "en": "Avenue of Stars"
+      },
+      "district": {
+        "zh-HK": "油尖旺區",
+        "en": "Yau Tsim Mong District"
+      },
+      "summary": {
+        "zh-HK": "沿維港散步，從影人掌印和雕塑認識香港電影。",
+        "en": "Walk beside Victoria Harbour and explore Hong Kong cinema through its handprints and sculptures."
+      },
+      "highlights": [
+        {
+          "zh-HK": "沿木欄找不同香港影人的掌印。",
+          "en": "Look for handprints of Hong Kong film figures along the railings.",
+          "sourceIds": [
+            "hktb-walk-tc"
+          ]
+        },
+        {
+          "zh-HK": "李小龍雕像是電影主題段的具體停留點。",
+          "en": "Pause at the Bruce Lee statue, one of the film-themed stops on the promenade.",
+          "sourceIds": [
+            "hktb-walk-en"
+          ]
+        }
+      ],
+      "transport": {
+        "zh-HK": "可乘天星小輪抵尖沙咀碼頭，再沿海濱步行往星光大道。",
+        "en": "Arrive by Star Ferry at Tsim Sha Tsui Pier and follow the waterfront to the Avenue of Stars.",
+        "sourceIds": [
+          "hktb-ferry-tc",
+          "hktb-walk-en"
+        ]
+      },
+      "cautions": {
+        "zh-HK": "海濱步行範圍大，沿現場標示找電影主題段。乘船前查看碼頭安排。",
+        "en": "The waterfront covers a wide area. Follow signs to the film-themed section and check pier arrangements before taking the ferry.",
+        "sourceIds": [
+          "hktb-walk-tc"
+        ]
+      },
+      "sources": [
+        {
+          "id": "hktb-place-tc",
+          "organization": {
+            "zh-HK": "香港旅遊發展局",
+            "en": "Hong Kong Tourism Board"
+          },
+          "title": {
+            "zh-HK": "星光大道",
+            "en": "Avenue of Stars"
+          },
+          "language": "zh-HK",
+          "url": "https://www.discoverhongkong.com/tc/place-to-go/travel.guide-avenue-of-stars.html"
+        },
+        {
+          "id": "hktb-place-en",
+          "organization": {
+            "zh-HK": "香港旅遊發展局",
+            "en": "Hong Kong Tourism Board"
+          },
+          "title": {
+            "zh-HK": "星光大道",
+            "en": "Avenue of Stars"
+          },
+          "language": "en",
+          "url": "https://www.discoverhongkong.com/eng/place-to-go/travel.guide-avenue-of-stars.html"
+        },
+        {
+          "id": "hktb-walk-tc",
+          "organization": {
+            "zh-HK": "香港旅遊發展局",
+            "en": "Hong Kong Tourism Board"
+          },
+          "title": {
+            "zh-HK": "尖沙咀海濱花園必遊景點",
+            "en": "Attractions along the Tsim Sha Tsui waterfront"
+          },
+          "language": "zh-HK",
+          "url": "https://www.discoverhongkong.com/tc/attractions/top-things-to-see-and-do-around-tsim-sha-tsui-promenade.html"
+        },
+        {
+          "id": "hktb-walk-en",
+          "organization": {
+            "zh-HK": "香港旅遊發展局",
+            "en": "Hong Kong Tourism Board"
+          },
+          "title": {
+            "zh-HK": "尖沙咀海濱花園必遊景點",
+            "en": "Attractions along the Tsim Sha Tsui waterfront"
+          },
+          "language": "en",
+          "url": "https://www.discoverhongkong.com/eng/attractions/top-things-to-see-and-do-around-tsim-sha-tsui-promenade.html"
+        },
+        {
+          "id": "hktb-ferry-tc",
+          "organization": {
+            "zh-HK": "香港旅遊發展局",
+            "en": "Hong Kong Tourism Board"
+          },
+          "title": {
+            "zh-HK": "天星小輪碼頭",
+            "en": "Star Ferry Pier"
+          },
+          "language": "zh-HK",
+          "url": "https://www.discoverhongkong.com/tc/place-to-go/travel.guide-star-ferry-pier.html"
+        }
+      ],
+      "reviewedAt": "2026-11-18",
+      "navigation": {
+        "status": "unverified"
+      }
+    },
+    {
+      "id": "hong-kong-park",
+      "category": "parks",
+      "additionalCategories": [],
+      "order": 50,
+      "title": {
+        "zh-HK": "香港公園",
+        "en": "Hong Kong Park"
+      },
+      "district": {
+        "zh-HK": "中西區",
+        "en": "Central and Western District"
+      },
+      "summary": {
+        "zh-HK": "從人工湖和瀑布走到舊軍營文物建築，看看一座市區公園如何利用原有地形。",
+        "en": "Explore a city park shaped around an artificial lake, a waterfall and buildings from the former garrison."
+      },
+      "highlights": [
+        {
+          "zh-HK": "人工湖與瀑布位於昔日軍營網球場一帶。",
+          "en": "The park’s lake and waterfall occupy the site of a former garrison tennis court.",
+          "sourceIds": [
+            "lcsd-visit-tc"
+          ]
+        },
+        {
+          "zh-HK": "園內的旗杆屋保留了維多利亞軍營時期的建築。",
+          "en": "Flagstaff House preserves part of the site’s garrison-era architecture.",
+          "sourceIds": [
+            "lcsd-visit-en"
+          ]
+        },
+        {
+          "zh-HK": "尤德觀鳥園借用了山坡旁的天然山谷地形。",
+          "en": "The Edward Youde Aviary is set in a natural valley on the hillside.",
+          "sourceIds": [
+            "lcsd-aviary-tc",
+            "lcsd-aviary-en"
+          ]
+        }
+      ],
+      "transport": {
+        "zh-HK": "由港鐵金鐘站或中環站按公園官網的出口及交通指引步行前往。",
+        "en": "Use the park’s official visitor directions from MTR Admiralty or Central.",
+        "sourceIds": [
+          "lcsd-visit-tc",
+          "lcsd-visit-en"
+        ]
+      },
+      "cautions": {
+        "zh-HK": "公園與觀鳥園等設施有各自安排，惡劣天氣可暫停開放。請查當天官網。",
+        "en": "Visitor arrangements vary by facility, and severe weather may cause closures. Check the park website on the day.",
+        "sourceIds": [
+          "lcsd-visit-tc"
+        ]
+      },
+      "sources": [
+        {
+          "id": "lcsd-visit-tc",
+          "organization": {
+            "zh-HK": "康樂及文化事務署",
+            "en": "Leisure and Cultural Services Department"
+          },
+          "title": {
+            "zh-HK": "參觀香港公園",
+            "en": "Visit Hong Kong Park"
+          },
+          "language": "zh-HK",
+          "url": "https://hkp.lcsd.gov.hk/tc/visit"
+        },
+        {
+          "id": "lcsd-visit-en",
+          "organization": {
+            "zh-HK": "康樂及文化事務署",
+            "en": "Leisure and Cultural Services Department"
+          },
+          "title": {
+            "zh-HK": "參觀香港公園",
+            "en": "Visit Hong Kong Park"
+          },
+          "language": "en",
+          "url": "https://hkp.lcsd.gov.hk/en/visit"
+        },
+        {
+          "id": "lcsd-aviary-tc",
+          "organization": {
+            "zh-HK": "康樂及文化事務署",
+            "en": "Leisure and Cultural Services Department"
+          },
+          "title": {
+            "zh-HK": "尤德觀鳥園",
+            "en": "Edward Youde Aviary"
+          },
+          "language": "zh-HK",
+          "url": "https://hkp.lcsd.gov.hk/tc/facilities/aviary"
+        },
+        {
+          "id": "lcsd-aviary-en",
+          "organization": {
+            "zh-HK": "康樂及文化事務署",
+            "en": "Leisure and Cultural Services Department"
+          },
+          "title": {
+            "zh-HK": "尤德觀鳥園",
+            "en": "Edward Youde Aviary"
+          },
+          "language": "en",
+          "url": "https://hkp.lcsd.gov.hk/en/facilities/aviary"
+        }
+      ],
+      "reviewedAt": "2026-11-18",
+      "navigation": {
+        "status": "unverified"
+      }
+    },
+    {
+      "id": "kowloon-walled-city-park",
+      "category": "parks",
+      "additionalCategories": [],
+      "order": 60,
+      "title": {
+        "zh-HK": "九龍寨城公園",
+        "en": "Kowloon Walled City Park"
+      },
+      "district": {
+        "zh-HK": "九龍城區",
+        "en": "Kowloon City District"
+      },
+      "summary": {
+        "zh-HK": "從衙門、南門遺址和園林小徑回看九龍寨城的歷史。",
+        "en": "Trace the history of Kowloon Walled City through the Yamen, South Gate remnants and garden paths."
+      },
+      "highlights": [
+        {
+          "zh-HK": "衙門是保留下來的寨城建築，位於公園中心一帶。",
+          "en": "The surviving Yamen building is a focal point near the centre of the park.",
+          "sourceIds": [
+            "lcsd-yamen"
+          ]
+        },
+        {
+          "zh-HK": "南門遺址保留出土的石碑與門基等遺存。",
+          "en": "At the South Gate remnants, look for the excavated stone plaques and gate foundations.",
+          "sourceIds": [
+            "lcsd-south-gate",
+            "amo-access"
+          ]
+        }
+      ],
+      "transport": {
+        "zh-HK": "參照康文署「如何前往」的巴士及專線小巴資料，到九龍城東正道一帶再按園圖選入口。",
+        "en": "Use LCSD’s bus or green-minibus guidance for Tung Tsing Road in Kowloon City, then follow the park map to a suitable gate.",
+        "sourceIds": [
+          "lcsd-access-tc",
+          "lcsd-access-en"
+        ]
+      },
+      "cautions": {
+        "zh-HK": "園區及室內文物各有安排，有意參觀衙門內部請先查園方資料。",
+        "en": "Outdoor grounds and indoor heritage spaces have separate arrangements. Check the park’s guidance before planning an interior visit.",
+        "sourceIds": [
+          "amo-access",
+          "lcsd-park-tc"
+        ]
+      },
+      "sources": [
+        {
+          "id": "lcsd-park-tc",
+          "organization": {
+            "zh-HK": "康樂及文化事務署",
+            "en": "Leisure and Cultural Services Department"
+          },
+          "title": {
+            "zh-HK": "九龍寨城公園",
+            "en": "Kowloon Walled City Park"
+          },
+          "language": "zh-HK",
+          "url": "https://www.lcsd.gov.hk/tc/parks/kwcp/index.html"
+        },
+        {
+          "id": "lcsd-park-en",
+          "organization": {
+            "zh-HK": "康樂及文化事務署",
+            "en": "Leisure and Cultural Services Department"
+          },
+          "title": {
+            "zh-HK": "九龍寨城公園",
+            "en": "Kowloon Walled City Park"
+          },
+          "language": "en",
+          "url": "https://www.lcsd.gov.hk/en/parks/kwcp/"
+        },
+        {
+          "id": "lcsd-yamen",
+          "organization": {
+            "zh-HK": "康樂及文化事務署",
+            "en": "Leisure and Cultural Services Department"
+          },
+          "title": {
+            "zh-HK": "衙門",
+            "en": "The Yamen"
+          },
+          "language": "en",
+          "url": "https://www.lcsd.gov.hk/en/parks/kwcp/his/yamen.html"
+        },
+        {
+          "id": "lcsd-south-gate",
+          "organization": {
+            "zh-HK": "康樂及文化事務署",
+            "en": "Leisure and Cultural Services Department"
+          },
+          "title": {
+            "zh-HK": "南門遺址",
+            "en": "The Old South Gate"
+          },
+          "language": "en",
+          "url": "https://www.lcsd.gov.hk/en/parks/kwcp/his/gate.html"
+        },
+        {
+          "id": "amo-access",
+          "organization": {
+            "zh-HK": "古物古蹟辦事處",
+            "en": "Antiquities and Monuments Office"
+          },
+          "title": {
+            "zh-HK": "政府擁有並開放予公眾參觀的法定古蹟",
+            "en": "Government-owned Declared Monuments Open to the Public"
+          },
+          "language": "bilingual",
+          "url": "https://www.amo.gov.hk/filemanager/amo/common/form/list_government-owned_DM_open.pdf"
+        },
+        {
+          "id": "lcsd-access-tc",
+          "organization": {
+            "zh-HK": "康樂及文化事務署",
+            "en": "Leisure and Cultural Services Department"
+          },
+          "title": {
+            "zh-HK": "如何前往九龍寨城公園",
+            "en": "Getting to Kowloon Walled City Park"
+          },
+          "language": "zh-HK",
+          "url": "https://www.lcsd.gov.hk/tc/parks/kwcp/access.html"
+        },
+        {
+          "id": "lcsd-access-en",
+          "organization": {
+            "zh-HK": "康樂及文化事務署",
+            "en": "Leisure and Cultural Services Department"
+          },
+          "title": {
+            "zh-HK": "如何前往九龍寨城公園",
+            "en": "Getting to Kowloon Walled City Park"
+          },
+          "language": "en",
+          "url": "https://www.lcsd.gov.hk/en/parks/kwcp/access.html"
+        }
+      ],
+      "reviewedAt": "2026-11-18",
+      "navigation": {
+        "status": "unverified"
+      }
+    },
+    {
+      "id": "tai-po-waterfront-park",
+      "category": "parks",
+      "additionalCategories": [
+        "waterfront"
+      ],
+      "order": 70,
+      "title": {
+        "zh-HK": "大埔海濱公園",
+        "en": "Tai Po Waterfront Park"
+      },
+      "district": {
+        "zh-HK": "大埔區",
+        "en": "Tai Po District"
+      },
+      "summary": {
+        "zh-HK": "沿着大埔海濱散步，從長廊和紀念塔一帶看吐露港。",
+        "en": "Walk the Tai Po waterfront and take in Tolo Harbour from the promenade and lookout area."
+      },
+      "highlights": [
+        {
+          "zh-HK": "海濱長廊串連公園面向吐露港的一側。",
+          "en": "The promenade follows the park’s Tolo Harbour frontage.",
+          "sourceIds": [
+            "lcsd-annual-tc"
+          ]
+        },
+        {
+          "zh-HK": "香港回歸紀念塔以螺旋形設計提供較高的觀景位置。",
+          "en": "The Spiral Lookout Tower offers an elevated view over Tolo Harbour.",
+          "sourceIds": [
+            "lcsd-outdoors",
+            "lcsd-annual-tc"
+          ]
+        }
+      ],
+      "transport": {
+        "zh-HK": "按康文署的公共交通指引前往大埔大發街，再參考園圖選擇入口。",
+        "en": "Follow LCSD’s public transport directions to Dai Fat Street in Tai Po, then use the park map to choose an entrance.",
+        "sourceIds": [
+          "lcsd-access-tc",
+          "lcsd-access-en"
+        ]
+      },
+      "cautions": {
+        "zh-HK": "登塔及其他設施的安排以現場告示和官網為準。康文署只在指定位置開放寵物共享。",
+        "en": "Check the park’s notices for access to the tower and other facilities. Pets may enter designated areas under LCSD’s pet-inclusive park rules.",
+        "sourceIds": [
+          "lcsd-park-tc",
+          "lcsd-pet-list"
+        ]
+      },
+      "sources": [
+        {
+          "id": "lcsd-park-tc",
+          "organization": {
+            "zh-HK": "康樂及文化事務署",
+            "en": "Leisure and Cultural Services Department"
+          },
+          "title": {
+            "zh-HK": "大埔海濱公園",
+            "en": "Tai Po Waterfront Park"
+          },
+          "language": "zh-HK",
+          "url": "https://www.lcsd.gov.hk/tc/parks/tpwp/index.html"
+        },
+        {
+          "id": "lcsd-park-en",
+          "organization": {
+            "zh-HK": "康樂及文化事務署",
+            "en": "Leisure and Cultural Services Department"
+          },
+          "title": {
+            "zh-HK": "大埔海濱公園",
+            "en": "Tai Po Waterfront Park"
+          },
+          "language": "en",
+          "url": "https://www.lcsd.gov.hk/en/parks/tpwp/"
+        },
+        {
+          "id": "lcsd-annual-tc",
+          "organization": {
+            "zh-HK": "康樂及文化事務署",
+            "en": "Leisure and Cultural Services Department"
+          },
+          "title": {
+            "zh-HK": "康文署年報：康體設施",
+            "en": "LCSD Annual Report: Recreational and Sports Facilities"
+          },
+          "language": "zh-HK",
+          "url": "https://www.lcsd.gov.hk/en/common/pdf/annual_report_2324_tc.pdf"
+        },
+        {
+          "id": "lcsd-outdoors",
+          "organization": {
+            "zh-HK": "康樂及文化事務署",
+            "en": "Leisure and Cultural Services Department"
+          },
+          "title": {
+            "zh-HK": "大埔海濱公園戶外設施",
+            "en": "Tai Po Waterfront Park outdoor facilities"
+          },
+          "language": "en",
+          "url": "https://www.lcsd.gov.hk/en/parks/tpwp/facilities/outdoor.html"
+        },
+        {
+          "id": "lcsd-access-tc",
+          "organization": {
+            "zh-HK": "康樂及文化事務署",
+            "en": "Leisure and Cultural Services Department"
+          },
+          "title": {
+            "zh-HK": "如何前往大埔海濱公園",
+            "en": "Getting to Tai Po Waterfront Park"
+          },
+          "language": "zh-HK",
+          "url": "https://www.lcsd.gov.hk/tc/parks/tpwp/access.html"
+        },
+        {
+          "id": "lcsd-access-en",
+          "organization": {
+            "zh-HK": "康樂及文化事務署",
+            "en": "Leisure and Cultural Services Department"
+          },
+          "title": {
+            "zh-HK": "如何前往大埔海濱公園",
+            "en": "Getting to Tai Po Waterfront Park"
+          },
+          "language": "en",
+          "url": "https://www.lcsd.gov.hk/en/parks/tpwp/access.html"
+        },
+        {
+          "id": "lcsd-pet-list",
+          "organization": {
+            "zh-HK": "康樂及文化事務署",
+            "en": "Leisure and Cultural Services Department"
+          },
+          "title": {
+            "zh-HK": "寵物共享公園名單",
+            "en": "Inclusive Park for Pets list"
+          },
+          "language": "bilingual",
+          "url": "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+        }
+      ],
+      "reviewedAt": "2026-11-18",
+      "navigation": {
+        "status": "unverified"
+      }
+    },
+    {
+      "id": "victoria-peak-garden",
+      "category": "pets",
+      "additionalCategories": [
+        "parks"
+      ],
+      "order": 80,
+      "title": {
+        "zh-HK": "山頂花園",
+        "en": "Victoria Peak Garden"
+      },
+      "district": {
+        "zh-HK": "中西區",
+        "en": "Central and Western District"
+      },
+      "summary": {
+        "zh-HK": "到柯士甸山道上方的園景和亭子走一趟，也可留意前總督山頂別墅的歷史痕跡。",
+        "en": "Walk through the garden and pavilions above Mount Austin Road and look for traces of the former Governor’s summer residence."
+      },
+      "highlights": [
+        {
+          "zh-HK": "由柯士甸山道上行後，可沿園內蜿蜒小徑經過草地與亭子。",
+          "en": "Follow winding paths past lawns and pavilions after walking up Mount Austin Road.",
+          "sourceIds": [
+            "hktb-tc",
+            "hktb-en"
+          ]
+        },
+        {
+          "zh-HK": "前總督山頂別墅守衛室可作為閱讀園址歷史的路標。",
+          "en": "The Gate Lodge is a landmark for understanding the site’s former use as a summer residence.",
+          "sourceIds": [
+            "amo-gatehouse-tc",
+            "amo-gatehouse-en"
+          ]
+        }
+      ],
+      "transport": {
+        "zh-HK": "到達山頂後，沿柯士甸山道上行前往花園。攜寵前請向交通營運商查詢攜寵條款。",
+        "en": "From the Peak, walk uphill along Mount Austin Road to the garden. If travelling with a pet, check the transport operator’s policy first.",
+        "sourceIds": [
+          "hktb-tc",
+          "hktb-en"
+        ]
+      },
+      "cautions": {
+        "zh-HK": "山頂花園屬寵物共享公園，狗隻在園內須繫上牽繩並受控制。請清理便溺物並遵循現場告示。",
+        "en": "Victoria Peak Garden is an Inclusive Park for Pets. Keep dogs on a lead and under control throughout the garden, clean up after them and follow on-site signs.",
+        "sourceIds": [
+          "lcsd-pet-rules-tc",
+          "lcsd-pet-rules-en",
+          "lcsd-pet-list",
+          "gov-pet-scope"
+        ]
+      },
+      "sources": [
+        {
+          "id": "lcsd-pet-list",
+          "organization": {
+            "zh-HK": "康樂及文化事務署",
+            "en": "Leisure and Cultural Services Department"
+          },
+          "title": {
+            "zh-HK": "寵物共享公園名單",
+            "en": "Inclusive Park for Pets list"
+          },
+          "language": "bilingual",
+          "url": "https://www.lcsd.gov.hk/en/common/pdf/Annex_IPP_Venue.pdf"
+        },
+        {
+          "id": "gov-pet-scope",
+          "organization": {
+            "zh-HK": "香港特別行政區政府",
+            "en": "Hong Kong SAR Government"
+          },
+          "title": {
+            "zh-HK": "山頂花園寵物共享範圍的政府答覆",
+            "en": "Government reply on pet-inclusive access at Victoria Peak Garden"
+          },
+          "language": "en",
+          "url": "https://www.info.gov.hk/gia/general/201901/23/P2019012300383p.htm"
+        },
+        {
+          "id": "hktb-tc",
+          "organization": {
+            "zh-HK": "香港旅遊發展局",
+            "en": "Hong Kong Tourism Board"
+          },
+          "title": {
+            "zh-HK": "山頂環迴步行徑：山頂花園",
+            "en": "Peak Circle Walk: Victoria Peak Garden"
+          },
+          "language": "zh-HK",
+          "url": "https://www.discoverhongkong.com/tc/place-to-go/travel.guide-peak-circle-walk.html"
+        },
+        {
+          "id": "hktb-en",
+          "organization": {
+            "zh-HK": "香港旅遊發展局",
+            "en": "Hong Kong Tourism Board"
+          },
+          "title": {
+            "zh-HK": "山頂環迴步行徑：山頂花園",
+            "en": "Peak Circle Walk: Victoria Peak Garden"
+          },
+          "language": "en",
+          "url": "https://www.discoverhongkong.com/eng/place-to-go/travel.guide-peak-circle-walk.html"
+        },
+        {
+          "id": "amo-gatehouse-tc",
+          "organization": {
+            "zh-HK": "古物古蹟辦事處",
+            "en": "Antiquities and Monuments Office"
+          },
+          "title": {
+            "zh-HK": "前總督山頂別墅守衛室",
+            "en": "Gate Lodge of the Former Mountain Lodge"
+          },
+          "language": "zh-HK",
+          "url": "https://www.amo.gov.hk/tc/historic-buildings/monuments/hong-kong-island/monuments_52/index.html"
+        },
+        {
+          "id": "amo-gatehouse-en",
+          "organization": {
+            "zh-HK": "古物古蹟辦事處",
+            "en": "Antiquities and Monuments Office"
+          },
+          "title": {
+            "zh-HK": "前總督山頂別墅守衛室",
+            "en": "Gate Lodge of the Former Mountain Lodge"
+          },
+          "language": "en",
+          "url": "https://www.amo.gov.hk/en/historic-buildings/monuments/hong-kong-island/monuments_52/index.html"
+        },
+        {
+          "id": "lcsd-pet-rules-tc",
+          "organization": {
+            "zh-HK": "康樂及文化事務署",
+            "en": "Leisure and Cultural Services Department"
+          },
+          "title": {
+            "zh-HK": "寵物共享公園使用者守則",
+            "en": "Inclusive Park for Pets users’ code"
+          },
+          "language": "zh-HK",
+          "url": "https://www.lcsd.gov.hk/tc/facilities/otherinfo/petpark.html"
+        },
+        {
+          "id": "lcsd-pet-rules-en",
+          "organization": {
+            "zh-HK": "康樂及文化事務署",
+            "en": "Leisure and Cultural Services Department"
+          },
+          "title": {
+            "zh-HK": "寵物共享公園使用者守則",
+            "en": "Inclusive Park for Pets users’ code"
+          },
+          "language": "en",
+          "url": "https://www.lcsd.gov.hk/en/facilities/otherinfo/petpark.html"
+        }
+      ],
+      "reviewedAt": "2026-11-18",
+      "navigation": {
+        "status": "unverified"
+      }
+    }
+  ]
+}

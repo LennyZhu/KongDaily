@@ -65,6 +65,11 @@ function RootStack() {
         headerStyle: { backgroundColor: colors.tintedBackground },
         headerShadowVisible: false,
       }} />
+      <Stack.Screen name="explore/place/[id]" options={{
+        title: copy.explore.placeDetail,
+        headerStyle: { backgroundColor: colors.tintedBackground },
+        headerShadowVisible: false,
+      }} />
     </Stack>
   );
 }
