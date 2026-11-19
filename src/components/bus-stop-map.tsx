@@ -1,20 +1,23 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, Polyline, type Region } from 'react-native-maps';
 
-import type { BusMapMarker } from '@/bus-route-map';
+import { numberedBusMapStops, type BusMapMarker } from '@/bus-route-map';
 import type { RouteStop } from '@/bus-stops';
 import { BusAction } from '@/components/bus-ui';
 import { MapBoundary } from '@/components/map-boundary';
 import { AppText } from '@/components/ui';
 import { useLanguage } from '@/language';
+import type { Coordinates } from '@/nearby-bus-data';
 import { colors, radius, space, touchTarget } from '@/theme';
 
 const padding = { top: 36, left: 36, bottom: 36, right: 36 };
 
-export function BusStopMap({ markers, selected, stopLabel, onSelect }: {
+export function BusStopMap({ markers, lines, selected, focusRequest, stopLabel, onSelect }: {
   markers: readonly BusMapMarker[];
+  lines?: Coordinates[][];
   selected?: string;
+  focusRequest?: { key: string };
   stopLabel: (stop: RouteStop) => string;
   onSelect: (key: string) => void;
 }) {
@@ -23,9 +26,15 @@ export function BusStopMap({ markers, selected, stopLabel, onSelect }: {
   const map = useRef<MapView>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [attempt, setAttempt] = useState(0);
-  const [hasLayout, setHasLayout] = useState(false);
+  const [size, setSize] = useState<{ width: number; height: number }>();
+  const [region, setRegion] = useState<Region>();
   const userMoved = useRef(false);
+  const lastFocused = useRef<typeof focusRequest>(undefined);
   const first = markers[0].coordinate;
+  const initialRegion = useMemo(() => ({ ...first, latitudeDelta: 0.009, longitudeDelta: 0.009 }), [first]);
+  const numbered = useMemo(() => numberedBusMapStops(markers, selected, region ?? initialRegion, size),
+    [markers, selected, region, initialRegion, size]);
+  const focusPoint = markers.find(({ key }) => key === focusRequest?.key)?.coordinate;
 
   useEffect(() => {
     if (status !== 'loading') return;
@@ -34,14 +43,21 @@ export function BusStopMap({ markers, selected, stopLabel, onSelect }: {
   }, [status, attempt]);
 
   useEffect(() => {
-    if (status !== 'ready' || !hasLayout || userMoved.current) return;
+    if (status !== 'ready' || !size || userMoved.current) return;
     const points = markers.map(({ coordinate }) => coordinate);
     if (points.every(({ latitude, longitude }) => latitude === first.latitude && longitude === first.longitude)) return;
     const frame = requestAnimationFrame(() => {
       if (!userMoved.current) map.current?.fitToCoordinates(points, { edgePadding: padding, animated: false });
     });
     return () => cancelAnimationFrame(frame);
-  }, [status, hasLayout, markers, first]);
+  }, [status, size, markers, first]);
+
+  useEffect(() => {
+    if (status !== 'ready' || !size || !focusRequest || !focusPoint || lastFocused.current === focusRequest) return;
+    userMoved.current = true;
+    lastFocused.current = focusRequest;
+    map.current?.animateCamera({ center: focusPoint }, { duration: 250 });
+  }, [status, size, focusRequest, focusPoint]);
 
   return (
     <View style={styles.mapCard}>
@@ -49,28 +65,40 @@ export function BusStopMap({ markers, selected, stopLabel, onSelect }: {
         <MapView
           ref={map}
           style={StyleSheet.absoluteFill}
-          initialRegion={{ ...first, latitudeDelta: 0.009, longitudeDelta: 0.009 }}
+          initialRegion={initialRegion}
           accessibilityLabel={labels.stopMap}
           showsPointsOfInterests={false}
           showsUserLocation={false}
           onMapReady={() => setStatus('ready')}
-          onLayout={() => setHasLayout(true)}
+          onLayout={({ nativeEvent: { layout: { width, height } } }) => {
+            if (width > 0 && height > 0) setSize({ width, height });
+          }}
+          onRegionChangeComplete={setRegion}
           onTouchStart={() => { userMoved.current = true; }}
         >
-          {markers.map(({ key, stop, coordinate }) => (
-            <Marker key={key} identifier={key} coordinate={coordinate} stopPropagation
-              accessibilityRole="button" accessibilityLabel={stopLabel(stop)}
-              accessibilityState={{ selected: selected === key }} zIndex={selected === key ? 1 : 0}
-              onPress={() => onSelect(key)}>
-              <View style={styles.pinTarget}>
-                <View style={[styles.pin, selected === key && styles.selectedPin]}>
-                  <AppText variant="caption" tone={selected === key ? 'onPrimary' : 'primary'} allowFontScaling={false}>
-                    {stop.seq}
-                  </AppText>
-                </View>
-              </View>
-            </Marker>
+          {lines?.map((coordinates, index) => (
+            <Polyline key={index} coordinates={coordinates} strokeColor={colors.primary} strokeWidth={4} />
           ))}
+          {markers.map(({ key, stop, coordinate }) => {
+            const active = selected === key;
+            const showNumber = numbered.has(key);
+            return (
+              <Marker key={key} identifier={key} coordinate={coordinate} stopPropagation
+                accessibilityRole="button" accessibilityLabel={stopLabel(stop)}
+                accessibilityState={{ selected: active }} zIndex={active ? 2 : showNumber ? 1 : 0}
+                onPress={() => onSelect(key)}>
+                <View style={styles.pinTarget}>
+                  {showNumber ? (
+                    <View style={[styles.pin, active && styles.selectedPin]}>
+                      <AppText variant="caption" tone={active ? 'onPrimary' : 'primary'} allowFontScaling={false}>
+                        {stop.seq}
+                      </AppText>
+                    </View>
+                  ) : <View style={styles.dot} />}
+                </View>
+              </Marker>
+            );
+          })}
         </MapView>
       </MapBoundary>
       {status !== 'ready' && (
@@ -85,7 +113,9 @@ export function BusStopMap({ markers, selected, stopLabel, onSelect }: {
               <AppText variant="detail" accessibilityRole="alert">{labels.mapUnavailable}</AppText>
               <BusAction label={copy.nearby.retryMap} onPress={() => {
                 userMoved.current = false;
-                setHasLayout(false);
+                lastFocused.current = undefined;
+                setSize(undefined);
+                setRegion(undefined);
                 setStatus('loading');
                 setAttempt((value) => value + 1);
               }} />
@@ -108,6 +138,10 @@ const styles = StyleSheet.create({
   pin: {
     minWidth: 32, height: 32, paddingHorizontal: space.xs, alignItems: 'center', justifyContent: 'center',
     borderRadius: radius.pill, borderWidth: 2, borderColor: colors.primary, backgroundColor: colors.surface,
+  },
+  dot: {
+    width: 12, height: 12, borderRadius: radius.pill, borderWidth: 2,
+    borderColor: colors.primary, backgroundColor: colors.surface,
   },
   selectedPin: { backgroundColor: colors.primary, borderColor: colors.surface },
   overlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', padding: space.md },

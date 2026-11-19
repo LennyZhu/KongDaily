@@ -1,0 +1,104 @@
+{
+  "datasetUrl": "https://portal.csdi.gov.hk/csdi-webpage/dataset/td_rcd_1638844988873_41214",
+  "metadataUrl": "https://portal.csdi.gov.hk/csdi-webpage/metadata/td_rcd_1638844988873_41214/html",
+  "queryUrl": "https://portal.csdi.gov.hk/server/rest/services/common/td_rcd_1638844988873_41214/MapServer/0/query",
+  "termsUrl": "https://static.csdi.gov.hk/csdi-webpage/doc/TNC",
+  "credit": "Source: Transport Department, HKSAR Government, via the Common Spatial Data Infrastructure Portal. Intellectual property rights belong to the Government and the relevant organisations.",
+  "tdStopsUrl": "https://static.data.gov.hk/td/routes-fares-geojson/JSON_BUS.json",
+  "tdStopsSha256": "a7a91c8b78bd6044bf9673436baadd709733221091777730e1f04588e74c6f2c",
+  "tdStopsLastModified": "2026-11-18T11:03:14Z",
+  "datasetRevision": "2026-11-11",
+  "reviewedOn": "2026-11-19",
+  "approvals": {
+    "[\"kmbLwb\",\"1\",\"outbound\",\"1\"]": {
+      "td": [
+        "KMB",
+        1001,
+        1
+      ],
+      "stopSha256": "5b99cd3a63bf9f5eae4330333bba332c7ce17692c8c670569a402b7aab4c413f",
+      "geojsonSha256": "b483b8142cb6afbd03b0fd4cda36ace496774dfba8f01cc8059320687e4bf641",
+      "packChecksum": 3718213713
+    },
+    "[\"kmbLwb\",\"1\",\"inbound\",\"1\"]": {
+      "td": [
+        "KMB",
+        1001,
+        2
+      ],
+      "stopSha256": "10abb7dcfc68353f6be22826626acbe4b27c832074907dacdd28b770721d4a0a",
+      "geojsonSha256": "f8a4b5020b169e21537f14e0e48fdc409bcba1673be28a7b97f3a1d096f80e76",
+      "packChecksum": 1689900367
+    },
+    "[\"kmbLwb\",\"268X\",\"inbound\",\"1\"]": {
+      "td": [
+        "KMB",
+        8203,
+        2
+      ],
+      "stopSha256": "f1a77066569a7ebc81320634495bf8a7a80cba560c2fe04cab9db9bbea85ec59",
+      "geojsonSha256": "f20f0835c5fa4671ce064b18d456eabe5ea1d321dc32f141f9d4e9bd883c9982",
+      "packChecksum": 695874548
+    },
+    "[\"kmbLwb\",\"268X\",\"outbound\",\"3\"]": {
+      "td": [
+        "KMB",
+        1000333,
+        1
+      ],
+      "stopSha256": "1c87229b5348819d84e186abad05672223d3f700101ddccab1a61d7b3f4f62bc",
+      "geojsonSha256": "ee8b3ee7920321ebfa887ecffb5cf2d1bb3af390a712a40f6d2be89760653e5a",
+      "packChecksum": 1150264661
+    },
+    "[\"kmbLwb\",\"10\",\"outbound\",\"1\"]": {
+      "td": [
+        "KMB",
+        1002,
+        1
+      ],
+      "stopSha256": "6acf6a45dee9f857e7bc10168618cbadcca6ac25c233d2b0945c7c2de90a93e5",
+      "geojsonSha256": "e0c644d6288d38239911bfca3a8423f3b0f9796997d5641c569dbb14451fbc1b",
+      "packChecksum": 1648751645
+    },
+    "[\"kmbLwb\",\"296A\",\"outbound\",\"1\"]": {
+      "td": [
+        "KMB",
+        1157,
+        1
+      ],
+      "stopSha256": "ec1fd9ec72df476cf0a98477d909c03ab783b608198525cbd3e2a69682e975d6",
+      "geojsonSha256": "d0f9e4fdf87538e6ab89fb005635446734c71f543b908a132f3a9f7956d33c5c",
+      "packChecksum": 1544407991
+    },
+    "[\"kmbLwb\",\"275X\",\"inbound\",\"1\"]": {
+      "td": [
+        "KMB",
+        1000392,
+        2
+      ],
+      "stopSha256": "2cf5d0fd0b620ab07a4eef87920b6ee146bf539e6a2ca331721c7a79375f1bd4",
+      "geojsonSha256": "aba04e674a0b56a780490f3aa1f02bbda6982f0b660d43720195c2353565c033",
+      "packChecksum": 794685810
+    },
+    "[\"citybus\",\"23\",\"outbound\",null]": {
+      "td": [
+        "CTB",
+        1520,
+        1
+      ],
+      "stopSha256": "78f230a8d284a15d1d00d25104ad57c69abbbc22fc2cab8f65af34bf6aa182e6",
+      "geojsonSha256": "ee9cc02907a0d8cb189fe59cb42ec28a7c61d4f6366736b8d865b5b3bda34c1b",
+      "packChecksum": 2823350168
+    },
+    "[\"citybus\",\"23\",\"inbound\",null]": {
+      "td": [
+        "CTB",
+        1520,
+        2
+      ],
+      "stopSha256": "b3c8067ad22766e2c95e96f5864c8dd4401ad9117ec16447b1f0a8fd7e50a4aa",
+      "geojsonSha256": "a88b51408de0b8e3aab3a1cf3028d37a78a47d1f8b195d8d5ec832513d9e13a6",
+      "packChecksum": 3691063804
+    }
+  }
+}

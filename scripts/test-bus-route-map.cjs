@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const { existsSync, readFileSync, readdirSync } = require('node:fs');
 const { join } = require('node:path');
+const { mock } = require('node:test');
 const ts = require('typescript');
 const { getRoutes } = require('expo-router/build/getRoutes');
 const { getReactNavigationConfig } = require('expo-router/build/getReactNavigationConfig');
@@ -11,32 +12,60 @@ const { StackRouter } = require('expo-router/build/react-navigation/routers/Stac
 const root = join(__dirname, '..');
 const { stops } = require('../assets/data/nearby-stops.json');
 const { sources } = require('../assets/data/nearby-stop-routes.json');
+const geometryPack = require('../assets/data/bus-route-geometry.json');
 const sourcePoints = Object.fromEntries(Object.entries(stops).map(([source, rows]) => [
   source, new Map(rows.map(([id, , , latitude, longitude]) => [id, { latitude, longitude }])),
 ]));
 const actions = [];
 const react = {
   Component: class {},
-  useEffect() {},
-  useMemo: (fn) => fn(),
-  useRef: (current) => ({ current }),
+  useEffect(fn) { effects.push(fn); },
+  useMemo(fn, dependencies) {
+    const index = memoIndex++;
+    if (!memos.has(state)) memos.set(state, []);
+    const cache = memos.get(state);
+    const entry = cache[index];
+    if (entry && entry.dependencies.length === dependencies.length
+        && dependencies.every((value, i) => Object.is(value, entry.dependencies[i]))) return entry.value;
+    const value = fn();
+    cache[index] = { dependencies, value };
+    return value;
+  },
+  useCallback: (fn, dependencies) => react.useMemo(() => fn, dependencies),
+  useRef(current) {
+    if (!refs.has(state)) refs.set(state, []);
+    const cache = refs.get(state);
+    const index = refIndex++;
+    return cache[index] ?? (cache[index] = { current });
+  },
   useState(initial) {
     const index = hookIndex++;
-    if (!Object.hasOwn(state, index)) state[index] = typeof initial === 'function' ? initial() : initial;
-    return [state[index], (value) => { state[index] = typeof value === 'function' ? value(state[index]) : value; }];
+    const local = state;
+    if (!Object.hasOwn(local, index)) local[index] = typeof initial === 'function' ? initial() : initial;
+    return [local[index], (value) => { local[index] = typeof value === 'function' ? value(local[index]) : value; }];
   },
 };
 let state = {};
 let hookIndex = 0;
+let memoIndex = 0;
+let refIndex = 0;
+let effects = [];
+let focusedEffect;
+const memos = new WeakMap();
+const refs = new WeakMap();
 let locale = 'zh-HK';
 let sequence;
 const native = Object.fromEntries(['ActivityIndicator', 'FlatList', 'Pressable', 'ScrollView', 'TextInput', 'View'].map((type) => [type, type]));
 Object.assign(native, { Keyboard: { dismiss() {} }, StyleSheet: { create: (styles) => styles, absoluteFill: {} } });
+native.AppState = { currentState: 'active', addEventListener: () => ({ remove() {} }) };
 const stubs = {
   react, 'react-native': native, 'expo-sqlite': {},
-  'react-native-maps': { __esModule: true, default: 'MapView', Marker: 'Marker' },
+  'react-native-maps': { __esModule: true, default: 'MapView', Marker: 'Marker', Polyline: 'Polyline' },
   'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ bottom: 0 }) },
-  'expo-router': { useRouter: () => ({ push: (href) => actions.push(href), canGoBack: () => true }) },
+  'expo-router': {
+    useRouter: () => ({ push: (href) => actions.push(href), canGoBack: () => true }),
+    useFocusEffect: (fn) => { focusedEffect = fn; },
+  },
   '@/language': { useLanguage: () => ({ copy: load('i18n').messages[locale], locale }) },
   '@/components/ui': { AppText: 'AppText', EmptyState: 'EmptyState', Icon: 'Icon', Screen: 'Screen' },
   '@/components/home-ui': { HarbourBackdrop: 'HarbourBackdrop' },
@@ -50,7 +79,6 @@ const stubs = {
     useRouteSequences: () => ({ sequences: sequence }),
     useRouteStopNames: () => ({ names: {} }),
   },
-  '@/bus-eta-hooks': {},
   '@/route-stop-recommendation': { useRouteStopRecommendation: () => ({}) },
 };
 const modules = new Map();
@@ -77,6 +105,10 @@ function load(name) {
 
 function render(component, props) {
   hookIndex = 0;
+  memoIndex = 0;
+  refIndex = 0;
+  effects = [];
+  focusedEffect = undefined;
   return component(props);
 }
 
@@ -85,7 +117,17 @@ function elements(node) {
   return node?.props ? [node, ...elements(node.props.children)] : [];
 }
 
-const { buildBusMapStops, busRouteMapHref, readBusMapChoice } = load('bus-route-map');
+function preview(tree) {
+  return elements(tree).find(({ type }) => type.name === 'MapStopArrival');
+}
+
+function action(tree, label) {
+  return elements(tree).find(({ type, props }) => type === 'Pressable'
+    && elements(props.children).some(({ props }) => props.children === label));
+}
+
+const { buildBusMapStops, busRouteMapHref, numberedBusMapStops, readBusMapChoice } = load('bus-route-map');
+const { readBusRouteGeometry } = load('bus-route-geometry');
 const { routeStopKey, parseBusStop, parseRouteStops, stopVisitKey } = load('bus-stops');
 const { parseBusCatalogue } = load('bus-routes');
 const { readEtaTarget } = load('bus-eta');
@@ -240,8 +282,12 @@ for (locale of ['zh-HK', 'en']) {
   const tree = elements(render(RouteMap, props));
   const list = tree.find(({ type }) => type === 'FlatList').props;
   assert.equal(list.data.length, 4);
-  const selected = tree.find(({ type, props }) => type === BusAction && props.label === labels.busMap.viewStop);
-  selected.props.onPress();
+  const selected = preview(tree);
+  assert.equal(selected.props.initialTarget.stopSeq, 3);
+  const listState = state;
+  state = {};
+  action(render(selected.type, selected.props), labels.busEta.openAll).props.onPress();
+  state = listState;
   const eta = actions.at(-1);
   assert.equal(stateFor(eta).routes.at(-1).name, 'bus/eta');
   assert.deepEqual(readEtaTarget(eta.params), {
@@ -260,10 +306,368 @@ for (locale of ['zh-HK', 'en']) {
   assert.equal(actions.at(-1), stopVisitKey(choice.identity, visits[1]));
   assert.equal(pins[2].props.accessibilityState.selected, true);
 
-  state = {};
+  state = listState;
   list.renderItem({ item: list.data[3] }).props.onPress();
-  elements(render(RouteMap, props)).find(({ type, props }) => type === BusAction && props.label === labels.busMap.viewStop).props.onPress();
+  preview(render(RouteMap, props)).props.onOpen();
   assert.equal(actions.at(-1).params.stopId, '999', 'A missing map coordinate does not block the official stop ETA');
 }
 
 console.log('PASS: official stop-map fixtures, direction and variants, repeated visits, coordinates, bilingual entry and ETA routing');
+
+const verified = [
+  ['kmbLwb', '1', 'O', '1', 'KMB', 1001, 1],
+  ['kmbLwb', '1', 'I', '1', 'KMB', 1001, 2],
+  ['kmbLwb', '268X', 'I', '1', 'KMB', 8203, 2],
+  ['kmbLwb', '268X', 'O', '3', 'KMB', 1000333, 1],
+  ['kmbLwb', '10', 'O', '1', 'KMB', 1002, 1],
+  ['kmbLwb', '296A', 'O', '1', 'KMB', 1157, 1],
+  ['kmbLwb', '275X', 'I', '1', 'KMB', 1000392, 2],
+  ['citybus', '23', 'O', '', 'CTB', 1520, 1],
+  ['citybus', '23', 'I', '', 'CTB', 1520, 2],
+];
+const approvedMaps = verified.map(([source, number, direction, variant, company, routeId, seq]) => {
+  const { choice, stops } = fixture(source, number, direction, variant);
+  const map = buildBusMapStops(choice.identity, stops, sourcePoints[source], () => undefined);
+  const lines = readBusRouteGeometry(map);
+  const record = geometryPack.records[map.routeKey];
+  assert.deepEqual(record.td, [company, routeId, seq]);
+  assert.deepEqual(lines.map((line) => line.length), record.parts.map((part) => part.length));
+  const [[lon, lat]] = record.parts[0];
+  assert.deepEqual(lines[0][0], { latitude: lat / 1_000_000, longitude: lon / 1_000_000 });
+  assert.deepEqual(map.markers.map(({ stop }) => stop), stops);
+  if (['10', '296A'].includes(number)) assert.equal(stops[0].id, stops.at(-1).id);
+  return map;
+});
+assert.equal(Object.keys(geometryPack.records).length, approvedMaps.length);
+assert.notDeepEqual(readBusRouteGeometry(approvedMaps[0]), readBusRouteGeometry(approvedMaps[1]));
+assert.notDeepEqual(readBusRouteGeometry(approvedMaps[2]), readBusRouteGeometry(approvedMaps[3]));
+
+for (const { choice, stops } of [samples[2], samples[4], ...samples.slice(8), fixture('kmbLwb', '275X', 'O', '1')]) {
+  const map = buildBusMapStops(choice.identity, stops, sourcePoints[choice.identity.source], () => undefined);
+  let requested = false;
+  assert.equal(readBusRouteGeometry(map, () => { requested = true; return geometryPack; }), undefined);
+  assert.equal(requested, false, 'Stops-only routes must not load the pack');
+}
+const firstMap = approvedMaps[0];
+for (const payload of [null, {}, { ...geometryPack, records: {} }, { ...geometryPack, crs: 'EPSG:2326' }]) {
+  assert.equal(readBusRouteGeometry(firstMap, () => payload), undefined);
+}
+assert.equal(readBusRouteGeometry(firstMap, () => { throw Error('read failure'); }), undefined);
+for (const corrupt of [
+  (record) => { record.td = ['CTB', 1001, 1]; },
+  (record) => { record.parts = []; },
+  (record) => { record.parts[0][0] = [22345523, 114192442]; },
+  (record) => { record.parts[0][0][1] += 10; },
+  (record) => { record.parts = [record.parts.flat()]; },
+  (record) => { record.visits[0][1] = 'wrong-stop'; },
+]) {
+  const payload = structuredClone(geometryPack);
+  corrupt(payload.records[firstMap.routeKey]);
+  assert.equal(readBusRouteGeometry(firstMap, () => payload), undefined);
+}
+assert.equal(readBusRouteGeometry({ ...firstMap, markers: firstMap.markers.slice(1) }), undefined);
+assert.equal(readBusRouteGeometry({ ...firstMap, markers: firstMap.markers.toReversed() }), undefined);
+const moved = firstMap.markers.map((marker, i) => i ? marker
+  : { ...marker, coordinate: { ...marker.coordinate, latitude: marker.coordinate.latitude + 0.00001 } });
+assert.equal(readBusRouteGeometry({ ...firstMap, markers: moved }), undefined);
+
+const b2 = samples[8];
+const b2Map = buildBusMapStops(b2.choice.identity, b2.stops, sourcePoints.nlb, () => undefined);
+const size = { width: 370, height: 300 };
+const closeStops = b2Map.markers.slice(10, 19);
+const focus = closeStops[4];
+const viewport = { ...focus.coordinate, latitudeDelta: 0.18, longitudeDelta: 0.22 };
+const overview = numberedBusMapStops(b2Map.markers, focus.key, viewport, size);
+assert(overview.has(focus.key));
+assert(closeStops.some(({ key }) => !overview.has(key)), 'Wide view suppresses crowded labels');
+const neighbour = closeStops.find(({ key, coordinate }) => key !== focus.key
+  && Math.hypot(coordinate.latitude - focus.coordinate.latitude, coordinate.longitude - focus.coordinate.longitude) < 0.007);
+assert(neighbour && !overview.has(neighbour.key));
+const closeBy = [focus, neighbour];
+const zoom = {
+  latitude: (focus.coordinate.latitude + neighbour.coordinate.latitude) / 2,
+  longitude: (focus.coordinate.longitude + neighbour.coordinate.longitude) / 2,
+  latitudeDelta: Math.max(0.001, Math.abs(focus.coordinate.latitude - neighbour.coordinate.latitude) * 2),
+  longitudeDelta: Math.max(0.001, Math.abs(focus.coordinate.longitude - neighbour.coordinate.longitude) * 2),
+};
+assert.equal(numberedBusMapStops(closeBy, focus.key, zoom, size).size, 2, 'Zooming separates nearby labels');
+const circular = approvedMaps[4].markers;
+const twin = circular.at(-1);
+assert.deepEqual(twin.coordinate, circular[0].coordinate);
+assert.notEqual(twin.key, circular[0].key);
+const repeated = numberedBusMapStops(circular, twin.key, { ...twin.coordinate, latitudeDelta: 0.05, longitudeDelta: 0.06 }, size);
+assert(repeated.has(twin.key));
+assert(!repeated.has(circular[0].key), 'Only one number at an identical coordinate, selected visit wins');
+
+async function checkGeometryScreen() {
+  load('nearby-bus-data').readBusStopCoordinates = async (source, ids) => new Map(ids.map((id) =>
+    [id, { ...sourcePoints[source].get(id), name: { zh: '站點', en: 'Stop' } }]));
+  const stopMapElement = (tree) => elements(elements(tree).find(({ type }) => type === 'FlatList').props.ListHeaderComponent);
+  for (locale of ['zh-HK', 'en']) {
+    const labels = messages[locale].busMap;
+    assert.match(labels.geometrySource, locale === 'en' ? /Transport Department.*CSDI/ : /運輸署.*空間數據共享平台/);
+    const lineSample = fixture('kmbLwb', '1', 'O', '1');
+    const props = { choice: lineSample.choice };
+    state = {};
+    sequence = { [firstMap.routeKey]: { snapshot: { stops: lineSample.stops, fetchedAt: 1 } } };
+    render(RouteMap, props);
+    effects.forEach((run) => run());
+    await Promise.resolve();
+    let tree = render(RouteMap, props);
+    let header = stopMapElement(tree);
+    const verifiedElement = header.find(({ type }) => type === BusStopMap);
+    assert(verifiedElement.props.lines?.length);
+    assert(header.some(({ props }) => props.children === labels.geometrySource));
+    const list = elements(tree).find(({ type }) => type === 'FlatList').props;
+    const item = list.data[3];
+    list.renderItem({ item }).props.onPress();
+    tree = render(RouteMap, props);
+    assert.equal(stopMapElement(tree).find(({ type }) => type === BusStopMap).props.focusRequest.key, item.key);
+
+    state = {};
+    let drawn = elements(render(BusStopMap, verifiedElement.props));
+    const lineCount = drawn.filter(({ type }) => type === 'Polyline').length;
+    assert.equal(lineCount, verifiedElement.props.lines.length);
+    assert(drawn.findIndex(({ type }) => type === 'Polyline') < drawn.findIndex(({ type }) => type === 'Marker'));
+
+    state = {};
+    sequence = { [b2Map.routeKey]: { snapshot: { stops: b2.stops, fetchedAt: 1 } } };
+    render(RouteMap, { choice: b2.choice });
+    effects.forEach((run) => run());
+    await Promise.resolve();
+    header = stopMapElement(render(RouteMap, { choice: b2.choice }));
+    const stopsOnly = header.find(({ type }) => type === BusStopMap);
+    assert.equal(stopsOnly.props.lines, undefined);
+    assert(!header.some(({ props }) => props.children === labels.geometrySource));
+    assert.notEqual(stopsOnly.key, verifiedElement.key);
+
+    state = {};
+    const selected = { ...stopsOnly.props, selected: focus.key };
+    drawn = elements(render(BusStopMap, selected));
+    const map = drawn.find(({ type }) => type === 'MapView');
+    map.props.onLayout({ nativeEvent: { layout: size } });
+    map.props.onRegionChangeComplete(viewport);
+    drawn = elements(render(BusStopMap, selected));
+    const pins = drawn.filter(({ type }) => type === 'Marker');
+    assert.equal(pins.length, b2.stops.length, 'Label suppression retains every native Marker');
+    assert.equal(pins.find(({ props }) => props.identifier === focus.key).props.zIndex, 2);
+    assert(pins.some(({ props }) => props.zIndex === 0));
+    assert(!drawn.some(({ type }) => type === 'Polyline'), 'Switching to a stops-only route cannot retain a line');
+  }
+}
+
+async function checkMapEtaPreview() {
+  const start = Date.parse('2026-11-19T07:00:00Z');
+  mock.timers.enable({ apis: ['Date', 'setTimeout', 'setInterval'], now: start });
+  const requests = [];
+  const { BusFeedError } = load('bus-data');
+  load('bus-data').requestBusJson = (source, url, signal) => new Promise((resolve, reject) => {
+    requests.push({ source, url, signal, resolve, reject });
+  });
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+  const hasText = (tree, label) => elements(tree).some(({ props }) => props.children === label);
+  const officialRow = (target, time, extra = {}) => ({
+    co: 'KMB', route: target.number, service_type: Number(target.serviceType),
+    dir: target.direction === 'outbound' ? 'O' : 'I', stop: target.stopId, seq: target.stopSeq,
+    eta: new Date(time).toISOString(), data_timestamp: new Date(Date.now()).toISOString(), ...extra,
+  });
+
+  function mount(node) {
+    const ownState = {};
+    const view = () => {
+      state = ownState;
+      return render(node.type, node.props);
+    };
+    view();
+    const stopDelay = effects[0]();
+    let stopFocus;
+    return {
+      view,
+      ready() {
+        mock.timers.tick(350);
+        view();
+        stopFocus = focusedEffect();
+      },
+      pause() { stopFocus?.(); },
+      resume() { view(); stopFocus = focusedEffect(); },
+      close() { stopDelay(); stopFocus?.(); },
+    };
+  }
+
+  try {
+    locale = 'en';
+    const labels = messages[locale];
+    const line = fixture('kmbLwb', '268X', 'O', '3');
+    const props = { choice: line.choice };
+    const routeState = {};
+    const mapView = () => {
+      state = routeState;
+      return render(RouteMap, props);
+    };
+    const routeIdentity = routeStopKey(line.choice.identity);
+    sequence = { [routeIdentity]: { snapshot: { stops: line.stops, fetchedAt: start } } };
+    assert.equal(preview(mapView()), undefined);
+    effects.forEach((run) => run());
+    await flush();
+    const mapTree = mapView();
+    const list = elements(mapTree).find(({ type }) => type === 'FlatList').props;
+    const busMap = elements(list.ListHeaderComponent).find(({ type }) => type === BusStopMap);
+    const selectList = (index) => {
+      list.renderItem({ item: list.data[index] }).props.onPress();
+      return preview(mapView());
+    };
+
+    const navCount = actions.length;
+    busMap.props.onSelect(busMap.props.markers[0].key);
+    const selectedA = preview(mapView());
+    assert.equal(actions.length, navCount, 'Selecting a marker never opens another screen');
+    const previewA = mount(selectedA);
+    assert(hasText(previewA.view(), labels.busEta.loading));
+    assert.equal(requests.length, 0);
+    previewA.ready();
+    assert.equal(requests.length, 1);
+    const first = requests[0];
+    assert.equal(first.url, `https://data.etabus.gov.hk/v1/transport/kmb/eta/${line.stops[0].id}/268X/3`);
+    assert.deepEqual(selectedA.props.initialTarget, {
+      number: '268X', source: 'kmbLwb', direction: 'outbound', serviceType: '3',
+      stopId: line.stops[0].id, stopSeq: line.stops[0].seq,
+    });
+
+    const selectedB = selectList(1);
+    assert.notEqual(selectedB.key, selectedA.key);
+    previewA.close();
+    assert(first.signal.aborted);
+    const previewB = mount(selectedB);
+    assert(hasText(previewB.view(), labels.busEta.loading));
+    previewB.ready();
+    assert.equal(requests.length, 2, 'Only selected stops request ETA');
+    const targetB = selectedB.props.initialTarget;
+    assert.equal(requests[1].source, targetB.source);
+    assert.equal(requests[1].url, first.url.replace(line.stops[0].id, line.stops[1].id));
+    first.resolve({ data: [officialRow(selectedA.props.initialTarget, Date.now() + 60_000)] });
+    await flush();
+    assert(hasText(previewB.view(), labels.busEta.loading));
+    assert(!hasText(previewB.view(), labels.busEta.due));
+    requests[1].resolve({ data: [
+      officialRow(targetB, Date.now() + 7 * 60_000),
+      officialRow(targetB, Date.now() + 30_000, { dir: 'I' }),
+      officialRow(targetB, Date.now() + 30_000, { service_type: 1 }),
+      officialRow(targetB, Date.now() + 30_000, { seq: targetB.stopSeq + 1 }),
+      officialRow(targetB, Date.now() + 3 * 60_000),
+    ] });
+    await flush();
+    assert(hasText(previewB.view(), 'About 3 min'));
+    assert(!hasText(previewB.view(), labels.busEta.due));
+    assert.equal(selectList(1).key, selectedB.key);
+    assert.equal(requests.length, 2);
+
+    const full = action(previewB.view(), labels.busEta.openAll);
+    assert.equal(full.props.style({ pressed: false })[0].minHeight, 44);
+    full.props.onPress();
+    assert.deepEqual(readEtaTarget(actions.at(-1).params), targetB);
+    previewB.pause();
+    mock.timers.tick(2_000);
+    assert.equal(requests.length, 2, 'No background poll while the detail screen is open');
+    assert.equal(preview(mapView()).key, selectedB.key);
+    previewB.resume();
+    assert(hasText(previewB.view(), 'About 3 min'));
+    assert.equal(requests.length, 2, 'Opening and returning retains a fresh snapshot and the poll deadline');
+
+    mock.timers.tick(60_000);
+    assert.equal(requests.length, 3);
+    requests[2].reject(new BusFeedError('network'));
+    await flush();
+    assert(hasText(previewB.view(), labels.busEta.errors.network));
+    assert(action(previewB.view(), labels.bus.retry).props.disabled);
+    mock.timers.tick(10_000);
+    const retry = action(previewB.view(), labels.bus.retry);
+    assert.equal(retry.props.disabled, false);
+    retry.props.onPress();
+    assert.equal(requests.length, 4);
+    assert.equal(requests[3].url, requests[1].url);
+    requests[3].resolve({ data: [
+      officialRow(targetB, Date.now() + 30_000, { data_timestamp: new Date(Date.now() - 120_000).toISOString() }),
+    ] });
+    await flush();
+    assert(hasText(previewB.view(), labels.busEta.stale));
+    assert(!hasText(previewB.view(), labels.busEta.due));
+    previewB.close();
+
+    const empty = mount(selectList(2));
+    empty.ready();
+    requests.at(-1).resolve({ data: [] });
+    await flush();
+    assert(hasText(empty.view(), labels.busEta.empty));
+    assert(!hasText(empty.view(), labels.busEta.due));
+    empty.close();
+
+    const unavailable = mount(selectList(3));
+    unavailable.ready();
+    requests.at(-1).reject(new BusFeedError('http', 501));
+    await flush();
+    assert(hasText(unavailable.view(), labels.busMap.etaUnavailable));
+    unavailable.close();
+
+    sequence = { [routeIdentity]: { snapshot: { stops: [{ id: 'invalid', seq: 1 }], fetchedAt: start } } };
+    const invalid = elements(mapView()).find(({ type }) => type === 'FlatList').props;
+    invalid.renderItem({ item: invalid.data[0] }).props.onPress();
+    const invalidTree = mapView();
+    assert.equal(preview(invalidTree), undefined);
+    assert(hasText(invalidTree, labels.busMap.etaUnavailable));
+    assert.equal(requests.length, 6, 'No request is scheduled for an invalid stop identity');
+
+    locale = 'zh-HK';
+    const zh = messages[locale];
+    const loop = fixture('kmbLwb', '10', 'O', '1');
+    const loopKey = routeStopKey(loop.choice.identity);
+    const last = loop.stops.at(-1);
+    sequence = { [loopKey]: { snapshot: { stops: loop.stops, fetchedAt: start } } };
+    const firstVisit = { choice: loop.choice, initialStopId: last.id, initialStopSeq: '1' };
+    state = {};
+    const firstLoop = preview(render(RouteMap, firstVisit));
+    state = {};
+    const lastLoop = preview(render(RouteMap, { ...firstVisit, initialStopSeq: String(last.seq) }));
+    assert.notEqual(firstLoop.key, lastLoop.key);
+    assert.equal(firstLoop.props.initialTarget.stopId, lastLoop.props.initialTarget.stopId);
+    assert.equal(lastLoop.props.initialTarget.stopSeq, last.seq);
+    const previewLast = mount(lastLoop);
+    previewLast.ready();
+    assert.equal(requests.length, 7);
+    requests.at(-1).resolve({ data: [
+      officialRow(firstLoop.props.initialTarget, Date.now() + 30_000),
+      officialRow(lastLoop.props.initialTarget, Date.now() + 5 * 60_000),
+    ] });
+    await flush();
+    assert(hasText(previewLast.view(), '約 5 分鐘'));
+    assert(!hasText(previewLast.view(), zh.busEta.due));
+    action(previewLast.view(), zh.busEta.openAll).props.onPress();
+    assert.equal(readEtaTarget(actions.at(-1).params).stopSeq, last.seq);
+    previewLast.close();
+
+    const ctb = fixture('citybus', '1', 'O', '');
+    const stop = ctb.stops[0];
+    sequence = { [routeStopKey(ctb.choice.identity)]: { snapshot: { stops: ctb.stops, fetchedAt: start } } };
+    state = {};
+    const ctbNode = preview(render(RouteMap, {
+      choice: ctb.choice, initialStopId: stop.id, initialStopSeq: String(stop.seq),
+    }));
+    const ctbPreview = mount(ctbNode);
+    ctbPreview.ready();
+    const request = requests.at(-1);
+    assert.equal(requests.length, 8);
+    assert.equal(request.source, 'citybus');
+    assert.match(stop.id, /^0\d{5}$/);
+    assert.equal(request.url, `https://rt.data.gov.hk/v2/transport/citybus/eta/CTB/${stop.id}/1`);
+    request.resolve({ data: [officialRow(ctbNode.props.initialTarget, Date.now() + 30_000, { co: 'CTB' })] });
+    await flush();
+    assert(hasText(ctbPreview.view(), zh.busEta.due));
+    ctbPreview.close();
+  } finally {
+    mock.timers.reset();
+  }
+}
+
+checkGeometryScreen().then(checkMapEtaPreview).then(
+  () => console.log('PASS: official geometry, selected-stop ETA requests, race isolation, retry, stale and unavailable states, and bilingual routing'),
+  (error) => { console.error(error); process.exitCode = 1; },
+);

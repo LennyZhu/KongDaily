@@ -184,8 +184,9 @@ const zhHK = {
     coordinateMissing: '暫無可核實座標',
     retryCoordinates: '重新讀取座標',
     mapUnavailable: '暫時無法載入地圖。你仍可在下方選站。',
+    geometrySource: '折線來源：香港特別行政區政府運輸署（空間數據共享平台）。資料知識產權屬政府及相關機構。實際行車安排以營辦商公告為準。',
     tilesNote: '地圖底圖可能需要網絡連線。',
-    viewStop: '查看站點及到站時間',
+    etaUnavailable: '此停靠站暫未能提供到站資料',
     returnToRoute: '返回路線詳情',
   },
   busDetail: {
@@ -716,8 +717,9 @@ const en: typeof zhHK = {
     coordinateMissing: 'Verified coordinates unavailable',
     retryCoordinates: 'Retry coordinates',
     mapUnavailable: 'The map could not load. You can still choose a stop below.',
+    geometrySource: 'Route geometry: Transport Department, HKSAR Government, via the CSDI Portal. Data rights belong to the Government and relevant organisations. Check the operator for current service arrangements.',
     tilesNote: 'The basemap may require an internet connection.',
-    viewStop: 'View stop and arrivals',
+    etaUnavailable: 'Arrival times are unavailable for this stop',
     returnToRoute: 'Back to route details',
   },
   busDetail: {

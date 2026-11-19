@@ -1,10 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { findBusRouteFamily } from '@/bus-data';
+import { useBusEta } from '@/bus-eta-hooks';
+import { describeEta, readEtaTarget, type EtaTarget } from '@/bus-eta';
 import { busStopEtaHref, describeBusVisit } from '@/bus-favorites';
+import { readBusRouteGeometry } from '@/bus-route-geometry';
 import { buildBusMapStops, isBusMapCoordinate, readBusMapChoice, type BusMapVisit } from '@/bus-route-map';
 import { routePlaceName } from '@/bus-routes';
 import { useRouteSequences, useRouteStopNames } from '@/bus-stop-hooks';
@@ -19,6 +22,7 @@ import { colors, radius, space, touchTarget } from '@/theme';
 const noStops: readonly RouteStop[] = [];
 type IndexedStops = Awaited<ReturnType<typeof readBusStopCoordinates>>;
 const noIndexedStops: IndexedStops = new Map();
+const etaPreviewDelay = 350;
 
 export default function BusRouteMapScreen() {
   const { routeId, direction, stopId, stopSeq } = useLocalSearchParams();
@@ -85,7 +89,8 @@ function RouteMap({ choice, initialStopId, initialStopSeq }: {
   const stopIds = useMemo(() => [...new Set(stops.map(({ id }) => id))], [stops]);
   const [index, setIndex] = useState<{ ids: string[]; stops: IndexedStops; attempt: number }>();
   const [attempt, setAttempt] = useState(0);
-  const [selection, setSelection] = useState<string>();
+  const [selection, setSelection] = useState<{ key: string; focusMap?: true }>();
+  const [etaCooldowns] = useState(() => new Map<string, number>());
 
   useEffect(() => {
     if (!stopIds.length) return;
@@ -109,9 +114,10 @@ function RouteMap({ choice, initialStopId, initialStopSeq }: {
   const { names } = useRouteStopNames(identity.source === 'nlb' ? undefined : identity.source, lookupIds);
   const map = useMemo(() => buildBusMapStops(identity, stops, indexed,
     (id) => names[id]?.snapshot?.stop.coordinate), [identity, stops, indexed, names]);
+  const lines = useMemo(() => indexReady ? readBusRouteGeometry(map) : undefined, [indexReady, map]);
   const selected = selection === undefined
     ? map.visits.find(({ stop }) => stop.id === initialStopId && String(stop.seq) === initialStopSeq)
-    : map.visits.find(({ key }) => key === selection);
+    : map.visits.find(({ key }) => key === selection.key);
 
   function station(stop: RouteStop) {
     return stop.name ?? names[stop.id]?.snapshot?.stop.name ?? indexed.get(stop.id)?.name;
@@ -131,6 +137,9 @@ function RouteMap({ choice, initialStopId, initialStopSeq }: {
   const directionLabel = destinationLabel ? detail.towards(destinationLabel)
     : routeName ? routePlaceName(routeName, locale)
       : identity.source !== 'nlb' ? copy.bus.directions[identity.direction] : '';
+  const selectedStation = selected && station(selected.stop);
+  const etaHref = selected && busStopEtaHref(describeBusVisit(identity, selected.stop, stops, selectedStation, destination));
+  const target = etaHref && readEtaTarget(etaHref.params);
 
   const cached = sequence?.snapshot && (sequence.fromCache || sequence.error)
     ? detail.cached(new Date(sequence.snapshot.fetchedAt).toLocaleString(locale, {
@@ -144,7 +153,7 @@ function RouteMap({ choice, initialStopId, initialStopSeq }: {
     return (
       <Pressable accessibilityRole="button" accessibilityState={{ selected: active }}
         accessibilityLabel={missingPoint ? `${stopLabel(item.stop)} · ${labels.coordinateMissing}` : stopLabel(item.stop)}
-        onPress={() => setSelection(item.key)}
+        onPress={() => setSelection({ key: item.key, focusMap: true })}
         style={({ pressed }) => [styles.stop, active && styles.selected, pressed && styles.pressed]}>
         <AppText variant="detail" tone="primary">{item.stop.seq}</AppText>
         <View style={styles.grow}>
@@ -184,8 +193,9 @@ function RouteMap({ choice, initialStopId, initialStopSeq }: {
             ) : (
               <>
                 {map.status === 'stops_only' && (
-                  <BusStopMap key={map.routeKey} markers={map.markers} selected={selected?.key}
-                    stopLabel={stopLabel} onSelect={setSelection} />
+                  <BusStopMap key={map.routeKey} markers={map.markers} lines={lines} selected={selected?.key}
+                    focusRequest={selection?.focusMap ? selection : undefined}
+                    stopLabel={stopLabel} onSelect={(key) => setSelection({ key })} />
                 )}
                 {(!indexReady || detailsPending) ? <Loading label={labels.loading} /> : (
                   <>
@@ -197,6 +207,7 @@ function RouteMap({ choice, initialStopId, initialStopSeq }: {
                     )}
                   </>
                 )}
+                {lines && <AppText variant="caption" tone="muted">{labels.geometrySource}</AppText>}
                 {map.status === 'stops_only' && <AppText variant="caption" tone="muted">{labels.tilesNote}</AppText>}
                 <AppText variant="homeHeading" accessibilityRole="header">{labels.stationOrder}</AppText>
               </>
@@ -205,14 +216,75 @@ function RouteMap({ choice, initialStopId, initialStopSeq }: {
         )}
       />
       {selected && (
-        <View style={styles.footer}>
-          <AppText variant="homeCardTitle" accessibilityLiveRegion="polite">{stopLabel(selected.stop)}</AppText>
-          <BusAction label={labels.viewStop}
-            onPress={() => router.push(busStopEtaHref(describeBusVisit(identity, selected.stop, stops,
-              station(selected.stop), destination)))} />
-        </View>
+        <ScrollView style={styles.footer} contentContainerStyle={styles.footerContent}>
+          <AppText variant="caption" tone="primary">{detail.stopOrder(selected.stop.seq)} · {identity.number}</AppText>
+          <AppText variant="homeCardTitle" accessibilityRole="header">
+            {selectedStation && routePlaceName(selectedStation, locale) || detail.unavailableName}
+          </AppText>
+          {target && etaHref ? (
+            <MapStopArrival key={JSON.stringify(target)} initialTarget={target} cooldowns={etaCooldowns}
+              onOpen={() => router.push(etaHref)} />
+          ) : <AppText variant="detail" tone="muted">{labels.etaUnavailable}</AppText>}
+        </ScrollView>
       )}
     </SafeAreaView>
+  );
+}
+
+function MapStopArrival({ initialTarget, cooldowns, onOpen }: {
+  initialTarget: EtaTarget;
+  cooldowns: Map<string, number>;
+  onOpen: () => void;
+}) {
+  // The complete target key remounts the preview on a different stop visit, including repeat visits.
+  const [target] = useState(initialTarget);
+  const [ready, setReady] = useState(false);
+  const { copy, locale } = useLanguage();
+  const eta = copy.busEta;
+  useEffect(() => {
+    const timer = setTimeout(() => setReady(true), etaPreviewDelay);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const { snapshot, error, now, loading, canRefresh, refresh } = useBusEta(target, locale, ready, cooldowns);
+  const view = describeEta(snapshot, error, now, loading, locale, eta);
+  const [next] = view.upcoming;
+  const unavailable = error?.status === 404 || error?.status === 501;
+  const value = unavailable ? copy.busMap.etaUnavailable : next
+    ? next.minutes === 0 ? eta.due : `${eta.minutes.prefix}${next.minutes}${eta.minutes.suffix}`
+    : view.status;
+  const retryEnabled = canRefresh && now >= (cooldowns.get(target.source) ?? 0);
+
+  return (
+    <>
+      <View style={styles.arrivalRow}>
+        <View style={styles.arrival} accessible accessibilityLiveRegion="polite">
+          <AppText variant="caption" tone="muted">{eta.nextArrival}</AppText>
+          <AppText variant={next && !unavailable ? 'title' : 'detail'} tone={next && !unavailable ? 'primary' : 'muted'}>
+            {value}
+          </AppText>
+        </View>
+        <Pressable accessibilityRole="button" onPress={onOpen}
+          style={({ pressed }) => [styles.arrivalAction, pressed && styles.pressed]}>
+          <AppText variant="detail" tone="primary" style={styles.actionLabel}>{eta.openAll}</AppText>
+          <Icon name="chevron.right" size={13} />
+        </Pressable>
+      </View>
+      {error && (
+        <View style={styles.arrivalRow}>
+          <AppText variant="caption" tone="error" style={styles.arrival}>
+            {view.errorText ?? eta.failed}
+          </AppText>
+          <Pressable accessibilityRole="button" disabled={!retryEnabled} onPress={refresh}
+            accessibilityState={{ disabled: !retryEnabled, busy: loading }}
+            style={({ pressed }) => [styles.arrivalAction, !retryEnabled && styles.disabled, pressed && styles.pressed]}>
+            <AppText variant="detail" tone="primary" style={styles.actionLabel}>{copy.bus.retry}</AppText>
+          </Pressable>
+        </View>
+      )}
+      {view.updateText && <AppText variant="caption" tone="muted">{view.updateText}</AppText>}
+      {target.repeatedStop && <AppText variant="caption" tone="muted">{eta.repeatedStop}</AppText>}
+    </>
   );
 }
 
@@ -243,8 +315,17 @@ const styles = StyleSheet.create({
   },
   selected: { backgroundColor: colors.tint, borderColor: colors.primary },
   pressed: { opacity: 0.72 },
+  disabled: { opacity: 0.6 },
   footer: {
-    marginHorizontal: space.xl, marginVertical: space.sm, padding: space.md, gap: space.xs,
+    maxHeight: '50%', flexGrow: 0, marginHorizontal: space.xl, marginVertical: space.sm,
     backgroundColor: colors.tint, borderRadius: radius.card,
   },
+  footerContent: { padding: space.md, gap: space.xs },
+  arrivalRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.xs },
+  arrival: { flexBasis: 115, flexGrow: 1, minWidth: 0 },
+  arrivalAction: {
+    flexBasis: 145, flexGrow: 1, minWidth: 0, minHeight: touchTarget, paddingVertical: space.xs,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: space.xs,
+  },
+  actionLabel: { flexShrink: 1, textAlign: 'right' },
 });
