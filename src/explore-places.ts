@@ -18,9 +18,10 @@ export type ExploreSource = Readonly<{
 
 type ExploreDestination = Readonly<{
   name: ExploreText;
-  coordinate: Readonly<{ latitude: number; longitude: number; crs: 'WGS84'; sourceId: string }>;
+  coordinate: Readonly<{ latitude: number; longitude: number; crs: 'WGS84'; sourceUrl: string }>;
   role: 'trailhead' | 'venue-entrance' | 'pedestrian-arrival';
   evidenceSourceIds: readonly string[];
+  verificationReport: string;
   reviewedAt: string;
 }>;
 
@@ -59,4 +60,20 @@ export function getExplorePlaces(category?: ExploreCategory): readonly ExplorePl
 
 export function getExplorePlace(id: string): ExplorePlace | undefined {
   return places.find((place) => place.id === id);
+}
+
+export function getExploreTrailhead(place: ExplorePlace | undefined) {
+  if (!place || place.category !== 'hiking' || place.navigation.status !== 'verified'
+    || (place.id !== homeFeaturedPlaceIds.dragon && place.id !== 'peak-circle-walk')) return;
+
+  const { destination } = place.navigation;
+  if (destination?.role !== 'trailhead' || destination.coordinate?.crs !== 'WGS84') return;
+  const { latitude, longitude } = destination.coordinate;
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)
+    || latitude < 22.13 || latitude > 22.57 || longitude < 113.82 || longitude > 114.48) return;
+
+  return {
+    name: destination.name,
+    url: `https://maps.apple.com/directions?destination=${latitude},${longitude}&mode=walking`,
+  };
 }

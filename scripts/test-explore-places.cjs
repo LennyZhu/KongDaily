@@ -23,6 +23,16 @@ const approvedPlaces = [
   ['tai-po-waterfront-park', '大埔海濱公園', 'Tai Po Waterfront Park', 'parks', ['waterfront']],
   ['victoria-peak-garden', '山頂花園', 'Victoria Peak Garden', 'pets', ['parks']],
 ];
+const approvedTrailheads = new Map([
+  ['dragons-back-to-tei-wan-tai-tam-gap', [
+    '石澳道土地灣港島徑入口', 'To Tei Wan Trailhead, Shek O Road', 22.2270299568, 114.2397903557,
+    'DragonsBack.gpx',
+  ]],
+  ['peak-circle-walk', [
+    '凌霄閣西側盧吉道入口', 'Lugard Road Trailhead, near The Peak Tower', 22.2712927825, 114.1494947398,
+    'HongKongTrail%28Section1%29ThePeaktoPokFuLamReservoirRoad.gpx',
+  ]],
+]);
 
 // Only the bundled JSON may be imported by the actual reader at runtime.
 function loadAppModule(name, importData) {
@@ -106,8 +116,32 @@ for (const place of catalog.places) {
       path + ' must reference existing evidence');
     assert.equal(new Set(item.sourceIds).size, item.sourceIds.length, path + ' repeats an evidence ID');
   }
-  assert.deepEqual(place.navigation, { status: 'unverified' }, label + ' cannot ship a navigation destination in UI-05C1');
+  const approved = approvedTrailheads.get(place.id);
+  if (approved) {
+    const [zh, en, latitude, longitude, file] = approved;
+    fields(place.navigation, 'status destination', label + '.navigation');
+    assert.equal(place.navigation.status, 'verified');
+    assert.equal(place.category, 'hiking');
+    const { destination } = place.navigation;
+    fields(destination, 'role name coordinate evidenceSourceIds reviewedAt verificationReport', label + '.destination');
+    assert.equal(destination.role, 'trailhead');
+    assert.deepEqual(destination.name, { 'zh-HK': zh, en });
+    assert.notDeepEqual(destination.name, place.title, 'Trailhead and hiking route must be named separately');
+    assert.deepEqual(destination.coordinate, {
+      latitude, longitude, crs: 'WGS84',
+      sourceUrl: 'https://www.hiking.gov.hk/console/public/uploads/others/file/gpx/' + file,
+    });
+    assert.ok(destination.evidenceSourceIds.length > 0 && destination.evidenceSourceIds.every((id) => sourceIds.has(id)),
+      label + ' needs traceable source evidence');
+    assert.equal(destination.verificationReport, 'docs/UI-05C3D-NAVIGATION-POINT-VERIFICATION.md');
+    checkDate(destination.reviewedAt, label + '.destination.reviewedAt');
+  } else {
+    assert.deepEqual(place.navigation, { status: 'unverified' }, label + ' cannot ship a navigation destination');
+  }
 }
+assert.equal(catalog.places.filter(({ navigation }) => navigation.status === 'verified').length, 2);
+assert.equal(catalog.places.reduce((count, { highlights }) => count + highlights.length, 0), 18);
+assert.equal(urls.size, 39);
 assert.equal(new Set(catalog.places.map(({ order }) => order)).size, 8, 'Display order must be unique');
 assert.equal(new Set(catalog.places.map(({ id }) => id)).size, 8, 'Stable IDs must be unique');
 
@@ -151,7 +185,7 @@ for (const [contentId, nearbyId, index] of [
   assert.equal(getExplorePlace(nearbyId), undefined, 'Nearby identity must not resolve as an Explore ID');
 }
 
-console.log('PASS · 8 approved offline places, 4 filters, bilingual copy and evidence, 0 navigation points');
+console.log('PASS · 8 offline places, 4 filters, 18 bilingual highlights, 2 approved trailheads, 6 unverified places');
 console.log(urls.size + ' unique official HTTPS sources. Reachability reviewed in the UI-05C1 report.');
 
 async function checkLinks() {

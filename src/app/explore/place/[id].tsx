@@ -1,10 +1,10 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef } from 'react';
-import { Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { ExploreArtwork, exploreCategoryIcons } from '@/components/explore-artwork';
 import { AppText, EmptyState, Icon, Screen, type IconName } from '@/components/ui';
-import { getExplorePlace, type ExplorePlace } from '@/explore-places';
+import { getExplorePlace, getExploreTrailhead, type ExplorePlace } from '@/explore-places';
 import { isOfficialExploreUrl, selectExploreSources } from '@/explore-sources';
 import { useLanguage } from '@/language';
 import { colors, radius, space, touchTarget } from '@/theme';
@@ -15,6 +15,7 @@ export default function ExplorePlaceScreen() {
   const { explore } = copy;
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const place = typeof id === 'string' ? getExplorePlace(id) : undefined;
+  const trailhead = supportsUnifiedMaps() ? getExploreTrailhead(place) : undefined;
   const backToExplore = () => router.dismissTo('/explore');
 
   return (
@@ -62,6 +63,7 @@ export default function ExplorePlaceScreen() {
               <TravelRow icon="info.circle" title={explore.cautions} body={place.cautions[locale]} />
             </View>
             <OfficialSources place={place} />
+            {trailhead && <TrailheadDirections name={trailhead.name[locale]} url={trailhead.url} />}
           </>
         ) : (
           <>
@@ -92,26 +94,15 @@ function TravelRow({ icon, title, body }: { icon: IconName; title: string; body:
 
 function OfficialSources({ place }: { place: ExplorePlace }) {
   const { copy: { explore }, locale } = useLanguage();
-  const opening = useRef(false);
+  const openExternalLink = useExploreExternalLink(explore.linkFailed);
   const sources = selectExploreSources(place, locale);
 
-  async function openSource(url: string) {
-    if (opening.current) return;
+  function openSource(url: string) {
     if (!isOfficialExploreUrl(url)) {
       Alert.alert(explore.linkFailed);
       return;
     }
-    opening.current = true;
-    try {
-      await Linking.openURL(url);
-    } catch {
-      Alert.alert(explore.linkFailed, explore.linkFailedDetail, [
-        { text: explore.cancel, style: 'cancel' },
-        { text: explore.retryLink, onPress: () => { void openSource(url); } },
-      ]);
-    } finally {
-      opening.current = false;
-    }
+    void openExternalLink(url);
   }
 
   return (
@@ -123,7 +114,7 @@ function OfficialSources({ place }: { place: ExplorePlace }) {
         return (
           <Pressable key={source.id} accessibilityRole="link"
             accessibilityLabel={[source.title[locale], source.organization[locale], language].filter(Boolean).join(', ')}
-            accessibilityHint={explore.externalLinkHint} onPress={() => { void openSource(source.url); }}
+            accessibilityHint={explore.externalLinkHint} onPress={() => openSource(source.url)}
             style={({ pressed }) => [styles.sourceLink, pressed && styles.pressed]}>
             <Icon name="link" size={16} />
             <View style={styles.sourceText}>
@@ -139,6 +130,57 @@ function OfficialSources({ place }: { place: ExplorePlace }) {
       <AppText variant="detail" tone="muted">{explore.sourceNote}</AppText>
     </View>
   );
+}
+
+function supportsUnifiedMaps() {
+  if (Platform.OS !== 'ios') return false;
+  const [major, minor = 0] = String(Platform.Version).split('.').map(Number);
+  return major > 18 || (major === 18 && minor >= 4);
+}
+
+function TrailheadDirections({ name, url }: { name: string; url: string }) {
+  const { copy: { explore: { trailhead } } } = useLanguage();
+  const openExternalLink = useExploreExternalLink(trailhead.openFailed);
+
+  return (
+    <View style={styles.trailheadSection}>
+      <AppText variant="title" accessibilityRole="header" style={styles.centered}>
+        <AppText variant="detail" tone="muted">{`${trailhead.destination} · `}</AppText>
+        {name}
+      </AppText>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${trailhead.action} · ${name}`}
+        accessibilityHint={trailhead.detail}
+        onPress={() => { void openExternalLink(url); }}
+        style={({ pressed }) => [styles.trailheadButton, pressed && styles.trailheadPressed]}
+      >
+        <Icon name="location" size={18} color={colors.onPrimary} />
+        <AppText variant="title" tone="onPrimary" style={styles.trailheadButtonText}>{trailhead.action}</AppText>
+      </Pressable>
+      <AppText variant="caption" tone="muted">{trailhead.detail}</AppText>
+    </View>
+  );
+}
+
+function useExploreExternalLink(errorTitle: string) {
+  const { copy: { explore } } = useLanguage();
+  const opening = useRef(false);
+
+  return async function open(url: string) {
+    if (opening.current) return;
+    opening.current = true;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert(errorTitle, explore.linkFailedDetail, [
+        { text: explore.cancel, style: 'cancel' },
+        { text: explore.retryLink, onPress: () => { void open(url); } },
+      ]);
+    } finally {
+      opening.current = false;
+    }
+  };
 }
 
 const styles = StyleSheet.create({
@@ -164,5 +206,14 @@ const styles = StyleSheet.create({
   sourceText: { flex: 1, minWidth: 0, gap: space.xs },
   headerButton: { minWidth: touchTarget, minHeight: touchTarget, borderRadius: radius.control,
     justifyContent: 'center', alignItems: 'center' },
+  centered: { textAlign: 'center' },
+  trailheadSection: { gap: space.xs },
+  trailheadButton: {
+    minHeight: touchTarget, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: space.sm, paddingHorizontal: space.md, paddingVertical: space.sm,
+    borderRadius: radius.control, backgroundColor: colors.primary,
+  },
+  trailheadButtonText: { flexShrink: 1, minWidth: 0, textAlign: 'center' },
+  trailheadPressed: { opacity: 0.86 },
   pressed: { backgroundColor: colors.pressed },
 });

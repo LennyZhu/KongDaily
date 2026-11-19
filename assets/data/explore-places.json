@@ -107,7 +107,23 @@
       ],
       "reviewedAt": "2026-11-18",
       "navigation": {
-        "status": "unverified"
+        "status": "verified",
+        "destination": {
+          "name": {
+            "zh-HK": "石澳道土地灣港島徑入口",
+            "en": "To Tei Wan Trailhead, Shek O Road"
+          },
+          "role": "trailhead",
+          "coordinate": {
+            "latitude": 22.2270299568,
+            "longitude": 114.2397903557,
+            "crs": "WGS84",
+            "sourceUrl": "https://www.hiking.gov.hk/console/public/uploads/others/file/gpx/DragonsBack.gpx"
+          },
+          "evidenceSourceIds": ["afcd-route", "afcd-map"],
+          "verificationReport": "docs/UI-05C3D-NAVIGATION-POINT-VERIFICATION.md",
+          "reviewedAt": "2026-11-19"
+        }
       }
     },
     {
@@ -202,7 +218,23 @@
       ],
       "reviewedAt": "2026-11-18",
       "navigation": {
-        "status": "unverified"
+        "status": "verified",
+        "destination": {
+          "name": {
+            "zh-HK": "凌霄閣西側盧吉道入口",
+            "en": "Lugard Road Trailhead, near The Peak Tower"
+          },
+          "role": "trailhead",
+          "coordinate": {
+            "latitude": 22.2712927825,
+            "longitude": 114.1494947398,
+            "crs": "WGS84",
+            "sourceUrl": "https://www.hiking.gov.hk/console/public/uploads/others/file/gpx/HongKongTrail%28Section1%29ThePeaktoPokFuLamReservoirRoad.gpx"
+          },
+          "evidenceSourceIds": ["hktb-tc", "hktb-en"],
+          "verificationReport": "docs/UI-05C3D-NAVIGATION-POINT-VERIFICATION.md",
+          "reviewedAt": "2026-11-19"
+        }
       }
     },
     {
