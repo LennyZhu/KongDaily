@@ -4,6 +4,7 @@ export const colors = {
   primary: '#246F69',
   primarySoft: '#3B8F87',
   background: '#F6F9F7',
+  searchBackground: '#FAF9F5',
   tintedBackground: '#E6F3F1',
   surface: '#FFFFFF',
   text: '#243330',

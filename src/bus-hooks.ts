@@ -3,13 +3,14 @@ import { useEffect, useRef, useState } from 'react';
 import { BusFeedError, isBusFeedFresh, readBusFeeds, readBusHistory, refreshBusFeed, type BusFeedFailure, type BusFeeds, type BusHistoryItem } from '@/bus-data';
 import { busSources, type BusSource } from '@/bus-routes';
 
-export function useBusCatalogue() {
+export function useBusCatalogue(enabled = true) {
   const [feeds, setFeeds] = useState<BusFeeds>({});
   const [failed, setFailed] = useState<Partial<Record<BusSource, BusFeedFailure>>>({});
   const [loading, setLoading] = useState(true);
   const [retrySources, setRetrySources] = useState<BusSource[]>();
 
   useEffect(() => {
+    if (!enabled) return;
     let active = true;
     setLoading(true);
     setFailed({});
@@ -44,9 +45,10 @@ export function useBusCatalogue() {
     }
     void load();
     return () => { active = false; };
-  }, [retrySources]);
+  }, [enabled, retrySources]);
 
-  return { feeds, failed, loading, retry: () => setRetrySources(busSources.filter((source) => failed[source])) };
+  return { feeds, failed, loading: enabled && loading,
+    retry: () => setRetrySources(busSources.filter((source) => failed[source])) };
 }
 
 export function useBusHistory() {
