@@ -10,7 +10,12 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.lennystudio.kongdaily",
-      "infoPlist": { "CFBundleAllowMixedLocalizations": true }
+      "infoPlist": {
+        "CFBundleAllowMixedLocalizations": true,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false
+        }
+      }
     },
     "locales": {
       "en": "./assets/locales/en.json",
