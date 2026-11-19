@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import { complianceDocuments } from '@/compliance-content';
 import { LanguageProvider, useLanguage } from '@/language';
 import { colors, typography } from '@/theme';
 
@@ -16,7 +17,8 @@ export default function RootLayout() {
 }
 
 function RootStack() {
-  const { copy } = useLanguage();
+  const { copy, locale } = useLanguage();
+  const { privacy, support } = complianceDocuments[locale];
 
   return (
     <Stack screenOptions={{
@@ -28,6 +30,9 @@ function RootStack() {
     }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="settings" options={{ title: copy.settings.title }} />
+      <Stack.Screen name="settings/privacy" options={{ title: privacy.title }} />
+      <Stack.Screen name="settings/support" options={{ title: support.title }} />
+      <Stack.Screen name="settings/credits" options={{ title: copy.compliance.creditsHeader }} />
       <Stack.Screen name="search" options={{ title: copy.search.title }} />
       <Stack.Screen name="search/facility-map" options={{ title: copy.search.facilityMap }} />
       <Stack.Screen name="weather" options={{

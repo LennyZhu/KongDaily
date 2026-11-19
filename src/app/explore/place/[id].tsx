@@ -4,7 +4,7 @@ import { Alert, Linking, Platform, Pressable, StyleSheet, View } from 'react-nat
 
 import { ExploreArtwork, exploreCategoryIcons } from '@/components/explore-artwork';
 import { AppText, EmptyState, Icon, Screen, type IconName } from '@/components/ui';
-import { getExplorePlace, getExploreTrailhead, type ExplorePlace } from '@/explore-places';
+import { getExplorePlace, getExploreTrailhead, homeFeaturedPlaceIds, type ExplorePlace } from '@/explore-places';
 import { isOfficialExploreUrl, selectExploreSources } from '@/explore-sources';
 import { useLanguage } from '@/language';
 import { colors, radius, space, touchTarget } from '@/theme';
@@ -63,6 +63,15 @@ export default function ExplorePlaceScreen() {
               <TravelRow icon="info.circle" title={explore.cautions} body={place.cautions[locale]} />
             </View>
             <OfficialSources place={place} />
+            {place.id === homeFeaturedPlaceIds.dragon && (
+              <Pressable accessibilityRole="link" onPress={() => router.push({
+                pathname: '/settings/credits', params: { photo: 'dragons-back' },
+              })} style={({ pressed }) => [styles.sourceLink, pressed && styles.pressed]}>
+                <Icon name="photo" size={16} />
+                <AppText variant="homeCardTitle" tone="primary" style={styles.copy}>{copy.compliance.dragonPhoto}</AppText>
+                <Icon name="chevron.right" size={13} />
+              </Pressable>
+            )}
             {trailhead && <TrailheadDirections name={trailhead.name[locale]} url={trailhead.url} />}
           </>
         ) : (

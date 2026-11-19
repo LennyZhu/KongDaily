@@ -1,13 +1,22 @@
+import { useRouter } from 'expo-router';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Icon, Screen } from '@/components/ui';
+import { complianceDocuments } from '@/compliance-content';
 import { languagePreferences } from '@/i18n';
 import { useLanguage } from '@/language';
 import { colors, radius, space, touchTarget } from '@/theme';
 
 export default function SettingsScreen() {
-  const { copy, preference, isSaving, saveFailed, changeLanguage } = useLanguage();
-  const { settings } = copy;
+  const router = useRouter();
+  const { copy, locale, preference, isSaving, saveFailed, changeLanguage } = useLanguage();
+  const { settings, compliance } = copy;
+  const { privacy, support } = complianceDocuments[locale];
+  const aboutLinks = [
+    { href: '/settings/privacy', label: privacy.title },
+    { href: '/settings/support', label: support.title },
+    { href: '/settings/credits', label: compliance.credits },
+  ] as const;
 
   return (
     <Screen hasHeader>
@@ -38,6 +47,18 @@ export default function SettingsScreen() {
           })}
         </View>
         {saveFailed && <AppText variant="detail" tone="error" accessibilityRole="alert">{settings.saveError}</AppText>}
+      </View>
+      <View style={styles.section}>
+        <AppText variant="section" accessibilityRole="header">{compliance.about}</AppText>
+        <View style={styles.options}>
+          {aboutLinks.map(({ href, label }, index) => (
+            <Pressable key={href} accessibilityRole="link" onPress={() => router.push(href)}
+              style={({ pressed }) => [styles.row, index > 0 && styles.separator, pressed && styles.pressed]}>
+              <AppText variant="title" style={styles.rowLabel}>{label}</AppText>
+              <Icon name="chevron.right" size={15} />
+            </Pressable>
+          ))}
+        </View>
       </View>
     </Screen>
   );

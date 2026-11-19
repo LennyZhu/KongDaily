@@ -561,6 +561,14 @@ const zhHK = {
     stopsLoading: '正在準備本機巴士站資料…',
     stopsFailed: '暫未能讀取本機巴士站資料。',
   },
+  compliance: {
+    about: '關於 KongDaily',
+    credits: '資料來源與圖片署名',
+    creditsHeader: '資料與署名',
+    dragonPhoto: '龍脊照片署名',
+    externalLink: '在外部開啟',
+    linkFailed: '未能開啟連結，請再試一次。',
+  },
   settings: {
     title: '設定',
     language: 'App 語言',
@@ -1130,6 +1138,14 @@ const en: typeof zhHK = {
     stopsNotLoaded: 'Bus stop data hasn’t loaded yet.',
     stopsLoading: 'Preparing local bus stop data…',
     stopsFailed: 'Local bus stop data couldn’t be loaded.',
+  },
+  compliance: {
+    about: 'About KongDaily',
+    credits: 'Data Sources & Credits',
+    creditsHeader: 'Sources & Credits',
+    dragonPhoto: 'Dragon’s Back photo credit',
+    externalLink: 'Opens externally',
+    linkFailed: 'Couldn’t open the link. Try again.',
   },
   settings: {
     title: 'Settings',
