@@ -1,10 +1,11 @@
 {
   "origin": null,
   "operator": { "zh-HK": null, "en": null },
-  "privacyEmail": null,
-  "supportEmail": null,
+  "operatorVerificationReference": null,
   "effectiveOn": null,
   "updatedOn": null,
   "siteAndSupportPrivacy": { "zh-HK": null, "en": null },
-  "approvalReference": null
+  "retentionDisclosure": { "zh-HK": null, "en": null },
+  "approvalReference": null,
+  "assetRightsApprovalReference": null
 }

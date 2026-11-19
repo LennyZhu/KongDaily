@@ -1,10 +1,15 @@
 {
   "reviewedOn": "2026-11-19",
+  "identity": {
+    "product": "KongDaily",
+    "brand": "Lenny Studio",
+    "operatorType": "individual",
+    "contactEmail": "lenny996@163.com"
+  },
   "locales": {
     "zh-HK": {
-      "brand": "港日常 · KongDaily",
       "reviewStatus": "審閱版",
-      "reviewNotice": "此內容供審閱。正式政策與聯絡方式將在核實後公布。",
+      "reviewNotice": "此內容供審閱。正式政策仍待發佈。",
       "reviewDate": "更新日期",
       "effectiveDate": "生效日期",
       "skipToContent": "跳至正文",
@@ -12,16 +17,17 @@
       "languagesLabel": "語言",
       "home": {
         "title": "關於 KongDaily",
-        "intro": "港日常提供香港巴士、天氣、附近設施及探索資料。"
+        "intro": "港日常（KongDaily）是由個人開發者以 Lenny Studio 品牌提供的獨立 App，提供香港巴士、天氣、附近設施及探索資料。"
       },
       "privacy": {
         "title": "私隱政策",
         "intro": "了解港日常如何使用位置、保存本機資料及向第三方服務查詢。",
+        "contactSection": "rights",
         "sections": [
           {
             "id": "scope",
             "title": "適用範圍",
-            "paragraphs": ["本說明涵蓋 KongDaily 的 iOS App。查看巴士、天氣、附近設施或精選地點，以及使用收藏，均毋須建立帳戶。"]
+            "paragraphs": ["本說明涵蓋 KongDaily 的 iOS 版本。KongDaily 是由個人開發者以 Lenny Studio 品牌提供的獨立 App。查看巴士、天氣、附近設施或精選地點，以及使用收藏，均毋須建立帳戶。"]
           },
           {
             "id": "location",
@@ -49,7 +55,7 @@
             "paragraphs": [
               "App 向九巴／龍運、城巴及嶼巴的官方服務查詢路線、站點及到站時間，按需要傳送公開路線或站點編號等查詢欄位。天氣查詢向香港天文台傳送資料類型和語言。",
               "在「附近」搜尋地點時，符合條件的文字會自動送往地政總署地點搜尋服務，可能包括你輸入的地址。這些查詢沒有附送裝置 GPS。連線接收端可見 IP 等網絡資訊。本說明未確認地政總署查詢日誌的保留期限。",
-              "App 內地圖由 Apple MapKit 提供。你選擇開啟 Apple 地圖或 Google Maps 導航時，App 會交付選定目的地和步行模式。外部地圖或網站依其政策及權限處理位置及連線資料。"
+              "App 內地圖由 Apple MapKit 提供。地圖套件的精確位置收集聲明仍待正式 App 歸檔核對。你選擇開啟 Apple 地圖或 Google Maps 導航時，App 會交付選定目的地和步行模式。外部地圖或網站依其政策及權限處理位置及連線資料。"
             ],
             "links": [
               { "label": "地政總署地點搜尋服務", "url": "https://data.gov.hk/tc-data/dataset/hk-landsd-openmap-development-location-search-api" },
@@ -79,6 +85,7 @@
       "support": {
         "title": "支援",
         "intro": "查閱巴士、天氣、定位及離線功能的常見問題。",
+        "contactSection": "contact",
         "sections": [
           { "id": "bus", "title": "巴士到站時間為何沒有更新？", "paragraphs": ["到站時間由營辦商提供。請確認網絡、路線方向和所選站點，再試重新整理。資料過期、服務中斷或沒有班次時，App 會顯示相應狀態。你可收藏站點，並將常用站點置頂到首頁。"] },
           { "id": "weather", "title": "天氣及警告如何更新？", "paragraphs": ["天氣觀測、預報和警告來自香港天文台。檢查資料時間及過期提示；如需最新官方消息，請查閱天文台。"] },
@@ -90,9 +97,8 @@
       }
     },
     "en": {
-      "brand": "KongDaily",
       "reviewStatus": "Review draft",
-      "reviewNotice": "For review. The official policy and contact details will be published once confirmed.",
+      "reviewNotice": "For review. The official policy has yet to be published.",
       "reviewDate": "Last updated",
       "effectiveDate": "Effective date",
       "skipToContent": "Skip to main content",
@@ -100,16 +106,17 @@
       "languagesLabel": "Language",
       "home": {
         "title": "About KongDaily",
-        "intro": "KongDaily brings together Hong Kong bus arrivals, weather, nearby facilities and curated places."
+        "intro": "KongDaily is a standalone app offered by an individual developer under the Lenny Studio brand. It covers Hong Kong bus arrivals, weather, nearby facilities and curated places."
       },
       "privacy": {
         "title": "Privacy Policy",
         "intro": "How KongDaily uses location, stores information on your device and makes requests to third-party services.",
+        "contactSection": "rights",
         "sections": [
           {
             "id": "scope",
             "title": "Scope",
-            "paragraphs": ["This notice covers the KongDaily iOS app. You can use bus information, weather, Nearby, Explore and bookmarks without creating an account."]
+            "paragraphs": ["This notice covers the iOS version of KongDaily, a standalone app offered by an individual developer under the Lenny Studio brand. You can use bus information, weather, Nearby, Explore and bookmarks without creating an account."]
           },
           {
             "id": "location",
@@ -137,7 +144,7 @@
             "paragraphs": [
               "The app requests route, stop and arrival information from official KMB and Long Win, Citybus and New Lantao Bus services. Requests can include public route or stop identifiers. Hong Kong Observatory weather requests include the data type and language.",
               "In Nearby place search, eligible text is sent automatically to the Lands Department’s Location Search API. This may include an address you type. These requests do not include your device’s GPS position. Services can see connection information such as IP addresses. This notice does not confirm how long the Lands Department keeps query logs.",
-              "Apple MapKit supplies the maps in the app. If you open directions in Apple Maps or Google Maps, the app passes the chosen destination and walking mode. External map services and websites handle location and connection data under their own policies and permissions."
+              "Apple MapKit supplies the maps in the app. The map SDK’s precise location collection declaration still needs to be checked against the final app archive. If you open directions in Apple Maps or Google Maps, the app passes the chosen destination and walking mode. External map services and websites handle location and connection data under their own policies and permissions."
             ],
             "links": [
               { "label": "Lands Department Location Search API", "url": "https://data.gov.hk/en-data/dataset/hk-landsd-openmap-development-location-search-api" },
@@ -167,6 +174,7 @@
       "support": {
         "title": "Support",
         "intro": "Answers about bus arrivals, weather, location and offline access.",
+        "contactSection": "contact",
         "sections": [
           { "id": "bus", "title": "Why are bus arrival times not updating?", "paragraphs": ["Arrival estimates come from the operators. Check your connection, travel direction and selected stop, then try refreshing. The app indicates stale data, service problems or when no arrivals are available. You can save a stop and pin it to Home."] },
           { "id": "weather", "title": "How are weather and warnings updated?", "paragraphs": ["Observations, forecasts and warnings come from the Hong Kong Observatory. Check the timestamp and any stale-data notice. Consult the Observatory for the latest official information."] },

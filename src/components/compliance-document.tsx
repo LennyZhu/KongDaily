@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Icon, PageHeading, Screen } from '@/components/ui';
-import { complianceDocuments, complianceReviewedOn, type ComplianceSection } from '@/compliance-content';
+import { complianceContact, complianceDocuments, complianceReviewedOn, type ComplianceSection } from '@/compliance-content';
 import { useLanguage } from '@/language';
 import { colors, radius, space, touchTarget } from '@/theme';
 
@@ -11,9 +11,10 @@ type ComplianceDocumentProps = {
   intro?: string;
   sections: readonly ComplianceSection[];
   review?: boolean;
+  contactSection?: string;
 };
 
-export function ComplianceDocumentScreen({ title, intro, sections, review }: ComplianceDocumentProps) {
+export function ComplianceDocumentScreen({ title, intro, sections, review, contactSection }: ComplianceDocumentProps) {
   const { copy: { compliance }, locale } = useLanguage();
   const labels = complianceDocuments[locale];
   const opening = useRef(false);
@@ -46,7 +47,7 @@ export function ComplianceDocumentScreen({ title, intro, sections, review }: Com
         <View key={id} style={styles.section}>
           <AppText variant="homeHeading" accessibilityRole="header">{sectionTitle}</AppText>
           {paragraphs.map((paragraph) => <AppText key={paragraph}>{paragraph}</AppText>)}
-          {links?.map(({ label, url }) => (
+          {(id === contactSection ? [...(links ?? []), complianceContact] : links)?.map(({ label, url }) => (
             <Pressable key={url} accessibilityRole="link" accessibilityHint={compliance.externalLink}
               onPress={() => { void openSource(url); }}
               style={({ pressed }) => [styles.link, pressed && styles.pressed]}>

@@ -10,6 +10,11 @@ const { getStateFromPath } = require('expo-router/build/react-navigation/core/ge
 const { resolveHref } = require('expo-router/build/link/href');
 
 const content = require('../content/compliance.json');
+const confirmedEmail = 'lenny996@163.com';
+const contactHref = `mailto:${confirmedEmail}`;
+const brand = 'KongDaily by Lenny Studio';
+assert.equal(content.identity.contactEmail, confirmedEmail);
+assert.equal(content.identity.operatorType, 'individual');
 const { buildSite, releaseIssues } = require('../website/build.cjs');
 const root = join(__dirname, '..');
 const src = join(root, 'src');
@@ -104,6 +109,12 @@ async function checkApp() {
       } else {
         assert.deepEqual(doc.props.sections, content.locales[locale][page].sections);
         assert.ok(view.some(({ props }) => props.children === content.locales[locale].reviewStatus));
+        const contacts = view.filter(({ props }) => props.accessibilityRole === 'link'
+          && elements(props.children).some((node) => node.props.children === confirmedEmail));
+        assert.equal(contacts.length, 1);
+        contacts[0].props.onPress();
+        await new Promise(setImmediate);
+        assert.equal(opens.at(-1), contactHref);
       }
     }
     elements(settings()).filter(({ props }) => props.accessibilityRole === 'radio')[1].props.onPress();
@@ -140,6 +151,8 @@ async function checkApp() {
 }
 
 function checkWebsite() {
+  const escape = (value) => value.replace(/[&<>"']/g, (char) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
   assert.deepEqual(
     Object.keys(content.locales['zh-HK']).sort(), Object.keys(content.locales.en).sort(),
   );
@@ -150,7 +163,7 @@ function checkWebsite() {
   const review = join(temporary, 'review');
   try {
     const blocked = join(temporary, 'must-not-write');
-    assert.equal(releaseIssues({}).length, 10);
+    assert.equal(releaseIssues({}).length, 12);
     assert.throws(() => buildSite(blocked, {}), /Publication blocked/);
     assert.throws(() => buildSite(blocked, null), /Publication blocked/);
     assert.equal(existsSync(blocked), false);
@@ -162,15 +175,34 @@ function checkWebsite() {
       const page = path.includes('privacy') ? 'privacy' : path.includes('support') ? 'support' : 'home';
       const file = join(review, path);
       const html = readFileSync(file, 'utf8');
+      const document = content.locales[language][page];
       assert.ok(html.includes(`<html lang="${language}">`));
       assert.ok(html.includes('noindex, nofollow'));
-      assert.match(html, /<h1>[^<]+<\/h1>/);
+      assert.ok(html.includes(`<h1>${escape(document.title)}</h1>`));
+      assert.ok(html.includes(`<title>${escape(document.title)} · ${brand}</title>`));
+      assert.match(html, /<a class="brand"[^>]*>KongDaily by Lenny Studio<\/a>/);
+      assert.match(html, /<footer[^>]*>\s*<p[^>]*>KongDaily by Lenny Studio<\/p>/);
+      assert.ok(html.includes(`<p>${escape(document.intro)}</p>`));
       assert.ok(html.includes(`datetime="${content.reviewedOn}"`));
-      assert.match(html, /hreflang="(en|zh-HK)"/);
-      assert.doesNotMatch(html, /mailto:|<script\b|<form\b|<iframe\b/i);
-      for (const { id } of content.locales[language][page].sections ?? []) assert.ok(html.includes(`id="${id}"`));
+      const alternate = language === 'en' ? 'zh-HK' : 'en';
+      const [, switchHref] = html.match(/class="language" href="([^"]+)" lang="[^"]+" hreflang="(?:en|zh-HK)"/);
+      const pageDirectory = page === 'home' ? '' : page;
+      assert.equal(resolve(dirname(file), switchHref), resolve(review, alternate === 'en' ? 'en' : '.', pageDirectory));
+      assert.doesNotMatch(html, /<script\b|<form\b|<iframe\b|class="operator"/i);
+      const mailLinks = [...html.matchAll(/href="(mailto:[^"]+)"/g)].map((match) => match[1]);
+      assert.deepEqual(mailLinks, page === 'home' ? [] : [contactHref]);
+      for (const { id, title, paragraphs, links } of document.sections ?? []) {
+        const start = html.indexOf(`<section aria-labelledby="${id}">`);
+        assert.ok(start >= 0);
+        const section = html.slice(start, html.indexOf('</section>', start));
+        assert.ok(section.includes(`<h2 id="${id}">${escape(title)}</h2>`));
+        for (const paragraph of paragraphs) assert.ok(section.includes(`<p>${escape(paragraph)}</p>`));
+        for (const { label, url } of links ?? []) assert.ok(section.includes(`<a href="${escape(url)}">${escape(label)}</a>`));
+        assert.equal(section.includes(`href="${contactHref}"`), id === document.contactSection);
+      }
       for (const [, href] of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
         if (href.startsWith('#')) assert.ok(html.includes(`id="${href.slice(1)}"`));
+        else if (href === contactHref) continue;
         else if (href.includes(':')) assert.equal(new URL(href).protocol, 'https:');
         else {
           const target = resolve(dirname(file), href);
@@ -187,20 +219,51 @@ function checkWebsite() {
     const fixture = {
       origin: 'https://release-fixture.iana.org',
       operator: { 'zh-HK': '測試營運者', en: 'Operator fixture' },
-      privacyEmail: 'privacy@release-fixture.iana.org',
-      supportEmail: 'support@release-fixture.iana.org',
+      operatorVerificationReference: 'Verified spelling fixture',
       effectiveOn: '2026-11-19', updatedOn: '2026-11-19',
       siteAndSupportPrivacy: { 'zh-HK': '測試網站與支援文字', en: 'Site & support fixture' },
+      retentionDisclosure: { 'zh-HK': '測試保留文字', en: 'Retention fixture' },
       approvalReference: 'Test fixture only',
+      assetRightsApprovalReference: 'Asset clearance fixture',
     };
     assert.deepEqual(releaseIssues(fixture), []);
+    for (const { field, changes } of [
+      { field: 'operator.en', changes: { operator: { ...fixture.operator, en: null } } },
+      { field: 'operator.zh-HK', changes: { operator: { ...fixture.operator, 'zh-HK': ' Lenny   Studio ' } } },
+      { field: 'operatorVerificationReference', changes: { operatorVerificationReference: null } },
+      { field: 'origin', changes: { origin: null } },
+      { field: 'origin', changes: { origin: 'https://example.com.' } },
+      { field: 'retentionDisclosure.en', changes: { retentionDisclosure: { ...fixture.retentionDisclosure, en: null } } },
+      { field: 'assetRightsApprovalReference', changes: { assetRightsApprovalReference: null } },
+    ]) {
+      const invalid = { ...fixture, ...changes };
+      assert.ok(releaseIssues(invalid).some((issue) => issue.startsWith(field)), field);
+      assert.throws(() => buildSite(blocked, invalid), /Publication blocked/);
+      assert.equal(existsSync(blocked), false);
+    }
+    for (const changes of [
+      { contactEmail: null },
+      { contactEmail: 'placeholder@example.com' },
+      { brand: 'Another brand' },
+      { operatorType: 'company' },
+    ]) {
+      assert.equal(releaseIssues(fixture, { ...content, identity: { ...content.identity, ...changes } }).length, 1);
+    }
+    const incomplete = structuredClone(content);
+    incomplete.locales.en.privacy.sections.pop();
+    assert.ok(releaseIssues(fixture, incomplete).some((issue) => issue.startsWith('privacy.en')));
     const release = join(temporary, 'release');
     buildSite(release, fixture);
     const releasedPrivacy = readFileSync(join(release, 'en/privacy/index.html'), 'utf8');
     assert.doesNotMatch(releasedPrivacy, /noindex|Review draft|Test fixture only/);
     assert.match(releasedPrivacy, /Site &amp; support fixture/);
-    assert.ok(releasedPrivacy.includes(`href="mailto:${fixture.privacyEmail}"`));
-    assert.ok(releasedPrivacy.includes(`rel="canonical" href="${fixture.origin}/en/privacy/"`));
+    assert.match(releasedPrivacy, /Retention fixture/);
+    assert.doesNotMatch(releasedPrivacy, /Asset clearance fixture|Verified spelling fixture/);
+    for (const route of ['privacy/', 'en/privacy/', 'support/', 'en/support/']) {
+      const html = readFileSync(join(release, route, 'index.html'), 'utf8');
+      assert.ok(html.includes(`rel="canonical" href="${fixture.origin}/${route}"`));
+      assert.deepEqual([...html.matchAll(/href="(mailto:[^"]+)"/g)].map((match) => match[1]), [contactHref]);
+    }
   } finally {
     rmSync(temporary, { recursive: true, force: true });
   }

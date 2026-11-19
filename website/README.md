@@ -1,6 +1,6 @@
-# KongDaily public pages
+# KongDaily by Lenny Studio
 
-The app and the static pages read the same bilingual Privacy and Support content in `content/compliance.json`. The site uses plain HTML and CSS, with no runtime scripts, tracking tags, cookies, forms, CDN dependencies or build installation.
+The app and the static pages read the same bilingual Privacy and Support content and verified contact in `content/compliance.json`. KongDaily is offered by an individual developer under the Lenny Studio brand. The legal operator's verified name belongs in the separate release inputs. The site uses plain HTML and CSS with no runtime scripts, tracking tags, cookies, forms or CDN dependencies.
 
 ## Local review
 
@@ -20,6 +20,6 @@ node website/build.cjs --check-release
 node website/build.cjs --release
 ```
 
-These commands currently fail because `website/release.json` has no approved operational details. Only complete it with the verified HTTPS origin, legal operator in both languages, tested privacy and support mailboxes, effective and update dates, approved site and support privacy text in both languages, and a reference to human review. The privacy text must reflect the actual hosting logs, mail and attachment handling, retention, deletion and contacts. The referenced approval must cover the app provider disclosures in the shared content as well.
+Both commands currently fail. The verified support and privacy mailbox is in the shared content and also works in the local review pages. To clear the release check, supply the verified legal name in both locales and its verification reference, the assigned and verified HTTPS origin, effective and update dates, approved site and support privacy text and retention disclosures in both languages, and separate references for privacy approval and required asset rights. The privacy text must reflect actual hosting logs, mail and attachment handling, retention, deletion and contacts. The approval must cover the app provider disclosures as well. For asset rights, retain a separate record of the clearance or removal decision, including the Dragon’s Back photograph and any affected distribution materials.
 
-The approved static output directory is `website/dist/release`. Run the publication check for the exact revision before deploying that output. The builder writes no release files when required inputs fail validation. The check verifies completeness and format. The release owner verifies the evidence, both public URLs, and email delivery separately. Consult the implementation report before removing the in-app review label or wiring the public URLs.
+The approved static output directory is `website/dist/release`. Run the publication check for the exact revision before deploying that output. The builder writes no release files when required inputs fail validation. The check verifies completeness and format. The release owner confirms the evidence and tests both language versions of the live HTTPS routes and email delivery independently. See the [Vercel preflight](../docs/REL-01C1B0-WEBSITE-PUBLISH-PREFLIGHT.md) for build settings and verification order.

@@ -6,6 +6,10 @@ const releaseInputs = require('./release.json');
 
 const pages = ['home', 'privacy', 'support'];
 const locales = ['zh-HK', 'en'];
+const requiredSections = {
+  privacy: ['scope', 'location', 'local-data', 'online-services', 'retention', 'security', 'rights'],
+  support: ['bus', 'weather', 'location', 'offline', 'saved', 'contact'],
+};
 
 function provided(value) {
   return typeof value === 'string' && Boolean(value.trim())
@@ -13,8 +17,9 @@ function provided(value) {
 }
 
 function publicHost(hostname) {
-  return hostname.includes('.') && /[a-z]/i.test(hostname)
-    && !/(^|\.)(localhost|example\.(com|net|org))$|\.(example|test|invalid|localhost|local)$/i.test(hostname);
+  const host = hostname.replace(/\.$/, '');
+  return host.includes('.') && /[a-z]/i.test(host)
+    && !/(^|\.)(localhost|example\.(com|net|org))$|\.(example|test|invalid|localhost|local)$/i.test(host);
 }
 
 function httpsOrigin(value) {
@@ -38,19 +43,41 @@ function calendarDate(value) {
   return !Number.isNaN(date.valueOf()) && date.toISOString().startsWith(value);
 }
 
-function releaseIssues(input) {
+function legalOperator(value) {
+  if (!provided(value)) return false;
+  const name = value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
+  return !['lenny studio', 'kongdaily', '港日常', '港日常 · kongdaily', 'kongdaily by lenny studio'].includes(name);
+}
+
+function completeDocument(document, required, contactSection) {
+  return provided(document?.title) && provided(document?.intro) && document.contactSection === contactSection
+    && Array.isArray(document.sections)
+    && required.every((id) => document.sections.some((section) => section?.id === id))
+    && document.sections.every((section) => provided(section?.id) && provided(section.title)
+      && Array.isArray(section.paragraphs) && section.paragraphs.length > 0 && section.paragraphs.every(provided));
+}
+
+function releaseIssues(input, copy = content) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return ['release.json must contain the approved release data'];
   const issues = [];
+  const identity = copy.identity;
+  if (identity?.product !== 'KongDaily' || identity.brand !== 'Lenny Studio') issues.push('identity requires the approved KongDaily and Lenny Studio branding');
+  if (identity?.operatorType !== 'individual') issues.push('identity.operatorType must remain individual');
+  if (!email(identity?.contactEmail)) issues.push('identity.contactEmail must be the verified privacy and support mailbox');
   if (!httpsOrigin(input.origin)) issues.push('origin must be the approved public HTTPS origin');
-  if (!email(input.privacyEmail)) issues.push('privacyEmail must be the verified privacy mailbox');
-  if (!email(input.supportEmail)) issues.push('supportEmail must be the verified support mailbox');
+  if (!provided(input.operatorVerificationReference)) issues.push('operatorVerificationReference must record verification of the legal name');
   if (!calendarDate(input.effectiveOn)) issues.push('effectiveOn must be an approved calendar date');
   if (!calendarDate(input.updatedOn)) issues.push('updatedOn must be an approved calendar date');
   for (const locale of locales) {
-    if (!provided(input.operator?.[locale])) issues.push(`operator.${locale} must name the legal operator`);
+    const labels = copy.locales?.[locale];
+    if (!completeDocument(labels?.privacy, requiredSections.privacy, 'rights')) issues.push(`privacy.${locale} must contain the complete policy and contact section`);
+    if (!completeDocument(labels?.support, requiredSections.support, 'contact')) issues.push(`support.${locale} must contain the complete FAQ and contact section`);
+    if (!legalOperator(input.operator?.[locale])) issues.push(`operator.${locale} must name the verified legal operator, separate from the product brand`);
     if (!provided(input.siteAndSupportPrivacy?.[locale])) issues.push(`siteAndSupportPrivacy.${locale} requires approved hosting and support data handling copy`);
+    if (!provided(input.retentionDisclosure?.[locale])) issues.push(`retentionDisclosure.${locale} requires the approved retention and deletion disclosure`);
   }
   if (!provided(input.approvalReference)) issues.push('approvalReference must record human approval of both languages, contacts and provider evidence');
+  if (!provided(input.assetRightsApprovalReference)) issues.push('assetRightsApprovalReference must record an independent clearance decision for distribution and required asset rights');
   return issues;
 }
 
@@ -68,6 +95,8 @@ function directory(locale, page) {
 
 function renderPage(locale, page, release) {
   const labels = content.locales[locale];
+  const { brand, product, contactEmail } = content.identity;
+  const brandName = `${product} by ${brand}`;
   const document = labels[page];
   const here = directory(locale, page);
   const href = (targetLocale, targetPage) => (posix.relative(here, directory(targetLocale, targetPage)) || '.') + '/';
@@ -82,14 +111,14 @@ function renderPage(locale, page, release) {
       <h2 id="${id}">${escape(title)}</h2>
       ${paragraphs.map((paragraph) => `<p>${escape(paragraph)}</p>`).join('\n      ')}
       ${links?.length ? `<ul class="sources">${links.map(({ label, url }) => `<li><a href="${escape(url)}">${escape(label)}</a></li>`).join('')}</ul>` : ''}
+      ${id === document.contactSection ? `<p><a href="mailto:${escape(contactEmail)}">${escape(contactEmail)}</a></p>` : ''}
     </section>`).join('\n    ');
-  const mail = release && page !== 'home' ? (page === 'privacy' ? release.privacyEmail : release.supportEmail) : '';
   const operator = release ? `<section class="operator">
-      <h2>${locale === 'en' ? 'Operator and contact' : '營運者與聯絡方式'}</h2>
+      <h2>${locale === 'en' ? 'Legal operator' : '法定營運者'}</h2>
       <p>${escape(release.operator[locale])}</p>
-      ${mail ? `<p><a href="mailto:${escape(mail)}">${escape(mail)}</a></p>` : ''}
       ${page === 'privacy' ? `<p>${labels.effectiveDate} · <time datetime="${release.effectiveOn}">${release.effectiveOn}</time></p>
-      <p>${escape(release.siteAndSupportPrivacy[locale])}</p>` : ''}
+      <p>${escape(release.siteAndSupportPrivacy[locale])}</p>
+      <p>${escape(release.retentionDisclosure[locale])}</p>` : ''}
     </section>` : '';
 
   return `<!doctype html>
@@ -100,14 +129,14 @@ function renderPage(locale, page, release) {
   <meta name="referrer" content="no-referrer">
   ${release ? '' : '<meta name="robots" content="noindex, nofollow">'}
   ${canonical ? `<link rel="canonical" href="${escape(canonical)}">` : ''}
-  <title>${escape(document.title)} · KongDaily</title>
+  <title>${escape(document.title)} · ${escape(brandName)}</title>
   <link rel="stylesheet" href="${stylesheet}">
 </head>
 <body>
   <a class="skip" href="#main">${labels.skipToContent}</a>
   <header class="site-header">
     <div class="frame header-content">
-      <a class="brand" href="${href(locale, 'home')}">${labels.brand}</a>
+      <a class="brand" href="${href(locale, 'home')}">${escape(brandName)}</a>
       <nav aria-label="${labels.languagesLabel}">
         <a class="language" href="${href(alternate, page)}" lang="${alternate}" hreflang="${alternate}">${languageName}</a>
       </nav>
@@ -126,6 +155,9 @@ function renderPage(locale, page, release) {
     ${sections}
     ${operator}
   </main>
+  <footer class="site-footer">
+    <p class="frame">${escape(brandName)}</p>
+  </footer>
 </body>
 </html>
 `;

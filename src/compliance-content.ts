@@ -14,6 +14,7 @@ export type ComplianceSection = Readonly<{
 export type ComplianceDocument = Readonly<{
   title: string;
   intro: string;
+  contactSection: string;
   sections: readonly ComplianceSection[];
 }>;
 
@@ -26,3 +27,7 @@ export const complianceDocuments: Readonly<Record<ComplianceLocale, {
 }>> = content.locales;
 
 export const complianceReviewedOn = content.reviewedOn;
+export const complianceContact: ComplianceLink = {
+  label: content.identity.contactEmail,
+  url: `mailto:${content.identity.contactEmail}`,
+};
