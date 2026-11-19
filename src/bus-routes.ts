@@ -130,6 +130,20 @@ const sourceTerms: Record<BusSource, string[]> = {
 
 const routeOrder = new Intl.Collator('en', { numeric: true });
 
+export function busRouteSearchNames(route: BusRoute) {
+  return [
+    route.origin.zh, route.origin.en, route.destination.zh, route.destination.en, ...sourceTerms[route.source],
+    ...(route.source === 'nlb' ? [route.routeName.zh, route.routeName.en] : []),
+  ];
+}
+
+export function compareBusRoutes(a: BusRoute, b: BusRoute) {
+  return routeOrder.compare(a.number, b.number)
+    || busSources.indexOf(a.source) - busSources.indexOf(b.source)
+    || routeOrder.compare(a.serviceType ?? '', b.serviceType ?? '')
+    || a.id.localeCompare(b.id);
+}
+
 export function matchBusRoutes(routes: BusRoute[], input: string) {
   const query = normalizeBusQuery(input);
   if (!query) return [];
@@ -144,20 +158,13 @@ export function matchBusRoutes(routes: BusRoute[], input: string) {
       matches.push({ route, rank: 1 });
     } else if (route.number.includes(routeQuery)) {
       matches.push({ route, rank: 2 });
-    } else if (matchNames && [
-      route.origin.zh, route.origin.en, route.destination.zh, route.destination.en, ...sourceTerms[route.source],
-      ...(route.source === 'nlb' ? [route.routeName.zh, route.routeName.en] : []),
-    ].some((term) => normalizeBusQuery(term).includes(query))) {
+    } else if (matchNames && busRouteSearchNames(route).some((term) => normalizeBusQuery(term).includes(query))) {
       matches.push({ route, rank: 3 });
     }
   }
 
   return matches
-    .sort((a, b) => a.rank - b.rank
-      || routeOrder.compare(a.route.number, b.route.number)
-      || busSources.indexOf(a.route.source) - busSources.indexOf(b.route.source)
-      || routeOrder.compare(a.route.serviceType ?? '', b.route.serviceType ?? '')
-      || a.route.id.localeCompare(b.route.id))
+    .sort((a, b) => a.rank - b.rank || compareBusRoutes(a.route, b.route))
     .map(({ route }) => route);
 }
 

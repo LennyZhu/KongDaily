@@ -158,6 +158,14 @@ export async function readNearbyBusStop(source: BusSource, stopId: string) {
   return db.getFirstAsync<StopRow>('SELECT * FROM nearby_bus_stops WHERE source = ? AND stop_id = ?', source, stopId);
 }
 
+export async function readBusStopsForSearch() {
+  await prepareNearbyBusIndex();
+  const db = await getDatabase();
+  return db.getAllAsync<Omit<StopRow, keyof Coordinates>>(
+    'SELECT source, stop_id, name_zh, name_en, street_zh, street_en FROM nearby_bus_stops ORDER BY source, stop_id',
+  );
+}
+
 export async function readBusStopCoordinates(source: BusSource, stopIds: string[]): Promise<Map<string, Coordinates & { name: RouteName }>> {
   if (!stopIds.length) return new Map();
   await prepareNearbyBusIndex();
