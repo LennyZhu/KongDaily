@@ -43,6 +43,8 @@ const react = {
     }
   },
 };
+react.useCallback = (fn, deps) => react.useMemo(() => fn, deps);
+react.useLayoutEffect = react.useEffect;
 
 let locale = 'zh-HK';
 let timerId = 0;
@@ -62,19 +64,40 @@ function advance(ms) {
 }
 
 const pushed = [];
+const alerts = [];
+let focusEffect;
+let blur;
+let failPush = false;
+const router = {
+  navigate: (href) => pushed.push(href),
+  push(href) {
+    if (failPush) throw new Error('Injected navigation failure');
+    pushed.push(href);
+  },
+};
 let keyboardDismissals = 0;
 const native = Object.fromEntries(['TextInput', 'FlatList', 'Text', 'View', 'Pressable', 'ActivityIndicator', 'Image']
   .map((name) => [name, name]));
 Object.assign(native, {
   StyleSheet: { create: (styles) => styles, hairlineWidth: 1 },
   Keyboard: { dismiss() { keyboardDismissals++; } },
+  Alert: { alert: (title) => alerts.push(title) },
   useWindowDimensions: () => ({ width: 375, height: 812, fontScale: 1 }),
 });
 const basicUi = Object.fromEntries(['AppText', 'EmptyState', 'Icon'].map((name) => [name, name]));
 const stubs = {
   react, 'react-native': native,
   'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
-  'expo-router': { useRouter: () => ({ navigate: (href) => pushed.push(href) }) },
+  'expo-router': {
+    useRouter: () => router,
+    useFocusEffect(fn) {
+      react.useEffect(() => {
+        focusEffect = fn;
+        blur = fn();
+        return () => blur?.();
+      }, [fn]);
+    },
+  },
   'expo-sqlite': {},
   'expo-linear-gradient': { LinearGradient: 'LinearGradient' },
   '@/language': { useLanguage: () => ({ copy: load('i18n').messages[locale], locale }) },
@@ -90,12 +113,13 @@ function load(name) {
   const { outputText } = ts.transpileModule(readFileSync(file, 'utf8'), {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, esModuleInterop: true, jsx: ts.JsxEmit.ReactJSX },
   });
-  new Function('module', 'exports', 'require', 'setTimeout', 'clearTimeout', outputText)(module, module.exports, (id) => {
+  new Function('module', 'exports', 'require', 'setTimeout', 'clearTimeout', 'requestAnimationFrame', 'cancelAnimationFrame', outputText)(module, module.exports, (id) => {
     if (Object.hasOwn(stubs, id)) return stubs[id];
     if (id.startsWith('@/')) return load(id.slice(2));
     if (id.startsWith('.')) return require(resolve(dirname(file), id));
     return require(id);
-  }, name === 'app/search' ? after : setTimeout, name === 'app/search' ? (id) => timers.delete(id) : clearTimeout);
+  }, name === 'app/search' ? after : setTimeout, name === 'app/search' ? (id) => timers.delete(id) : clearTimeout,
+  (fn) => after(fn, 16), (id) => timers.delete(id));
   return module.exports;
 }
 
@@ -288,8 +312,58 @@ async function verify() {
 
   const row = list(screen).data.find((entry) => entry.type === 'result' && entry.result.kind === 'facility');
   assert(row.result.identity.stableFacilityId);
-  assert(!nodes(list(screen).renderItem({ item: row }), true).some(({ type }) => type === 'Pressable'));
-  assert.deepEqual(pushed, ['/search'], 'C2 results do not perform any destination navigation');
+  const pressRow = (item) => nodes(list(screen).renderItem({ item }), true).find(({ type }) => type === 'Pressable');
+  assert.ok(pressRow(row).props.accessibilityLabel.includes(row.result.facility.name['zh-HK']));
+  const scrolls = [];
+  const listRef = find(screen, 'FlatList').props.ref;
+  listRef.current = { scrollToOffset: ({ offset }) => scrolls.push(offset) };
+  pressRow(row).props.onPress();
+  pressRow(row).props.onPress();
+  assert.deepEqual(pushed, ['/search', { pathname: '/search/facility-map', params: row.result.identity }]);
+  blur();
+  blur = focusEffect();
+  advance(16);
+  assert.deepEqual(scrolls, [190]);
+  assert.equal(input(render()).value, '香港');
+
+  tapText(list(screen).renderItem({ item: stopHeading }), labels().search.viewAllFor(labels().search.groups.bus_stop));
+  screen = render();
+  const scopedData = list(screen).data;
+  const stopRow = scopedData.find((entry) => entry.type === 'result');
+  list(screen).onScroll({ nativeEvent: { contentOffset: { y: 310 } } });
+  pressRow(stopRow).props.onPress();
+  const otherStop = scopedData.find((entry) => entry.type === 'result' && entry !== stopRow);
+  pressRow(otherStop).props.onPress();
+  assert.equal(pushed.length, 3, 'A second row may not push while the first is opening');
+  assert.deepEqual(pushed.at(-1), { pathname: '/bus/nearby/stop', params: {
+    source: stopRow.result.source, stopId: stopRow.result.stopId,
+  } });
+  blur();
+  blur = focusEffect();
+  advance(16);
+  screen = render();
+  assert.deepEqual(scrolls, [190, 310]);
+  assert.equal(input(screen).value, '香港');
+  assert.deepEqual(list(screen).data.map(({ key }) => key), scopedData.map(({ key }) => key));
+  assert.equal(cachedReads, 1);
+  assert.equal(stopReads, 1);
+  tapText(screen, labels().search.backToAll);
+  screen = render();
+  assert.equal(list(screen).contentOffset.y, 190);
+
+  const invalid = { ...row, result: { ...row.result, identity: { source: 'afcd', stableFacilityId: 'unknown' } } };
+  pressRow(invalid).props.onPress();
+  assert.equal(alerts.at(-1), labels().search.facilityUnavailable);
+  assert.equal(pushed.length, 3);
+  failPush = true;
+  pressRow(row).props.onPress();
+  assert.equal(alerts.at(-1), labels().search.openFailed);
+  failPush = false;
+  pressRow(row).props.onPress();
+  assert.equal(pushed.length, 4);
+  blur();
+  blur = focusEffect();
+  advance(16);
 
   locale = 'en';
   screen = render();
@@ -311,6 +385,15 @@ async function verify() {
   assert.equal(displayed(screen, 'explore_place')[0].place.id, 'dragons-back-to-tei-wan-tai-tam-gap');
   assert(hasCopy(list(screen).renderItem({ item: list(screen).data.find((item) => item.type === 'result') }), 'Dragon’s Back'));
   assert.equal(list(screen).data.filter(({ type }) => type === 'group').length, 1);
+  const dragonRow = list(screen).data.find((item) => item.type === 'result');
+  pressRow({ ...dragonRow, result: { ...dragonRow.result, place: { ...dragonRow.result.place, id: 'invalid' } } }).props.onPress();
+  assert.equal(alerts.at(-1), 'This search result is currently unavailable');
+  pressRow(dragonRow).props.onPress();
+  assert.deepEqual(pushed.at(-1), { pathname: '/explore/place/[id]', params: { id: 'dragons-back-to-tei-wan-tai-tam-gap' } });
+  blur();
+  blur = focusEffect();
+  advance(16);
+  assert.equal(input(render()).value, "dRaGoN's BaCk");
 
   input(screen).onChangeText('不存在的關鍵詞𠮷');
   screen = await complete();
@@ -365,7 +448,7 @@ async function verify() {
   screen = await flush();
   assert(!hasCopy(list(screen).ListHeaderComponent, labels().search.stopsFailed));
 
-  console.log('PASS: Home entry, C1-backed bilingual UI, five-row previews, bounded expansion and scroll offset, debounce, local and partial states');
+  console.log('PASS: C2 bilingual search, bounded expansion and source states; C3 result presses, single push and scoped scroll return');
 }
 
 verify().catch((error) => { console.error(error); process.exitCode = 1; }).finally(reset);

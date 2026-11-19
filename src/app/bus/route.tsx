@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useNavigation, useRoute, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState, type Ref, type RefObject } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -32,12 +32,15 @@ let lastRouteSelection: { id: string; locale: string; value: RouteSelection } | 
 
 export default function RouteDetailsScreen() {
   const { routeId, stopId, stopSeq, direction } = useLocalSearchParams<BoardingParams & { routeId?: string }>();
+  const { key: screenKey } = useRoute();
+  const routes = useNavigation().getState()?.routes;
+  const fromSearch = routes?.[routes.findIndex((screen) => screen.key === screenKey) - 1]?.name === 'search';
   const id = typeof routeId === 'string' ? routeId : '';
   const key = JSON.stringify([id, stopId, stopSeq, direction]);
-  return <RouteLoader key={key} id={id} boarding={{ stopId, stopSeq, direction }} />;
+  return <RouteLoader key={key} id={id} boarding={{ stopId, stopSeq, direction }} fromSearch={fromSearch} />;
 }
 
-function RouteLoader({ id, boarding }: { id: string; boarding: BoardingParams }) {
+function RouteLoader({ id, boarding, fromSearch }: { id: string; boarding: BoardingParams; fromSearch: boolean }) {
   const { copy } = useLanguage();
   const router = useRouter();
   const [family, setFamily] = useState<RouteFamily | null>();
@@ -59,17 +62,17 @@ function RouteLoader({ id, boarding }: { id: string; boarding: BoardingParams })
     return (
       <Screen hasHeader>
         <EmptyState icon="exclamationmark.circle" title={copy.busDetail.loadFailed} detail={copy.busDetail.routeChanged} />
-        <BusAction label={copy.busDetail.backToSearch} onPress={() => {
+        <BusAction label={fromSearch ? copy.search.backToSearch : copy.busDetail.backToSearch} onPress={() => {
           if (router.canGoBack()) router.back();
           else router.replace('/bus');
         }} />
       </Screen>
     );
   }
-  return <RouteDetails family={family} boarding={boarding} />;
+  return <RouteDetails family={family} boarding={boarding} fromSearch={fromSearch} />;
 }
 
-function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: BoardingParams }) {
+function RouteDetails({ family, boarding, fromSearch }: { family: RouteFamily; boarding: BoardingParams; fromSearch: boolean }) {
   const { copy, locale } = useLanguage();
   const router = useRouter();
   const detail = copy.busDetail;
@@ -94,20 +97,21 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
       };
     }
     const remembered = lastRouteSelection;
-    if (remembered?.id === base.id && remembered.locale !== locale
+    if (!fromSearch && remembered?.id === base.id && remembered.locale !== locale
       && family.routes.some((route) => routeOptionKey(route) === remembered.value.variant)) {
       return remembered.value;
     }
     return {
       variant: routeOptionKey(base),
-      direction: base.source === 'nlb' ? undefined : base.direction === 'inbound' ? 'inbound' : 'outbound',
+      direction: base.source === 'nlb' || (fromSearch && base.source === 'citybus')
+        ? undefined : base.direction === 'inbound' ? 'inbound' : 'outbound',
     };
   });
   const { variant, direction, stop: explicitStop } = selection;
 
   useEffect(() => {
-    lastRouteSelection = { id: base.id, locale, value: selection };
-  }, [base.id, locale, selection]);
+    if (!fromSearch) lastRouteSelection = { id: base.id, locale, value: selection };
+  }, [base.id, fromSearch, locale, selection]);
 
   const optionHeading = base.source === 'nlb' ? detail.routeOptions : detail.variants;
   const options = useMemo(() => {
@@ -129,9 +133,13 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
   const preferred = entries.find(({ identity }) => identity.source === 'nlb' || identity.direction === direction);
   const pending = ({ state }: SequenceEntry) => !state || state.loading;
   const explicitPreferred = explicitStop?.visit && explicitStop.routeKey === preferred?.key;
-  const current = preferred && (explicitPreferred || pending(preferred) || available.includes(preferred))
+  // A search row identifies an exact service, except Citybus catalogue rows, which list no direction.
+  const current = fromSearch || (preferred && (explicitPreferred || pending(preferred) || available.includes(preferred)))
     ? preferred
     : available[0] ?? entries.find(pending) ?? preferred ?? entries[0];
+  const chooseDirection = fromSearch && !preferred && available.length > 0;
+  const showDirections = available.length > 1
+    || (fromSearch && available.some(({ key, identity }) => key !== current?.key && identity.source !== 'nlb'));
   const sequence = current?.state?.snapshot;
   const explicitForCurrent = explicitStop?.routeKey === current?.key ? explicitStop : undefined;
   const recommendationIdentity = current?.identity;
@@ -227,7 +235,11 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
             <AppText variant="moduleTitle" accessibilityRole="header" style={styles.grow}>{base.number}</AppText>
             <AppText variant="detail" tone="muted" style={styles.source}>{bus.sources[base.source]}</AppText>
           </View>
-          {nlbNameOnly ? (
+          {fromSearch && base.source === 'citybus' && !current ? (
+            <AppText variant="homeCardTitle">
+              {[routePlaceName(base.origin, locale), routePlaceName(base.destination, locale)].filter(Boolean).join(' – ')}
+            </AppText>
+          ) : nlbNameOnly ? (
             <AppText variant="homeCardTitle">{routePlaceName(nlbRoute.routeName, locale)}</AppText>
           ) : (
             <View style={styles.endpoints}>
@@ -264,7 +276,7 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
             </View>
           </View>
         )}
-        {available.length > 1 && (
+        {showDirections && (
           <View style={styles.segments} accessibilityRole="radiogroup" accessibilityLabel={detail.directions}>
             {available.map((entry) => {
               const { identity } = entry;
@@ -358,7 +370,9 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
                 );
               })}
             </View>
-          ) : current && pending(current) ? (
+          ) : chooseDirection ? (
+            <AppText variant="detail" tone="muted">{copy.search.chooseDirection}</AppText>
+          ) : (current ? pending(current) : fromSearch && entries.some(pending)) ? (
             <RouteLoading label={detail.loadingSequence} />
           ) : !failures.length ? (
             <EmptyState icon="bus" title={detail.noStops} detail={base.source === 'nlb' ? undefined : detail.routeChanged} />

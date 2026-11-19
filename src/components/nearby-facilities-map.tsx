@@ -21,24 +21,24 @@ export type NearbyFacilitiesMapHandle = { moveTo: (region: Region) => void };
 
 export function NearbyFacilitiesMap({ mapRef, initialRegion, devicePoint, placePin, items, selectedId, emptyMessage, areaPending,
   locating, onLocate, onViewportChange, onCameraMove, onMapInteraction, onAreaBrowsed, onSearchArea, onSelect, onDismiss, onShowList }: {
-  mapRef: RefObject<NearbyFacilitiesMapHandle | null>;
+  mapRef?: RefObject<NearbyFacilitiesMapHandle | null>;
   initialRegion: Region;
   devicePoint?: Coordinates;
   placePin?: { point: Coordinates; name: string };
   items: NearbyFacility[];
   selectedId?: string;
   emptyMessage: string;
-  areaPending: boolean;
-  locating: boolean;
-  onLocate: () => void;
-  onViewportChange: (region: Region) => void;
-  onCameraMove: (region: Region) => void;
-  onMapInteraction: () => void;
-  onAreaBrowsed: () => void;
-  onSearchArea: () => void;
+  areaPending?: boolean;
+  locating?: boolean;
+  onLocate?: () => void;
+  onViewportChange?: (region: Region) => void;
+  onCameraMove?: (region: Region) => void;
+  onMapInteraction?: () => void;
+  onAreaBrowsed?: () => void;
+  onSearchArea?: () => void;
   onSelect: (item: NearbyFacility) => void;
   onDismiss: () => void;
-  onShowList: () => void;
+  onShowList?: () => void;
 }) {
   const { copy, locale } = useLanguage();
   const labels = copy.nearby;
@@ -57,7 +57,7 @@ export function NearbyFacilitiesMap({ mapRef, initialRegion, devicePoint, placeP
   const markers = useMemo(() => visibleFacilityMarkers(items, region, size, selectedId), [items, region, size, selectedId]);
   const hasClusters = markers.some((marker) => marker.kind === 'cluster');
   const hasVisibleSelection = markers.some((marker) => marker.kind === 'facility' && marker.item.id === selectedId);
-  const showSearchArea = areaPending && !isMoving;
+  const showSearchArea = onSearchArea && areaPending && !isMoving;
   const showPlace = placePin && !areaPending && !isMoving
     && Math.abs(placePin.point.latitude - region.latitude) <= region.latitudeDelta / 2
     && Math.abs(placePin.point.longitude - region.longitude) <= region.longitudeDelta / 2;
@@ -72,7 +72,7 @@ export function NearbyFacilitiesMap({ mapRef, initialRegion, devicePoint, placeP
     clearSettling();
     setIsMoving(false);
     motion.moveCamera(target, Date.now());
-    onCameraMove(target);
+    onCameraMove?.(target);
     setRegion(target);
     if (mapReady.current) nativeMap.current?.animateToRegion(target, 250);
     else pendingCamera.current = target;
@@ -105,13 +105,13 @@ export function NearbyFacilitiesMap({ mapRef, initialRegion, devicePoint, placeP
 
   function noteGesture() {
     if (!observing.current) return;
-    onMapInteraction();
+    onMapInteraction?.();
     motion.noteGesture(Date.now());
   }
 
   function noteTouchStart(event: GestureResponderEvent) {
     if (!observing.current) return;
-    onMapInteraction();
+    onMapInteraction?.();
     if (event.nativeEvent.touches.length >= 2) noteGesture();
   }
 
@@ -119,14 +119,14 @@ export function NearbyFacilitiesMap({ mapRef, initialRegion, devicePoint, placeP
     if (!observing.current) return;
     const change = motion.change(next, Date.now(), complete);
     if (!change) return;
-    onViewportChange(next);
+    onViewportChange?.(next);
     clearTimeout(settleTimer.current);
     if (complete) setRegion(next);
     else setIsMoving(true);
     settleTimer.current = setTimeout(() => {
       clearSettling();
       setIsMoving(false);
-      if (change.userMoved && observing.current) onAreaBrowsed();
+      if (change.userMoved && observing.current) onAreaBrowsed?.();
     }, complete ? 160 : 500);
   }
 
@@ -170,7 +170,7 @@ export function NearbyFacilitiesMap({ mapRef, initialRegion, devicePoint, placeP
                 <Marker key={marker.id} identifier={marker.id} coordinate={marker.coordinate} stopPropagation
                   accessibilityRole="button" accessibilityLabel={labels.facilityCluster(marker.count)}
                   onPress={() => {
-                    onMapInteraction();
+                    onMapInteraction?.();
                     moveTo(marker.zoomRegion);
                   }}>
                   <View style={styles.clusterPin}>
@@ -232,7 +232,7 @@ export function NearbyFacilitiesMap({ mapRef, initialRegion, devicePoint, placeP
               {showSearchArea && (
                 <Pressable accessibilityRole="button" accessibilityHint={labels.searchAreaHint} onPress={() => {
                   clearSettling();
-                  onSearchArea();
+                  onSearchArea?.();
                 }}
                   style={({ pressed }) => [styles.searchArea, pressed && styles.pressed]}>
                   <AppText variant="homeCardTitle" tone="onPrimary" style={styles.searchAreaText}>{labels.searchArea}</AppText>
@@ -252,11 +252,13 @@ export function NearbyFacilitiesMap({ mapRef, initialRegion, devicePoint, placeP
               )}
             </View>
           )}
-          <Pressable accessibilityRole="button" accessibilityLabel={locating ? copy.nearbyBus.locating : labels.useLocation}
-            accessibilityState={{ busy: locating, disabled: locating }} disabled={locating} onPress={onLocate}
-            style={({ pressed }) => [styles.locationAction, pressed && styles.pressed]}>
-            {locating ? <ActivityIndicator color={colors.primary} /> : <Icon name="location" size={22} />}
-          </Pressable>
+          {onLocate && (
+            <Pressable accessibilityRole="button" accessibilityLabel={locating ? copy.nearbyBus.locating : labels.useLocation}
+              accessibilityState={{ busy: locating, disabled: locating }} disabled={locating} onPress={onLocate}
+              style={({ pressed }) => [styles.locationAction, pressed && styles.pressed]}>
+              {locating ? <ActivityIndicator color={colors.primary} /> : <Icon name="location" size={22} />}
+            </Pressable>
+          )}
         </>
       ) : status === 'loading' ? (
         <View pointerEvents="none" style={styles.overlay}>
@@ -281,10 +283,12 @@ export function NearbyFacilitiesMap({ mapRef, initialRegion, devicePoint, placeP
               }} style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
                 <AppText variant="detail" tone="primary">{labels.retryMap}</AppText>
               </Pressable>
-              <Pressable accessibilityRole="button" onPress={onShowList}
-                style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
-                <AppText variant="detail" tone="primary">{labels.showList}</AppText>
-              </Pressable>
+              {onShowList && (
+                <Pressable accessibilityRole="button" onPress={onShowList}
+                  style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
+                  <AppText variant="detail" tone="primary">{labels.showList}</AppText>
+                </Pressable>
+              )}
             </View>
           </View>
         </View>

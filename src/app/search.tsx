@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Keyboard, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, Keyboard, Pressable, StyleSheet, TextInput, View, type FlatListProps } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBusCatalogue } from '@/bus-hooks';
@@ -10,6 +11,7 @@ import {
   globalSearchKinds, globalSearchMaxLength, loadGlobalBusStops, prepareGlobalSearchQuery, searchGlobal,
   type GlobalBusStopsState, type GlobalSearchCategory, type GlobalSearchGroup, type GlobalSearchKind, type GlobalSearchResult,
 } from '@/global-search';
+import { searchResultDestination } from '@/global-search-navigation';
 import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
 import { colors, radius, space, touchTarget, typography } from '@/theme';
@@ -22,11 +24,19 @@ type ListRow = {
 } | {
   type: 'result'; key: string; result: GlobalSearchResult; first: boolean; last: boolean;
 };
+type ListAnchor = { key: string; index: number };
 
 export default function SearchScreen() {
   const { copy } = useLanguage();
   const labels = copy.search;
+  const router = useRouter();
   const input = useRef<TextInput>(null);
+  const list = useRef<FlatList<ListRow>>(null);
+  const opening = useRef(false);
+  const visibleAnchor = useRef<ListAnchor>(undefined);
+  const latestRows = useRef<ListRow[]>([]);
+  const returnPosition = useRef<{ list: FlatList<ListRow> | null; offset: number; anchor?: ListAnchor }>(undefined);
+  const anchorFallback = useRef(0);
   const sequence = useRef(0);
   const scrollPositions = useRef<Partial<Record<GlobalSearchCategory, number>>>({});
   const [draft, setDraft] = useState({ text: '', id: 0 });
@@ -80,6 +90,36 @@ export default function SearchScreen() {
   const queryStatus = result?.queryStatus ?? prepared.status;
   const showEmpty = canSearch && queryStatus === 'ready' && !rows.length && !pendingSources;
 
+  useLayoutEffect(() => { latestRows.current = rows; }, [rows]);
+
+  useFocusEffect(useCallback(() => {
+    opening.current = false;
+    const position = returnPosition.current;
+    returnPosition.current = undefined;
+    const frame = position && requestAnimationFrame(() => {
+      const current = list.current;
+      if (!current || current !== position.list || opening.current) return;
+      const index = latestRows.current.findIndex(({ key }) => key === position.anchor?.key);
+      if (position.anchor && index >= 0 && index !== position.anchor.index) {
+        anchorFallback.current = position.offset;
+        current.scrollToIndex({ index, animated: false });
+      } else {
+        current.scrollToOffset({ offset: position.offset, animated: false });
+      }
+    });
+    return () => {
+      opening.current = true;
+      if (frame !== undefined) cancelAnimationFrame(frame);
+    };
+  }, []));
+
+  const onViewableItemsChanged: NonNullable<FlatListProps<ListRow>['onViewableItemsChanged']> = useCallback(
+    ({ viewableItems }) => {
+      const first = viewableItems[0];
+      visibleAnchor.current = typeof first?.index === 'number' ? { key: first.key, index: first.index } : undefined;
+    }, [],
+  );
+
   function edit(text: string) {
     scrollPositions.current = {};
     setDraft({ text, id: ++sequence.current });
@@ -91,6 +131,30 @@ export default function SearchScreen() {
     scrollPositions.current = { ...scrollPositions.current };
     Keyboard.dismiss();
     setCategory(next);
+  }
+
+  function openResult(result: GlobalSearchResult) {
+    if (opening.current) return;
+    const target = searchResultDestination(result);
+    if ('issue' in target) {
+      Alert.alert(labels[target.issue]);
+      return;
+    }
+
+    const anchor = visibleAnchor.current;
+    returnPosition.current = {
+      list: list.current, offset: scrollPositions.current[category] ?? 0,
+      anchor: anchor && rows[anchor.index]?.key === anchor.key ? anchor : undefined,
+    };
+    opening.current = true;
+    Keyboard.dismiss();
+    try {
+      router.push(target.href);
+    } catch {
+      opening.current = false;
+      returnPosition.current = undefined;
+      Alert.alert(labels.openFailed);
+    }
   }
 
   return (
@@ -119,9 +183,11 @@ export default function SearchScreen() {
           <AppText variant="detail" tone="primary" style={styles.buttonText}>{labels.backToAll}</AppText>
         </Pressable>
       )}
-      <FlatList<ListRow> key={`${draft.id}:${category}`} data={rows}
+      <FlatList<ListRow> ref={list} key={`${draft.id}:${category}`} data={rows}
         contentContainerStyle={styles.list} contentOffset={initialOffset}
         onScroll={({ nativeEvent }) => { offsets[category] = Math.max(0, nativeEvent.contentOffset.y); }}
+        onViewableItemsChanged={onViewableItemsChanged}
+        onScrollToIndexFailed={() => list.current?.scrollToOffset({ offset: anchorFallback.current, animated: false })}
         scrollEventThrottle={32} initialNumToRender={10} maxToRenderPerBatch={10}
         contentInsetAdjustmentBehavior="never" automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
@@ -150,7 +216,7 @@ export default function SearchScreen() {
         ) : null}
         keyExtractor={(row) => row.key}
         renderItem={({ item }) => item.type === 'result'
-          ? <GlobalSearchResultRow result={item.result} first={item.first} last={item.last} />
+          ? <GlobalSearchResultRow result={item.result} first={item.first} last={item.last} onPress={openResult} />
           : <GroupHeading kind={item.kind} labels={labels} onExpand={item.canExpand ? () => chooseCategory(item.kind) : undefined} />}
       />
     </SafeAreaView>

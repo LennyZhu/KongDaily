@@ -1,0 +1,53 @@
+import type { Href } from 'expo-router';
+
+import { busSources, normalizeBusQuery, type BusRoute } from '@/bus-routes';
+import { getExplorePlace } from '@/explore-places';
+import { resolveStableFacilityIdentity } from '@/facility-identity';
+import type { GlobalSearchResult } from '@/global-search';
+
+type SearchDestination = { href: Href } | { issue: 'resultUnavailable' | 'facilityUnavailable' | 'facilityNeedsReview' };
+
+function isCatalogueIdentity(route: BusRoute) {
+  const { id, number } = route;
+  if (typeof number !== 'string' || !number || number.includes(':') || normalizeBusQuery(number) !== number) return false;
+  switch (route.source) {
+    case 'kmbLwb': {
+      const bound = route.direction === 'outbound' ? 'O' : route.direction === 'inbound' ? 'I' : '';
+      return !!bound && typeof route.serviceType === 'string' && /^\d+$/.test(route.serviceType)
+        && id === `KMB-LWB:${number}:${bound}:${route.serviceType}`;
+    }
+    case 'citybus':
+      return route.direction === 'listed' && id === `CTB:${number}`;
+    case 'nlb':
+      return typeof route.routeId === 'string' && /^\d+$/.test(route.routeId) && id === `NLB:${route.routeId}`;
+  }
+}
+
+export function searchResultDestination(result: GlobalSearchResult): SearchDestination {
+  switch (result.kind) {
+    case 'bus_route':
+      if (isCatalogueIdentity(result.route)) {
+        return { href: { pathname: '/bus/route', params: { routeId: result.route.id } } };
+      }
+      break;
+    case 'bus_stop':
+      if (busSources.includes(result.source) && typeof result.stopId === 'string'
+        && result.stopId && result.stopId.trim() === result.stopId) {
+        return { href: { pathname: '/bus/nearby/stop', params: { source: result.source, stopId: result.stopId } } };
+      }
+      break;
+    case 'facility': {
+      const resolved = resolveStableFacilityIdentity(result.identity);
+      if (resolved.status === 'available') {
+        return { href: { pathname: '/search/facility-map', params: resolved.identity } };
+      }
+      return { issue: resolved.status === 'needs_review' ? 'facilityNeedsReview' : 'facilityUnavailable' };
+    }
+    case 'explore_place':
+      if (getExplorePlace(result.place.id)) {
+        return { href: { pathname: '/explore/place/[id]', params: { id: result.place.id } } };
+      }
+      break;
+  }
+  return { issue: 'resultUnavailable' };
+}

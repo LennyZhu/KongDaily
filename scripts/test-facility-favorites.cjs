@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict');
 const { execFileSync, spawnSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
-const { mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs');
+const { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs');
 const { createRequire } = require('node:module');
 const { tmpdir } = require('node:os');
 const { dirname, join, resolve } = require('node:path');
@@ -69,12 +69,14 @@ function loadApp(file, { failAfterV8 = false, changeCatalog, registry, beforeQue
   function load(name) {
     if (loaded.has(name)) return loaded.get(name).exports;
     const testExports = {
-      'app/(tabs)/nearby': 'FacilitySummary, FacilityListRow',
+      'app/(tabs)/nearby': 'FacilityListRow',
+      'components/facility-selection-card': 'FacilitySummary',
       'app/(tabs)/saved': 'SavedBuses, SavedFacilities',
       'app/bus/route': 'SelectedStopCard',
       'app/bus/eta': 'EtaDetails',
     }[name];
-    const filename = join(root, 'src', name + (testExports ? '.tsx' : '.ts'));
+    const tsPath = join(root, 'src', name + '.ts');
+    const filename = existsSync(tsPath) ? tsPath : tsPath + 'x';
     const module = { exports: {} };
     loaded.set(name, module);
     const source = readFileSync(filename, 'utf8') + (testExports ? `\nexport { ${testExports} };` : '');
@@ -398,7 +400,8 @@ async function testNearbyFavoriteButtons() {
   const sources = ['fehd', 'afcd', 'lcsd-parks', 'lcsd-pet-gardens', 'lcsd-inclusive-pet-parks'];
   const sampleFacilities = sources.map((source) => app.load('facilities').nearbyFacilities.find((f) => f.source === source));
   const [fehd, afcd] = sampleFacilities;
-  const { FacilitySummary, FacilityListRow } = app.load('app/(tabs)/nearby');
+  const { FacilitySummary } = app.load('components/facility-selection-card');
+  const { FacilityListRow } = app.load('app/(tabs)/nearby');
   const { loadFacilityFavorites } = app.load('facility-favorite-hooks');
   const { isFacilityFavorite } = app.load('facility-favorites');
   const { resolveFacilityIdentity } = app.load('facility-identity');
@@ -533,7 +536,7 @@ async function testNearbyFavoriteButtons() {
       facility.source === afcd.source && facility.officialId === afcd.officialId
         ? { ...facility, coordinate: { latitude: 0, longitude: 0 } } : facility) });
     await conflict.load('facility-favorite-hooks').loadFacilityFavorites();
-    const summary = conflict.load('app/(tabs)/nearby').FacilitySummary({ facility: afcd, distance: 0, onClose: closeOrExpand });
+    const summary = conflict.load('components/facility-selection-card').FacilitySummary({ facility: afcd, distance: 0, onClose: closeOrExpand });
     const component = elements(summary).find((node) => node.type.name === 'FacilityDetails');
     const invalid = component.type(component.props);
     assert.equal(bookmark(invalid).props.disabled, true);

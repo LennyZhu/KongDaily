@@ -1,7 +1,13 @@
 import type { Region } from 'react-native-maps';
 
+import type { Coordinates } from '@/nearby-bus-data';
+
 const gestureWindow = 1_800;
 const animationWindow = 900;
+
+export function regionAroundFacility(point: Coordinates): Region {
+  return { ...point, latitudeDelta: 0.022, longitudeDelta: 0.022 };
+}
 
 function centerShift(a: Region, b: Region) {
   const longitude = ((b.longitude - a.longitude + 540) % 360) - 180;

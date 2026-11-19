@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { routePlaceName } from '@/bus-routes';
 import { AppText, Icon, type IconName } from '@/components/ui';
@@ -55,7 +55,9 @@ function resultCopy(result: GlobalSearchResult, { copy, locale }: ReturnType<typ
   }
 }
 
-export function GlobalSearchResultRow({ result, first, last }: { result: GlobalSearchResult; first: boolean; last: boolean }) {
+export function GlobalSearchResultRow({ result, first, last, onPress }: {
+  result: GlobalSearchResult; first: boolean; last: boolean; onPress: (result: GlobalSearchResult) => void;
+}) {
   const language = useLanguage();
   const icon = result.kind === 'facility' ? facilityIcons[result.facility.category]
     : result.kind === 'explore_place' ? placeIcons[result.place.category] : searchGroupIcons[result.kind];
@@ -63,14 +65,17 @@ export function GlobalSearchResultRow({ result, first, last }: { result: GlobalS
   const subtitle = detail.filter(Boolean).join(' · ');
 
   return (
-    <View style={[styles.row, first && styles.first, last && styles.last]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={[title, subtitle, note].filter(Boolean).join(' · ')}
+      onPress={() => onPress(result)}
+      style={({ pressed }) => [styles.row, first && styles.first, last && styles.last, pressed && styles.pressed]}>
       <View style={styles.icon}><Icon name={icon} size={21} /></View>
       <View style={styles.text}>
         <AppText variant={result.kind === 'bus_route' ? 'homeHeading' : 'homeCardTitle'}>{title}</AppText>
         {!!subtitle && <AppText variant="detail" tone="muted">{subtitle}</AppText>}
         {!!note && <AppText variant="caption" tone="muted">{note}</AppText>}
       </View>
-    </View>
+      <Icon name="chevron.right" color={colors.muted} size={14} />
+    </Pressable>
   );
 }
 
@@ -83,6 +88,7 @@ const styles = StyleSheet.create({
   },
   first: { borderTopWidth: StyleSheet.hairlineWidth, borderTopLeftRadius: radius.card, borderTopRightRadius: radius.card },
   last: { borderBottomLeftRadius: radius.card, borderBottomRightRadius: radius.card },
+  pressed: { backgroundColor: colors.pressed },
   icon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radius.control, backgroundColor: colors.tint },
   text: { flex: 1, minWidth: 0, gap: space.xs },
 });
