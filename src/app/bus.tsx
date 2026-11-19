@@ -22,6 +22,7 @@ export default function BusScreen() {
   const input = useRef<TextInput>(null);
   const list = useRef<FlatList<BusRoute>>(null);
   const [query, setQuery] = useState(sessionQuery);
+  const [choosingMapRoute, setChoosingMapRoute] = useState(false);
   const { feeds, failed, loading, retry } = useBusCatalogue();
   const { history, loadingHistory, historyFailed, changeHistory } = useBusHistory();
 
@@ -82,6 +83,12 @@ export default function BusScreen() {
                 else router.replace('/');
               }}
             />
+            {choosingMapRoute && (
+              <View style={styles.notice}>
+                <AppText variant="detail" accessibilityLiveRegion="polite">{copy.busMap.chooseRoute}</AppText>
+                <BusAction label={bus.cancel} onPress={() => setChoosingMapRoute(false)} />
+              </View>
+            )}
             {loading && routes.length === 0 && (
               <View style={styles.loading} accessibilityRole="progressbar">
                 <ActivityIndicator color={colors.primary} />
@@ -127,8 +134,15 @@ export default function BusScreen() {
                 history={history}
                 historyLoading={loadingHistory}
                 routesById={routesById}
-                onFocus={() => input.current?.focus()}
+                onFocus={() => {
+                  setChoosingMapRoute(false);
+                  input.current?.focus();
+                }}
                 onNearby={() => router.push('/bus/nearby')}
+                onMap={() => {
+                  setChoosingMapRoute(true);
+                  input.current?.focus();
+                }}
                 onJumpToFavorites={(offset) => {
                   Keyboard.dismiss();
                   list.current?.scrollToOffset({ offset: Math.max(0, offset - space.sm), animated: true });

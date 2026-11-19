@@ -1,4 +1,5 @@
 import type { BusDirection, BusRoute, BusSource, RouteName } from '@/bus-routes';
+import { isNearHongKong, type Coordinates } from '@/nearby-bus-data';
 
 export type TravelDirection = Exclude<BusDirection, 'listed'>;
 export type StopNameSource = Exclude<BusSource, 'nlb'>;
@@ -7,8 +8,14 @@ export type RouteStopIdentity = { number: string } & (
   | { source: 'citybus'; direction: TravelDirection }
   | { source: 'nlb'; routeId: string }
 );
-export type RouteStop = { seq: number; id: string; name?: RouteName; someDeparturesOnly?: boolean };
-export type BusStop = { id: string; name: RouteName };
+export type RouteStop = {
+  seq: number;
+  id: string;
+  name?: RouteName;
+  someDeparturesOnly?: boolean;
+  coordinate?: Coordinates;
+};
+export type BusStop = { id: string; name: RouteName; coordinate?: Coordinates };
 export type RouteSequenceChoice = { identity: RouteStopIdentity; catalogueRoute?: BusRoute };
 
 export function routeOptionKey(route: BusRoute) {
@@ -61,6 +68,13 @@ function validStopId(source: StopNameSource, value: unknown): value is string {
   return typeof value === 'string' && (source === 'citybus' ? /^\d{6}$/ : /^[A-F0-9]{16}$/i).test(value);
 }
 
+function readStopCoordinate(latitude: unknown, longitude: unknown) {
+  const number = (value: unknown) => typeof value === 'number' || (typeof value === 'string' && value.trim())
+    ? Number(value) : NaN;
+  const point = { latitude: number(latitude), longitude: number(longitude) };
+  return isNearHongKong(point) ? point : undefined;
+}
+
 export function parseRouteStops(identity: RouteStopIdentity, payload: unknown): RouteStop[] {
   const envelope = record(payload);
   if (identity.source === 'nlb') {
@@ -73,6 +87,7 @@ export function parseRouteStops(identity: RouteStopIdentity, payload: unknown): 
       const rawId = row?.stopId;
       const id = typeof rawId === 'number' && Number.isSafeInteger(rawId) ? String(rawId) : rawId;
       if (!row || typeof id !== 'string' || !/^\d+$/.test(id)) throw new Error('Invalid NLB stop');
+      const coordinate = readStopCoordinate(row.latitude, row.longitude);
       return {
         seq: index + 1,
         id,
@@ -81,6 +96,7 @@ export function parseRouteStops(identity: RouteStopIdentity, payload: unknown): 
           en: typeof row.stopName_e === 'string' ? row.stopName_e.trim() : '',
         },
         someDeparturesOnly: row.someDepartureObserveOnly === 1,
+        ...(coordinate && { coordinate }),
       };
     });
   }
@@ -115,5 +131,6 @@ export function parseBusStop(source: StopNameSource, id: string, payload: unknow
   if (!validStopId(source, row?.stop) || row.stop !== id || !(zh || en)) {
     throw new Error('Invalid or missing stop details');
   }
-  return { id, name: { zh, en } };
+  const coordinate = readStopCoordinate(row.lat, row.long);
+  return { id, name: { zh, en }, ...(coordinate && { coordinate }) };
 }

@@ -1,8 +1,9 @@
 import { useFocusEffect } from 'expo-router';
-import { Component, useCallback, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useCallback, useImperativeHandle, useMemo, useRef, useState, type RefObject } from 'react';
 import { ActivityIndicator, AppState, Pressable, StyleSheet, View, type GestureResponderEvent } from 'react-native';
 import MapView, { Marker, type Region } from 'react-native-maps';
 
+import { MapBoundary } from '@/components/map-boundary';
 import { AppText, Icon, type IconName } from '@/components/ui';
 import { facilityText, hitsFacilityMarker, petFacilityType, visibleFacilityMarkers, type FacilityCategory, type NearbyFacility } from '@/facilities';
 import { useLanguage } from '@/language';
@@ -290,22 +291,6 @@ export function NearbyFacilitiesMap({ mapRef, initialRegion, devicePoint, placeP
       )}
     </View>
   );
-}
-
-class MapBoundary extends Component<{ children: ReactNode; onFailure: () => void }> {
-  state = { failed: false };
-
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-
-  componentDidCatch() {
-    this.props.onFailure();
-  }
-
-  render() {
-    return this.state.failed ? null : this.props.children;
-  }
 }
 
 const styles = StyleSheet.create({

@@ -5,9 +5,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { findBusRouteFamily } from '@/bus-data';
 import { useBusEta } from '@/bus-eta-hooks';
-import { describeEta, etaIsStale, readEtaTarget, type EtaTarget } from '@/bus-eta';
+import { describeEta, etaIsStale, readEtaTarget } from '@/bus-eta';
 import { useBusStopFavorite } from '@/bus-favorite-hooks';
-import { busStopEtaHref, type BusVisitSummary } from '@/bus-favorites';
+import { busStopEtaHref, describeBusVisit, type BusVisitSummary } from '@/bus-favorites';
+import { busRouteMapHref } from '@/bus-route-map';
 import { routePlaceName } from '@/bus-routes';
 import { useRouteSequences, useRouteStopNames, type SequenceState } from '@/bus-stop-hooks';
 import {
@@ -195,12 +196,7 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
   const showSaved = sequence && sequence.stops.length > 0 && (current.state?.fromCache || current.state?.error);
   const hasStops = (sequence?.stops.length ?? 0) > 0;
   const picked = current && sequence?.stops.find((stop) => stopVisitKey(current.identity, stop) === selectedVisit);
-  const etaTarget: EtaTarget | undefined = current && picked && sequence ? {
-    ...current.identity,
-    stopId: picked.id,
-    stopSeq: picked.seq,
-    repeatedStop: current.identity.source === 'nlb' && sequence.stops.some((stop) => stop.id === picked.id && stop.seq !== picked.seq),
-  } : undefined;
+  const mapRouteId = current?.catalogueRoute?.id ?? (current?.identity.source === 'citybus' ? base.id : undefined);
 
   function scrollToRecommendation() {
     const row = recommendedRow.current;
@@ -212,16 +208,13 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
   }
 
   let visit: BusVisitSummary | undefined;
-  if (etaTarget && current && picked && sequence) {
+  if (current && picked && sequence) {
     const station = picked.name ?? names[picked.id]?.snapshot?.stop.name;
     const last = sequence.stops.at(-1);
     const to = current.catalogueRoute?.destination ?? (last && names[last.id]?.snapshot?.stop.name);
-    visit = {
-      target: etaTarget,
-      station: { zh: station?.zh ?? '', en: station?.en ?? '' },
-      destination: { zh: to?.zh || nlbRoute?.routeName.zh || '', en: to?.en || nlbRoute?.routeName.en || '' },
-      destinationStopId: etaTarget.source === 'citybus' ? last?.id : undefined,
-    };
+    visit = describeBusVisit(current.identity, picked, sequence.stops, station, {
+      zh: to?.zh || nlbRoute?.routeName.zh || '', en: to?.en || nlbRoute?.routeName.en || '',
+    });
   }
 
   return (
@@ -313,9 +306,19 @@ function RouteDetails({ family, boarding }: { family: RouteFamily; boarding: Boa
 
         <View style={styles.section}>
           <View style={styles.listHeading}>
-            <AppText variant="homeHeading" accessibilityRole="header" style={styles.grow}>{detail.stops}</AppText>
-            {sequence && sequence.stops.length > 0 && (
-              <AppText variant="caption" tone="muted">{detail.stopCount(sequence.stops.length)}</AppText>
+            <View style={styles.listTitle}>
+              <AppText variant="homeHeading" accessibilityRole="header" style={styles.headingText}>{detail.stops}</AppText>
+              {sequence && sequence.stops.length > 0 && (
+                <AppText variant="caption" tone="muted" style={styles.headingText}>{detail.stopCount(sequence.stops.length)}</AppText>
+              )}
+            </View>
+            {hasStops && current && mapRouteId && (
+              <Pressable accessibilityRole="button" accessibilityLabel={copy.busMap.open}
+                onPress={() => router.push(busRouteMapHref(mapRouteId, current.identity, picked))}
+                style={({ pressed }) => [styles.routeMapAction, pressed && styles.pressed]}>
+                <Icon name="map" size={16} />
+                <AppText variant="detail" tone="primary" style={styles.headingText}>{copy.busMap.title}</AppText>
+              </Pressable>
             )}
           </View>
           {hasStops && (
@@ -565,7 +568,17 @@ const styles = StyleSheet.create({
   segment: { flex: 1, minWidth: 0 },
   center: { textAlign: 'center' },
   activeOption: { backgroundColor: colors.primary, borderColor: colors.primary },
-  listHeading: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  listHeading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm },
+  listTitle: {
+    flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', maxWidth: '100%',
+    columnGap: space.sm, rowGap: space.xs,
+  },
+  headingText: { flexShrink: 1 },
+  routeMapAction: {
+    marginStart: 'auto', minWidth: touchTarget, minHeight: touchTarget, maxWidth: '100%',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.xs,
+    paddingHorizontal: space.sm, paddingVertical: space.xs, borderRadius: radius.control, backgroundColor: colors.tint,
+  },
   stopHint: { flexDirection: 'row', alignItems: 'flex-start', gap: space.xs },
   locationHint: {
     minHeight: touchTarget, flexDirection: 'row', alignItems: 'center', gap: space.sm,

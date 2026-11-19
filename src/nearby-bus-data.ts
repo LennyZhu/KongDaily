@@ -1,7 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { requestBusJson } from '@/bus-data';
-import { busSources, type BusSource } from '@/bus-routes';
+import { busSources, type BusSource, type RouteName } from '@/bus-routes';
 import { getDatabase } from '@/database';
 
 export type Coordinates = { latitude: number; longitude: number };
@@ -158,13 +158,16 @@ export async function readNearbyBusStop(source: BusSource, stopId: string) {
   return db.getFirstAsync<StopRow>('SELECT * FROM nearby_bus_stops WHERE source = ? AND stop_id = ?', source, stopId);
 }
 
-export async function readBusStopCoordinates(source: BusSource, stopIds: string[]) {
+export async function readBusStopCoordinates(source: BusSource, stopIds: string[]): Promise<Map<string, Coordinates & { name: RouteName }>> {
+  if (!stopIds.length) return new Map();
   await prepareNearbyBusIndex();
   const db = await getDatabase();
-  const rows = await db.getAllAsync<Pick<StopRow, 'stop_id' | 'latitude' | 'longitude'>>(
-    `SELECT stop_id, latitude, longitude FROM nearby_bus_stops
+  const rows = await db.getAllAsync<Pick<StopRow, 'stop_id' | 'latitude' | 'longitude' | 'name_zh' | 'name_en'>>(
+    `SELECT stop_id, latitude, longitude, name_zh, name_en FROM nearby_bus_stops
      WHERE source = ? AND stop_id IN (SELECT value FROM json_each(?))`,
     source, JSON.stringify(stopIds),
   );
-  return new Map<string, Coordinates>(rows.map(({ stop_id, latitude, longitude }) => [stop_id, { latitude, longitude }]));
+  return new Map(rows.map(({ stop_id, latitude, longitude, name_zh, name_en }) => [
+    stop_id, { latitude, longitude, name: { zh: name_zh, en: name_en } },
+  ]));
 }

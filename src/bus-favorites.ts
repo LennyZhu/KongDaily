@@ -4,7 +4,7 @@ import { isBusFeedFresh, readBusFeeds } from '@/bus-data';
 import { readEtaTarget, type EtaTarget } from '@/bus-eta';
 import type { RouteName } from '@/bus-routes';
 import { isStopDataFresh, readRouteStops, routeStopMaxAge } from '@/bus-stop-data';
-import { routeStopKey, stopVisitKey } from '@/bus-stops';
+import { routeStopKey, stopVisitKey, type RouteStop, type RouteStopIdentity } from '@/bus-stops';
 import { getDatabase } from '@/database';
 
 export const homeBusLimit = 3;
@@ -81,6 +81,26 @@ export function busStopEtaHref(visit: BusVisitSummary) {
       destinationEn: visit.destination.en,
       ...(visit.destinationStopId && { destinationStopId: visit.destinationStopId }),
     },
+  };
+}
+
+export function describeBusVisit(
+  identity: RouteStopIdentity,
+  stop: RouteStop,
+  sequence: readonly RouteStop[],
+  station: BusVisitSummary['station'] | undefined,
+  destination: BusVisitSummary['destination'] | undefined,
+): BusVisitSummary {
+  return {
+    target: {
+      ...identity,
+      stopId: stop.id,
+      stopSeq: stop.seq,
+      repeatedStop: identity.source === 'nlb' && sequence.some((visit) => visit.id === stop.id && visit.seq !== stop.seq),
+    },
+    station: station ?? { zh: '', en: '' },
+    destination: destination ?? { zh: '', en: '' },
+    destinationStopId: identity.source === 'citybus' ? sequence.at(-1)?.id : undefined,
   };
 }
 

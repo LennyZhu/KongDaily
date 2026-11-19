@@ -79,7 +79,7 @@ const landingShortcuts = [
   { key: 'map', icon: 'map' },
 ] as const satisfies ReadonlyArray<{ key: keyof BusCopy['shortcuts']; icon: IconName }>;
 
-export function BusLanding({ copy, locale, history, historyLoading, routesById, onFocus, onNearby, onJumpToFavorites, onClear, onRecent }: {
+export function BusLanding({ copy, locale, history, historyLoading, routesById, onFocus, onNearby, onMap, onJumpToFavorites, onClear, onRecent }: {
   copy: BusCopy;
   locale: BusLocale;
   history: BusHistoryItem[];
@@ -87,6 +87,7 @@ export function BusLanding({ copy, locale, history, historyLoading, routesById, 
   routesById: Map<string, BusRoute>;
   onFocus: () => void;
   onNearby: () => void;
+  onMap: () => void;
   onJumpToFavorites: (offset: number) => void;
   onClear: () => void;
   onRecent: (entry: BusHistoryItem) => void;
@@ -106,19 +107,14 @@ export function BusLanding({ copy, locale, history, historyLoading, routesById, 
           <Icon name="magnifyingglass" size={23} />
           <AppText variant="caption" style={styles.centered}>{copy.shortcuts.search}</AppText>
         </Pressable>
-        {landingShortcuts.map(({ key, icon }) => key !== 'map' ? (
+        {landingShortcuts.map(({ key, icon }) => (
           <Pressable key={key} accessibilityRole="button"
-            onPress={key === 'nearby' ? onNearby : () => onJumpToFavorites(layoutOffsets.current.landing + layoutOffsets.current.favorites)}
+            onPress={key === 'map' ? onMap : key === 'nearby' ? onNearby
+              : () => onJumpToFavorites(layoutOffsets.current.landing + layoutOffsets.current.favorites)}
             style={({ pressed }) => [styles.shortcut, pressed && styles.pressed]}>
             <Icon name={icon} size={23} />
             <AppText variant="caption" style={styles.centered}>{copy.shortcuts[key]}</AppText>
           </Pressable>
-        ) : (
-          <View key={key} style={styles.shortcut}>
-            <Icon name={icon} size={23} />
-            <AppText variant="caption" style={styles.centered}>{copy.shortcuts[key]}</AppText>
-            <AppText variant="caption" tone="muted" style={styles.centered}>{copy.comingSoon}</AppText>
-          </View>
         ))}
       </View>
 
