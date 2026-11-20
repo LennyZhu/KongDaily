@@ -53,6 +53,12 @@
           "motionUsagePermission": false
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "46b3f4a1-36a6-4a62-aebf-2a65b795e9fd"
+      }
+    },
+    "owner": "homeypaw"
   }
 }
