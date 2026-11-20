@@ -1,5 +1,11 @@
 {
-  "reviewedOn": "2026-11-19",
+  "reviewedOn": "2026-11-20",
+  "publication": {
+    "effectiveOn": null,
+    "updatedOn": null,
+    "siteAndSupportPrivacy": { "zh-HK": null, "en": null },
+    "retentionDisclosure": { "zh-HK": null, "en": null }
+  },
   "identity": {
     "product": "KongDaily",
     "brand": "Lenny Studio",
@@ -11,6 +17,7 @@
     "zh-HK": {
       "reviewStatus": "審閱版",
       "reviewNotice": "此內容供審閱。正式政策仍待發佈。",
+      "draftReviewDate": "審閱日期",
       "reviewDate": "更新日期",
       "effectiveDate": "生效日期",
       "skipToContent": "跳至正文",
@@ -46,7 +53,7 @@
             "id": "local-data",
             "title": "本機儲存與搜尋",
             "paragraphs": [
-              "App 在裝置上保存巴士與設施收藏、首頁置頂、語言偏好、最多八筆巴士最近搜尋，以及官方巴士及天氣資料的快取。首頁全域搜尋在裝置上比對字詞；需要更新巴士路線目錄時，目錄請求不包含搜尋字詞。",
+              "App 在裝置的 SQLite 資料庫保存巴士與設施收藏、首頁置頂、語言偏好、最多八筆巴士最近搜尋，以及官方巴士及天氣資料的快取。首頁全域搜尋在裝置上比對字詞；需要更新巴士路線目錄時，目錄請求不包含搜尋字詞。",
               "目前位置與附近搜尋結果可暫存在 App 記憶體。若你啟用了 iOS 備份，App 的本機資料可能隨裝置備份及還原。"
             ]
           },
@@ -55,11 +62,13 @@
             "title": "線上查詢與外部服務",
             "paragraphs": [
               "App 向九巴／龍運、城巴及嶼巴的官方服務查詢路線、站點及到站時間，按需要傳送公開路線或站點編號等查詢欄位。天氣查詢向香港天文台傳送資料類型和語言。",
-              "在「附近」搜尋地點時，符合條件的文字會自動送往地政總署地點搜尋服務，可能包括你輸入的地址。這些查詢沒有附送裝置 GPS。連線接收端可見 IP 等網絡資訊。本說明未確認地政總署查詢日誌的保留期限。",
-              "App 內地圖由 Apple MapKit 提供。地圖套件的精確位置收集聲明仍待正式 App 歸檔核對。你選擇開啟 Apple 地圖或 Google Maps 導航時，App 會交付選定目的地和步行模式。外部地圖或網站依其政策及權限處理位置及連線資料。"
+              "在「附近」搜尋地點時，符合條件的文字會自動透過 HTTPS 送往地政總署地點搜尋服務，可能包括你輸入的地址。App 不會在該請求附送裝置 GPS 座標。服務端可接收 IP 位址等連線資訊，並可能按其適用政策處理查詢及連線資料。地政總署公開的 API 文件沒有說明查詢是否記入日誌或日誌會保留多久。",
+              "App 內地圖由 Apple MapKit 提供。Apple 的定位和地圖服務可依你的設定及其私隱政策處理位置及連線資料。你選擇開啟 Apple 地圖或 Google Maps 導航時，App 會交付選定目的地和步行模式。外部地圖或網站依其政策及權限處理資料。",
+              "如你主動發送支援或私隱查詢電郵，營運者會透過郵件服務收到你的電郵地址、來信內容及你附上的檔案，以處理和回覆查詢。"
             ],
             "links": [
               { "label": "地政總署地點搜尋服務", "url": "https://data.gov.hk/tc-data/dataset/hk-landsd-openmap-development-location-search-api" },
+              { "label": "地政總署收集個人資料聲明及聯絡方式", "url": "https://www.landsd.gov.hk/tc/about-us/contact-us/collection-statement.html" },
               { "label": "Google 私隱權政策", "url": "https://policies.google.com/privacy?hl=zh-HK" }
             ]
           },
@@ -100,6 +109,7 @@
     "en": {
       "reviewStatus": "Review draft",
       "reviewNotice": "For review. The official policy has yet to be published.",
+      "draftReviewDate": "Review date",
       "reviewDate": "Last updated",
       "effectiveDate": "Effective date",
       "skipToContent": "Skip to main content",
@@ -135,7 +145,7 @@
             "id": "local-data",
             "title": "Local storage and search",
             "paragraphs": [
-              "The app stores bus and facility bookmarks, pinned stops, your language preference, up to eight recent bus searches, and cached public bus and weather data on your device. Global Search matches text on your device. If the bus route catalogue needs to be updated, the catalogue request does not include your search text.",
+              "The app uses an on-device SQLite database for bus and facility bookmarks, pinned stops, your language preference, up to eight recent bus searches, and cached public bus and weather data. Global Search matches text on your device. If the bus route catalogue needs to be updated, the catalogue request does not include your search text.",
               "Your current location and Nearby results may be kept temporarily in app memory. If you use iOS backups, local app data may be included in a device backup and restored later."
             ]
           },
@@ -144,11 +154,13 @@
             "title": "Online requests and external services",
             "paragraphs": [
               "The app requests route, stop and arrival information from official KMB and Long Win, Citybus and New Lantao Bus services. Requests can include public route or stop identifiers. Hong Kong Observatory weather requests include the data type and language.",
-              "In Nearby place search, eligible text is sent automatically to the Lands Department’s Location Search API. This may include an address you type. These requests do not include your device’s GPS position. Services can see connection information such as IP addresses. This notice does not confirm how long the Lands Department keeps query logs.",
-              "Apple MapKit supplies the maps in the app. The map SDK’s precise location collection declaration still needs to be checked against the final app archive. If you open directions in Apple Maps or Google Maps, the app passes the chosen destination and walking mode. External map services and websites handle location and connection data under their own policies and permissions."
+              "In Nearby place search, eligible text is sent automatically over HTTPS to the Lands Department’s Location Search API. This may include an address you type. The app does not attach your device’s GPS coordinates to this request. The service can receive connection information such as an IP address and may handle the query and connection data under its applicable policies. The published API documentation does not say whether queries are logged or how long any logs are kept.",
+              "Apple MapKit supplies the maps in the app. Apple’s Location Services and Apple Maps may process location and connection data according to your settings and Apple’s privacy policies. If you open directions in Apple Maps or Google Maps, the app passes the chosen destination and walking mode. External map services and websites handle data under their own policies and permissions.",
+              "If you choose to send a support or privacy email, the operator receives your email address, message and any attachments through the mail service to handle and respond to your request."
             ],
             "links": [
               { "label": "Lands Department Location Search API", "url": "https://data.gov.hk/en-data/dataset/hk-landsd-openmap-development-location-search-api" },
+              { "label": "Lands Department Personal Information Collection Statement and contact", "url": "https://www.landsd.gov.hk/en/about-us/contact-us/collection-statement.html" },
               { "label": "Google Privacy Policy", "url": "https://policies.google.com/privacy?hl=en" }
             ]
           },

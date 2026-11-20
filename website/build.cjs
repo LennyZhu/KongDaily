@@ -2,6 +2,7 @@ const { copyFileSync, mkdirSync, writeFileSync } = require('node:fs');
 const { join, posix } = require('node:path');
 
 const content = require('../content/compliance-policy');
+const { provided, publicationIssues, getPolicyPublication, getPrivacyDocument } = content;
 const releaseInputs = require('./release.json');
 
 const pages = ['home', 'privacy', 'support'];
@@ -10,11 +11,6 @@ const requiredSections = {
   privacy: ['scope', 'location', 'local-data', 'online-services', 'retention', 'security', 'rights'],
   support: ['bus', 'weather', 'location', 'offline', 'saved', 'contact'],
 };
-
-function provided(value) {
-  return typeof value === 'string' && Boolean(value.trim())
-    && !/\b(TBD|TODO|TBC|placeholder)\b|待確認|待填|\{operatorName\}/i.test(value);
-}
 
 function publicHost(hostname) {
   const host = hostname.replace(/\.$/, '');
@@ -35,12 +31,6 @@ function httpsOrigin(value) {
 function email(value) {
   if (!provided(value) || !/^[a-z0-9.!_+%-]+@[a-z0-9.-]+$/i.test(value)) return false;
   return publicHost(value.split('@')[1]);
-}
-
-function calendarDate(value) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const date = new Date(value);
-  return !Number.isNaN(date.valueOf()) && date.toISOString().startsWith(value);
 }
 
 function legalOperator(value) {
@@ -67,22 +57,19 @@ function releaseIssues(input, copy = content) {
   if (!email(identity?.contactEmail)) issues.push('identity.contactEmail must be the verified privacy and support mailbox');
   if (input.origin != null && !httpsOrigin(input.origin)) issues.push('origin must be a public HTTPS origin or null before the first deployment');
   if (!provided(input.operatorVerificationReference)) issues.push('operatorVerificationReference must record verification of the legal name');
-  if (!calendarDate(input.effectiveOn)) issues.push('effectiveOn must be an approved calendar date');
-  if (!calendarDate(input.updatedOn)) issues.push('updatedOn must be an approved calendar date');
+  issues.push(...publicationIssues(copy.publication));
   for (const locale of locales) {
     const labels = copy.locales?.[locale];
     if (!completeDocument(labels?.privacy, requiredSections.privacy, 'rights')) issues.push(`privacy.${locale} must contain the complete policy and contact section`);
     if (!completeDocument(labels?.support, requiredSections.support, 'contact')) issues.push(`support.${locale} must contain the complete FAQ and contact section`);
-    if (!provided(input.siteAndSupportPrivacy?.[locale])) issues.push(`siteAndSupportPrivacy.${locale} requires approved hosting and support data handling copy`);
-    if (!provided(input.retentionDisclosure?.[locale])) issues.push(`retentionDisclosure.${locale} requires the approved retention and deletion disclosure`);
   }
   if (!provided(input.approvalReference)) issues.push('approvalReference must record human approval of both languages, contacts and provider evidence');
   if (!provided(input.assetRightsApprovalReference)) issues.push('assetRightsApprovalReference must record an independent clearance decision for distribution and required asset rights');
   return issues;
 }
 
-function requireReleaseInputs(input) {
-  const issues = releaseIssues(input);
+function requireReleaseInputs(input, policy) {
+  const issues = releaseIssues(input, policy);
   if (issues.length) throw new Error('Publication blocked:\n- ' + issues.join('\n- '));
 }
 
@@ -93,19 +80,20 @@ function directory(locale, page) {
   return posix.join(locale === 'en' ? 'en' : '.', page === 'home' ? '.' : page);
 }
 
-function renderPage(locale, page, release) {
+function renderPage(locale, page, release, publication) {
   const labels = content.locales[locale];
   const { brand, product, operatorName, contactEmail } = content.identity;
   const brandName = `${product} by ${brand}`;
-  const document = labels[page];
+  const document = page === 'privacy' ? getPrivacyDocument(locale, publication) : labels[page];
   const here = directory(locale, page);
   const href = (targetLocale, targetPage) => (posix.relative(here, directory(targetLocale, targetPage)) || '.') + '/';
   const alternate = locale === 'en' ? 'zh-HK' : 'en';
   const languageName = alternate === 'en' ? 'English' : '繁體中文';
   const stylesheet = posix.relative(here, 'site.css');
   const canonical = release?.origin ? new URL(here === '.' ? '/' : here + '/', release.origin).href : '';
-  const date = release?.updatedOn ?? content.reviewedOn;
-  const updated = `<p class="date">${labels.reviewDate} · <time datetime="${date}">${date}</time></p>`;
+  const date = publication?.updatedOn ?? content.reviewedOn;
+  const dateLabel = release ? labels.reviewDate : labels.draftReviewDate;
+  const updated = `<p class="date">${dateLabel} · <time datetime="${date}">${date}</time></p>`;
   const review = release ? '' : `<aside class="review"><strong>${labels.reviewStatus}</strong><p>${escape(labels.reviewNotice)}</p></aside>`;
   const sections = (document.sections ?? []).map(({ id, title, paragraphs, links }) => `<section aria-labelledby="${id}">
       <h2 id="${id}">${escape(title)}</h2>
@@ -116,9 +104,7 @@ function renderPage(locale, page, release) {
   const operator = release ? `<section class="operator">
       <h2>${locale === 'en' ? 'Legal operator' : '法定營運者'}</h2>
       <p>${escape(operatorName)}</p>
-      ${page === 'privacy' ? `<p>${labels.effectiveDate} · <time datetime="${release.effectiveOn}">${release.effectiveOn}</time></p>
-      <p>${escape(release.siteAndSupportPrivacy[locale])}</p>
-      <p>${escape(release.retentionDisclosure[locale])}</p>` : ''}
+      ${page === 'privacy' ? `<p>${labels.effectiveDate} · <time datetime="${publication.effectiveOn}">${publication.effectiveOn}</time></p>` : ''}
     </section>` : '';
 
   return `<!doctype html>
@@ -163,21 +149,23 @@ function renderPage(locale, page, release) {
 `;
 }
 
-function buildSite(output, release) {
-  if (release !== undefined) requireReleaseInputs(release);
+function buildSite(output, release, policy = content) {
+  if (release !== undefined) requireReleaseInputs(release, policy);
+  const publication = release ? getPolicyPublication(policy.publication) : null;
   for (const locale of locales) {
     for (const page of pages) {
       const folder = join(output, directory(locale, page));
       mkdirSync(folder, { recursive: true });
-      writeFileSync(join(folder, 'index.html'), renderPage(locale, page, release));
+      writeFileSync(join(folder, 'index.html'), renderPage(locale, page, release, publication));
     }
   }
   copyFileSync(join(__dirname, 'site.css'), join(output, 'site.css'));
 }
 
-async function verifyPublishedWebsite(release, fetchPage = fetch) {
+async function verifyPublishedWebsite(release, fetchPage = fetch, policy = content) {
   if (!httpsOrigin(release?.origin)) throw new Error('Live verification requires the actual deployed HTTPS origin.');
-  requireReleaseInputs(release);
+  requireReleaseInputs(release, policy);
+  const publication = getPolicyPublication(policy.publication);
   const verified = [];
   for (const locale of locales) {
     for (const page of ['privacy', 'support']) {
@@ -188,7 +176,8 @@ async function verifyPublishedWebsite(release, fetchPage = fetch) {
       }
       const html = await response.text();
       // The first deployment can precede any assigned origin and omit canonical tags.
-      if (html !== renderPage(locale, page, release) && html !== renderPage(locale, page, { ...release, origin: null })) {
+      if (html !== renderPage(locale, page, release, publication)
+        && html !== renderPage(locale, page, { ...release, origin: null }, publication)) {
         throw new Error(`Live verification failed for ${url}: HTML differs from the approved release.`);
       }
       verified.push(url);

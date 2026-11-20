@@ -4,5 +4,5 @@ import { useLanguage } from '@/language';
 
 export default function SupportScreen() {
   const { locale } = useLanguage();
-  return <ComplianceDocumentScreen {...complianceDocuments[locale].support} review />;
+  return <ComplianceDocumentScreen {...complianceDocuments[locale].support} policy="support" />;
 }

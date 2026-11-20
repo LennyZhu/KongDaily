@@ -21,12 +21,20 @@ export type ComplianceDocument = Readonly<{
 export const complianceDocuments: Readonly<Record<ComplianceLocale, {
   reviewStatus: string;
   reviewNotice: string;
+  draftReviewDate: string;
   reviewDate: string;
+  effectiveDate: string;
   privacy: ComplianceDocument;
   support: ComplianceDocument;
 }>> = content.locales;
 
 export const complianceReviewedOn = content.reviewedOn;
+export const compliancePublication = content.getPolicyPublication();
+
+export function getCompliancePrivacy(locale: ComplianceLocale): ComplianceDocument {
+  return content.getPrivacyDocument(locale, compliancePublication);
+}
+
 export const complianceContact: ComplianceLink = {
   label: content.identity.contactEmail,
   url: `mailto:${content.identity.contactEmail}`,

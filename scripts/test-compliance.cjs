@@ -117,6 +117,10 @@ async function checkApp() {
           assert.ok(view.some(({ props }) => typeof props.children === 'string' && props.children.includes(operatorSentences[locale])));
         }
         assert.ok(view.some(({ props }) => props.children === content.locales[locale].reviewStatus));
+        assert.ok(view.some(({ props }) => Array.isArray(props.children)
+          && props.children.includes(content.locales[locale].draftReviewDate) && props.children.includes(content.reviewedOn)));
+        assert.ok(!view.some(({ props }) => Array.isArray(props.children)
+          && props.children.includes(content.locales[locale].effectiveDate)));
         const contacts = view.filter(({ props }) => props.accessibilityRole === 'link'
           && elements(props.children).some((node) => node.props.children === confirmedEmail));
         assert.equal(contacts.length, 1);
@@ -223,28 +227,43 @@ async function checkWebsite() {
     }
     assert.match(readFileSync(join(review, 'site.css'), 'utf8'), /flex-wrap: wrap/);
     assert.doesNotMatch(readFileSync(join(review, 'site.css'), 'utf8'), /@import|url\(/);
-    assert.ok(releaseIssues({ origin: 'http://localhost:4173', effectiveOn: '2026-02-30' }).length >= 2);
+    assert.ok(releaseIssues({ origin: 'http://localhost:4173' }).some((issue) => issue.startsWith('origin')));
 
     // Synthetic values exercise rendering only in this temporary directory. No requests are made.
     const fixture = {
       origin: null,
       operatorVerificationReference: 'Verified spelling fixture',
-      effectiveOn: '2026-11-19', updatedOn: '2026-11-19',
-      siteAndSupportPrivacy: { 'zh-HK': '測試網站與支援文字', en: 'Site & support fixture' },
-      retentionDisclosure: { 'zh-HK': '測試保留文字', en: 'Retention fixture' },
       approvalReference: 'Test fixture only',
       assetRightsApprovalReference: 'Asset clearance fixture',
     };
-    assert.deepEqual(releaseIssues(fixture), []);
+    const publication = {
+      effectiveOn: '2026-11-21', updatedOn: '2026-11-22',
+      siteAndSupportPrivacy: { 'zh-HK': '測試網站與支援文字', en: 'Site & support fixture' },
+      retentionDisclosure: { 'zh-HK': '測試保留文字', en: 'Retention fixture' },
+    };
+    const approvedCopy = { ...content, publication };
+    assert.deepEqual(releaseIssues(fixture, approvedCopy), []);
     for (const { field, changes } of [
       { field: 'operatorVerificationReference', changes: { operatorVerificationReference: null } },
       { field: 'origin', changes: { origin: 'https://example.com.' } },
-      { field: 'retentionDisclosure.en', changes: { retentionDisclosure: { ...fixture.retentionDisclosure, en: null } } },
+      { field: 'approvalReference', changes: { approvalReference: null } },
       { field: 'assetRightsApprovalReference', changes: { assetRightsApprovalReference: null } },
     ]) {
       const invalid = { ...fixture, ...changes };
-      assert.ok(releaseIssues(invalid).some((issue) => issue.startsWith(field)), field);
-      assert.throws(() => buildSite(blocked, invalid), /Publication blocked/);
+      assert.ok(releaseIssues(invalid, approvedCopy).some((issue) => issue.startsWith(field)), field);
+      assert.throws(() => buildSite(blocked, invalid, approvedCopy), /Publication blocked/);
+      assert.equal(existsSync(blocked), false);
+    }
+    for (const { field, changes } of [
+      { field: 'effectiveOn', changes: { effectiveOn: '2026-02-30' } },
+      { field: 'updatedOn', changes: { updatedOn: '2026-11-20' } },
+      { field: 'siteAndSupportPrivacy.zh-HK', changes: { siteAndSupportPrivacy: { ...publication.siteAndSupportPrivacy, 'zh-HK': '待確認' } } },
+      { field: 'retentionDisclosure.en', changes: { retentionDisclosure: { ...publication.retentionDisclosure, en: null } } },
+    ]) {
+      const invalid = { ...content, publication: { ...publication, ...changes } };
+      assert.equal(content.getPolicyPublication(invalid.publication), null);
+      assert.ok(releaseIssues(fixture, invalid).some((issue) => issue.startsWith(field)), field);
+      assert.throws(() => buildSite(blocked, fixture, invalid), /Publication blocked/);
       assert.equal(existsSync(blocked), false);
     }
     for (const changes of [
@@ -255,13 +274,13 @@ async function checkWebsite() {
       { operatorName: null },
       { operatorName: ' Lenny   Studio ' },
     ]) {
-      assert.equal(releaseIssues(fixture, { ...content, identity: { ...content.identity, ...changes } }).length, 1);
+      assert.equal(releaseIssues(fixture, { ...approvedCopy, identity: { ...content.identity, ...changes } }).length, 1);
     }
-    const incomplete = structuredClone(content);
+    const incomplete = { ...approvedCopy, locales: structuredClone(content.locales) };
     incomplete.locales.en.privacy.sections.pop();
     assert.ok(releaseIssues(fixture, incomplete).some((issue) => issue.startsWith('privacy.en')));
     const release = join(temporary, 'release');
-    buildSite(release, fixture);
+    buildSite(release, fixture, approvedCopy);
     const releasedPrivacy = readFileSync(join(release, 'en/privacy/index.html'), 'utf8');
     assert.doesNotMatch(releasedPrivacy, /noindex|Review draft|Test fixture only|rel="canonical"|\{operatorName\}/);
     assert.ok(releasedPrivacy.includes(operatorSentences.en));
@@ -269,9 +288,33 @@ async function checkWebsite() {
     assert.match(releasedPrivacy, /Site &amp; support fixture/);
     assert.match(releasedPrivacy, /Retention fixture/);
     assert.doesNotMatch(releasedPrivacy, /Asset clearance fixture|Verified spelling fixture/);
+    // Reload the App screens with the same isolated approved policy used for static output.
+    stubs['../content/compliance-policy'] = { ...approvedCopy, getPolicyPublication: () => content.getPolicyPublication(publication) };
+    try {
+      cache.clear();
+      for (locale of ['zh-HK', 'en']) {
+        const indexPath = locale === 'en' ? 'en/privacy/index.html' : 'privacy/index.html';
+        const html = readFileSync(join(release, indexPath), 'utf8');
+        const doc = load(join(src, 'app/settings/privacy')).default();
+        const view = elements(doc.type(doc.props));
+        assert.ok(!view.some(({ props }) => props.children === content.locales[locale].reviewStatus));
+        for (const [label, date] of [[content.locales[locale].effectiveDate, publication.effectiveOn],
+          [content.locales[locale].reviewDate, publication.updatedOn]]) {
+          assert.ok(view.some(({ props }) => Array.isArray(props.children)
+            && props.children.includes(label) && props.children.includes(date)));
+          assert.ok(html.includes(`${label} · <time datetime="${date}">${date}</time>`));
+        }
+        for (const { paragraphs } of doc.props.sections) {
+          for (const paragraph of paragraphs) assert.ok(html.includes(`<p>${escape(paragraph)}</p>`));
+        }
+      }
+    } finally {
+      delete stubs['../content/compliance-policy'];
+      cache.clear();
+    }
     const live = { ...fixture, origin: 'https://release-fixture.iana.org' };
     const canonicalOutput = join(temporary, 'canonical');
-    buildSite(canonicalOutput, live);
+    buildSite(canonicalOutput, live, approvedCopy);
     const routes = ['privacy/', 'support/', 'en/privacy/', 'en/support/'];
     for (const route of routes) {
       const html = readFileSync(join(release, route, 'index.html'), 'utf8');
@@ -288,10 +331,10 @@ async function checkWebsite() {
         { headers: { 'content-type': 'text/html; charset=utf-8' } });
     };
     await assert.rejects(verifyPublishedWebsite(fixture, () => assert.fail('No request without an origin')), /actual deployed HTTPS origin/);
-    assert.deepEqual(await verifyPublishedWebsite(live, readResponse(release)), expected);
-    assert.deepEqual(await verifyPublishedWebsite(live, readResponse(canonicalOutput)), expected);
-    await assert.rejects(verifyPublishedWebsite(live, async () => new Response(null, { status: 302 })), /public HTTP 200 HTML/);
-    await assert.rejects(verifyPublishedWebsite(live, readResponse(review)), /differs from the approved release/);
+    assert.deepEqual(await verifyPublishedWebsite(live, readResponse(release), approvedCopy), expected);
+    assert.deepEqual(await verifyPublishedWebsite(live, readResponse(canonicalOutput), approvedCopy), expected);
+    await assert.rejects(verifyPublishedWebsite(live, async () => new Response(null, { status: 302 }), approvedCopy), /public HTTP 200 HTML/);
+    await assert.rejects(verifyPublishedWebsite(live, readResponse(review), approvedCopy), /differs from the approved release/);
   } finally {
     rmSync(temporary, { recursive: true, force: true });
   }

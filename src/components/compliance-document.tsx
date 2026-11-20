@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Icon, PageHeading, Screen } from '@/components/ui';
-import { complianceContact, complianceDocuments, complianceReviewedOn, type ComplianceSection } from '@/compliance-content';
+import { complianceContact, complianceDocuments, compliancePublication, complianceReviewedOn, type ComplianceSection } from '@/compliance-content';
 import { useLanguage } from '@/language';
 import { colors, radius, space, touchTarget } from '@/theme';
 
@@ -10,11 +10,11 @@ type ComplianceDocumentProps = {
   title: string;
   intro?: string;
   sections: readonly ComplianceSection[];
-  review?: boolean;
+  policy?: 'privacy' | 'support';
   contactSection?: string;
 };
 
-export function ComplianceDocumentScreen({ title, intro, sections, review, contactSection }: ComplianceDocumentProps) {
+export function ComplianceDocumentScreen({ title, intro, sections, policy, contactSection }: ComplianceDocumentProps) {
   const { copy: { compliance }, locale } = useLanguage();
   const labels = complianceDocuments[locale];
   const opening = useRef(false);
@@ -35,13 +35,20 @@ export function ComplianceDocumentScreen({ title, intro, sections, review, conta
     <Screen hasHeader>
       <View style={styles.heading}>
         <PageHeading title={title} description={intro} />
-        {review && (
+        {policy && (compliancePublication ? (
+          <View>
+            <AppText variant="detail" tone="muted">{labels.reviewDate} · {compliancePublication.updatedOn}</AppText>
+            {policy === 'privacy' && (
+              <AppText variant="detail" tone="muted">{labels.effectiveDate} · {compliancePublication.effectiveOn}</AppText>
+            )}
+          </View>
+        ) : (
           <View style={styles.review}>
             <AppText variant="title" accessibilityRole="header">{labels.reviewStatus}</AppText>
             <AppText variant="detail">{labels.reviewNotice}</AppText>
-            <AppText variant="detail" tone="muted">{labels.reviewDate} · {complianceReviewedOn}</AppText>
+            <AppText variant="detail" tone="muted">{labels.draftReviewDate} · {complianceReviewedOn}</AppText>
           </View>
-        )}
+        ))}
       </View>
       {sections.map(({ id, title: sectionTitle, paragraphs, links }) => (
         <View key={id} style={styles.section}>
