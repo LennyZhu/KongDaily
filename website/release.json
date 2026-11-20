@@ -1,5 +1,6 @@
 {
   "origin": null,
+  "firstPublicDeploymentAt": null,
   "operatorVerificationReference": "Developer confirmation in REL-01C1B1, 2026-11-19 HKT: use the exact policy name Lenny for the individual developer.",
   "approvalReference": null,
   "assetRightsApprovalReference": null

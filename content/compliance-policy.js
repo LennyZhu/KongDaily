@@ -1,5 +1,6 @@
 const copy = require('./compliance.json');
 
+/** @param {unknown} value @returns {value is string} */
 function provided(value) {
   return typeof value === 'string' && Boolean(value.trim())
     && !/\b(TBD|TODO|TBC|placeholder)\b|待確認|待填|\{operatorName\}/i.test(value);
@@ -13,6 +14,7 @@ function calendarDate(value) {
 
 function publicationIssues(publication) {
   const issues = [];
+  if (!/^\d+\.\d+(?:\.\d+)?$/.test(publication?.version ?? '')) issues.push('version must identify the approved shared policy');
   const hasEffectiveDate = calendarDate(publication?.effectiveOn);
   const hasUpdateDate = calendarDate(publication?.updatedOn);
   if (!hasEffectiveDate) issues.push('effectiveOn must be an approved calendar date');
@@ -27,7 +29,7 @@ function publicationIssues(publication) {
   return issues;
 }
 
-/** @typedef {{effectiveOn: string, updatedOn: string, siteAndSupportPrivacy: Record<'zh-HK'|'en', string>, retentionDisclosure: Record<'zh-HK'|'en', string>}} PolicyPublication */
+/** @typedef {{version: string, effectiveOn: string, updatedOn: string, siteAndSupportPrivacy: Record<'zh-HK'|'en', string>, retentionDisclosure: Record<'zh-HK'|'en', string>}} PolicyPublication */
 
 /** @returns {PolicyPublication | null} */
 function getPolicyPublication(publication = copy.publication) {
@@ -39,17 +41,15 @@ function getPolicyPublication(publication = copy.publication) {
  * @param {PolicyPublication | null} publication */
 function getPrivacyDocument(locale, publication) {
   const { privacy } = locales[locale];
-  if (!publication) return privacy;
+  const disclosures = publication ?? copy.publication;
   return {
     ...privacy,
     sections: privacy.sections.map((section) => {
-      if (section.id === 'online-services') {
-        return { ...section, paragraphs: [...section.paragraphs, publication.siteAndSupportPrivacy[locale]] };
-      }
-      if (section.id === 'retention') {
-        return { ...section, paragraphs: [...section.paragraphs, publication.retentionDisclosure[locale]] };
-      }
-      return section;
+      const paragraph = {
+        'online-services': disclosures.siteAndSupportPrivacy[locale],
+        retention: disclosures.retentionDisclosure[locale],
+      }[section.id];
+      return provided(paragraph) ? { ...section, paragraphs: [...section.paragraphs, paragraph] } : section;
     }),
   };
 }

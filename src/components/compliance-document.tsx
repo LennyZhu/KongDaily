@@ -39,7 +39,10 @@ export function ComplianceDocumentScreen({ title, intro, sections, policy, conta
           <View>
             <AppText variant="detail" tone="muted">{labels.reviewDate} · {compliancePublication.updatedOn}</AppText>
             {policy === 'privacy' && (
-              <AppText variant="detail" tone="muted">{labels.effectiveDate} · {compliancePublication.effectiveOn}</AppText>
+              <>
+                <AppText variant="detail" tone="muted">{labels.effectiveDate} · {compliancePublication.effectiveOn}</AppText>
+                <AppText variant="detail" tone="muted">{labels.policyVersion} · {compliancePublication.version}</AppText>
+              </>
             )}
           </View>
         ) : (

@@ -24,6 +24,7 @@ export const complianceDocuments: Readonly<Record<ComplianceLocale, {
   draftReviewDate: string;
   reviewDate: string;
   effectiveDate: string;
+  policyVersion: string;
   privacy: ComplianceDocument;
   support: ComplianceDocument;
 }>> = content.locales;

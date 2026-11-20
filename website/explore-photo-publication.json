@@ -1,0 +1,42 @@
+{
+  "dragons-back-to-tei-wan-tai-tam-gap": {
+    "license": "Public domain (U.S. Navy)",
+    "sha256": "5822dbb21799c40d8e0303ace426764823eb35f75e7c4aedf8fb2be254b09f90",
+    "website": "preview-and-download"
+  },
+  "peak-circle-walk": {
+    "license": "Public domain (author dedication)",
+    "sha256": "507f5f412bcdb32ec2813dded3976481f79809225924b84b418921607ab19b4d",
+    "website": "preview-and-download"
+  },
+  "west-kowloon-art-park": {
+    "license": "Unsplash License",
+    "sha256": "1428e2ad4c6a97ade65e341bd761695259a538c6005f429084813ba13ed46577",
+    "website": "source-only"
+  },
+  "avenue-of-stars": {
+    "license": "CC0 1.0",
+    "sha256": "0ed86502fca360f467d8d42ad9e0b75f19e1607ff687a9b8b9706889b0f3fa9c",
+    "website": "preview-and-download"
+  },
+  "hong-kong-park": {
+    "license": "CC0 1.0",
+    "sha256": "eb62e56c6c204a4de0f3eed1b26d6bb94e2fa75038f28ba61a560faf57c74add",
+    "website": "preview-and-download"
+  },
+  "kowloon-walled-city-park": {
+    "license": "CC0 1.0",
+    "sha256": "a28f9ec8fda2db702b4eaefb7f7c692eae1e3d8d23883dab0c158a8e97f2a5d8",
+    "website": "preview-and-download"
+  },
+  "tai-po-waterfront-park": {
+    "license": "Public domain (author dedication)",
+    "sha256": "f249c8e015e62ef511580c1d2d59b956f5bc3975c76cfc6f8263eaea9967081f",
+    "website": "preview-and-download"
+  },
+  "victoria-peak-garden": {
+    "license": "CC BY 4.0",
+    "sha256": "59f27e7e1e3d876e1a9c6876b1d0450c5bc1c9c32c74c435b341dbebf783f4cb",
+    "website": "preview-and-download"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "true",
+  "buildCommand": "node website/build.cjs --release",
+  "outputDirectory": "website/dist/release",
+  "trailingSlash": true,
+  "git": { "deploymentEnabled": false }
+}

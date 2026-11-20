@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
-const { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } = require('node:fs');
+const { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { dirname, join, resolve } = require('node:path');
 const ts = require('typescript');
@@ -21,7 +21,10 @@ const operatorSentences = {
   'zh-HK': 'KongDaily 由個人開發者 Lenny 以 Lenny Studio 品牌提供。',
   en: 'KongDaily is provided by Lenny, an individual developer operating under the Lenny Studio brand.',
 };
-const { buildSite, releaseIssues, verifyPublishedWebsite } = require('../website/build.cjs');
+const { buildSite, releaseIssues, verifyReleaseOutput, verifyPublishedWebsite } = require('../website/build.cjs');
+const { creditsCopy, loadExplorePhotos } = require('../website/explore-credits.cjs');
+const vercelConfig = require('../vercel.json');
+const photoPublication = require('../website/explore-photo-publication.json');
 const root = join(__dirname, '..');
 const src = join(root, 'src');
 
@@ -38,7 +41,9 @@ const native = {
   Linking: { async openURL(url) { opens.push(url); throw new Error('Offline'); } },
   Alert: { alert(message) { alerts.push(message); } },
 };
+const draftPolicy = { ...content, getPolicyPublication: () => null };
 const stubs = {
+  '../content/compliance-policy': draftPolicy,
   react: { useRef: (current) => ({ current }) },
   'react-native': native,
   'expo-router': { Stack: { Screen: 'StackScreen' }, useLocalSearchParams: () => params,
@@ -116,7 +121,8 @@ async function checkApp() {
         assert.ok(doc.props.sections.some(({ id, paragraphs }) => id === 'other-photos'
           && paragraphs.some((line) => line.includes('Kevin Huynh') && line.includes('Jeanne Rose Gomez'))));
       } else {
-        assert.deepEqual(doc.props.sections, content.locales[locale][page].sections);
+        const document = page === 'privacy' ? content.getPrivacyDocument(locale, null) : content.locales[locale][page];
+        assert.deepEqual(doc.props.sections, document.sections);
         if (page === 'privacy') {
           assert.ok(view.some(({ props }) => typeof props.children === 'string' && props.children.includes(operatorSentences[locale])));
         }
@@ -193,23 +199,68 @@ async function checkWebsite() {
   for (const page of ['privacy', 'support']) {
     assert.deepEqual(content.locales.en[page].sections.map(({ id }) => id), content.locales['zh-HK'][page].sections.map(({ id }) => id));
   }
+  const retention = Object.fromEntries(['zh-HK', 'en'].map((locale) => {
+    const policy = content.getPrivacyDocument(locale, null);
+    return [locale, policy.sections.find(({ id }) => id === 'retention').paragraphs.join(' ')];
+  }));
+  assert.match(retention['zh-HK'], /個案解決後最多保留 12 個月，適用法律要求保留更長時間者除外。.*刪除要求/);
+  assert.match(retention.en, /up to 12 months after the case is resolved, unless applicable law requires longer retention\. You can request deletion/);
+  assert.match(retention['zh-HK'], /電郵服務商獨立管理的備份、日誌及留存安排.*無法保證其刪除時間/);
+  assert.match(retention.en, /email provider manages its own backups, logs and retention arrangements.*cannot guarantee/);
+  assert.match(JSON.stringify(content.locales['zh-HK'].privacy), /姓名、電郵地址、問題描述及附件/);
+  assert.match(JSON.stringify(content.locales.en.privacy), /name, email address, description of the issue and any attachments/);
+  assert.match(JSON.stringify(content.locales['zh-HK'].privacy), /不會在該請求附送裝置 GPS 座標.*沒有說明查詢是否記入日誌或日誌會保留多久/);
+  assert.match(JSON.stringify(content.locales.en.privacy), /does not attach your device’s GPS coordinates.*does not say whether queries are logged or how long any logs are kept/);
+  assert.deepEqual([vercelConfig.buildCommand, vercelConfig.outputDirectory, vercelConfig.trailingSlash],
+    ['node website/build.cjs --release', 'website/dist/release', true]);
+  assert.equal(vercelConfig.git.deploymentEnabled, false);
+  const photos = loadExplorePhotos();
+  assert.equal(photos.length, 8);
+  assert.equal(photos.filter(({ hosted }) => hosted).length, 7);
+  const sourceOnly = photos.find(({ id }) => id === 'west-kowloon-art-park');
+  assert.equal(sourceOnly.hosted, false);
+  const removed = { ...photoCredits };
+  delete removed[dragonId];
+  assert.throws(() => loadExplorePhotos(removed), /all eight official Explore places/);
+  assert.throws(() => loadExplorePhotos({ ...photoCredits,
+    [dragonId]: { ...dragonPhoto, sha256: '0'.repeat(64) } }), /SHA-256 differs/);
+  assert.throws(() => loadExplorePhotos({ ...photoCredits,
+    [dragonId]: { ...dragonPhoto, licenseUrl: 'https://creativecommons.org/licenses/by/4.0/' } }), /licence or processing evidence/);
+  assert.throws(() => loadExplorePhotos({ ...photoCredits,
+    'victoria-peak-garden': { ...photoCredits['victoria-peak-garden'], creditLine: null } }), /missing photo-side credit/);
+  assert.throws(() => loadExplorePhotos(photoCredits, {
+    ...photoPublication, [dragonId]: { ...photoPublication[dragonId], sha256: '0'.repeat(64) },
+  }), /outdated website rights review/);
+  assert.throws(() => loadExplorePhotos(photoCredits, {
+    ...photoPublication, [sourceOnly.id]: { ...photoPublication[sourceOnly.id], website: 'pending' },
+  }), /outdated website rights review/);
   const temporary = mkdtempSync(join(tmpdir(), 'kongdaily-compliance-'));
   const review = join(temporary, 'review');
   try {
     const blocked = join(temporary, 'must-not-write');
-    assert.equal(releaseIssues({}).length, 9);
+    assert.ok(releaseIssues({}).some((issue) => issue.startsWith('assetRightsApprovalReference')));
     assert.throws(() => buildSite(blocked, {}), /Publication blocked/);
     assert.throws(() => buildSite(blocked, null), /Publication blocked/);
     assert.equal(existsSync(blocked), false);
-    const paths = ['index.html', 'privacy/index.html', 'support/index.html', 'en/index.html',
-      'en/privacy/index.html', 'en/support/index.html'];
+    const paths = ['index.html', 'privacy/index.html', 'support/index.html', 'credits/explore/index.html',
+      'en/index.html', 'en/privacy/index.html', 'en/support/index.html', 'en/credits/explore/index.html'];
     buildSite(review);
+    const stale = join(review, sourceOnly.route);
+    writeFileSync(stale, sourceOnly.bytes);
+    buildSite(review);
+    assert.equal(existsSync(stale), false, 'An exact B3 generated JPEG must not survive rebuilding');
+    writeFileSync(stale, 'unrecognised file');
+    assert.throws(() => buildSite(review), /Unexpected static output entry/);
+    assert.equal(readFileSync(stale, 'utf8'), 'unrecognised file');
+    unlinkSync(stale);
     for (const path of paths) {
       const language = path.startsWith('en/') ? 'en' : 'zh-HK';
-      const page = path.includes('privacy') ? 'privacy' : path.includes('support') ? 'support' : 'home';
+      const page = path.includes('privacy') ? 'privacy' : path.includes('support') ? 'support'
+        : path.includes('credits') ? 'credits' : 'home';
       const file = join(review, path);
       const html = readFileSync(file, 'utf8');
-      const document = content.locales[language][page];
+      const document = page === 'privacy' ? content.getPrivacyDocument(language, null)
+        : page === 'credits' ? creditsCopy[language] : content.locales[language][page];
       assert.ok(html.includes(`<html lang="${language}">`));
       assert.ok(html.includes('noindex, nofollow'));
       assert.ok(html.includes(`<h1>${escape(document.title)}</h1>`));
@@ -217,16 +268,16 @@ async function checkWebsite() {
       assert.match(html, /<a class="brand"[^>]*>KongDaily by Lenny Studio<\/a>/);
       assert.match(html, /<footer[^>]*>\s*<p[^>]*>KongDaily by Lenny Studio<\/p>/);
       assert.ok(html.includes(`<p>${escape(document.intro)}</p>`));
-      assert.ok(html.includes(`datetime="${content.reviewedOn}"`));
+      assert.equal(html.includes(`datetime="${content.reviewedOn}"`), page !== 'credits');
       const alternate = language === 'en' ? 'zh-HK' : 'en';
       const [, switchHref] = html.match(/class="language" href="([^"]+)" lang="[^"]+" hreflang="(?:en|zh-HK)"/);
-      const pageDirectory = page === 'home' ? '' : page;
+      const pageDirectory = page === 'home' ? '' : page === 'credits' ? 'credits/explore' : page;
       assert.equal(resolve(dirname(file), switchHref), resolve(review, alternate === 'en' ? 'en' : '.', pageDirectory));
       assert.doesNotMatch(html, /<script\b|<form\b|<iframe\b|class="operator"|\{operatorName\}/i);
       assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1">/);
       if (page === 'privacy') assert.ok(html.includes(operatorSentences[language]));
       const mailLinks = [...html.matchAll(/href="(mailto:[^"]+)"/g)].map((match) => match[1]);
-      assert.deepEqual(mailLinks, page === 'home' ? [] : [contactHref]);
+      assert.deepEqual(mailLinks, ['home', 'credits'].includes(page) ? [] : [contactHref]);
       for (const { id, title, paragraphs, links } of document.sections ?? []) {
         const start = html.indexOf(`<section aria-labelledby="${id}">`);
         assert.ok(start >= 0);
@@ -235,6 +286,29 @@ async function checkWebsite() {
         for (const paragraph of paragraphs) assert.ok(section.includes(`<p>${escape(paragraph)}</p>`));
         for (const { label, url } of links ?? []) assert.ok(section.includes(`<a href="${escape(url)}">${escape(label)}</a>`));
         assert.equal(section.includes(`href="${contactHref}"`), id === document.contactSection);
+      }
+      if (page === 'credits') {
+        assert.equal([...html.matchAll(/<img /g)].length, 7);
+        assert.equal([...html.matchAll(/ download>/g)].length, 7);
+        for (const { id, title, photo, route, hosted } of photos) {
+          const start = html.indexOf(`<section aria-labelledby="${id}">`);
+          assert.ok(start >= 0);
+          const section = html.slice(start, html.indexOf('</section>', start));
+          assert.ok(section.includes(`<h2 id="${id}">${escape(title[language])}</h2>`));
+          assert.ok(section.includes(photo.processing.pixels.join(' × ')));
+          if (hosted) {
+            assert.ok(section.includes(`alt="${escape(photo.description[language])}"`));
+            assert.match(section, /<figure[^>]*>\s*<img[^>]*>\s*<figcaption>/);
+            assert.deepEqual(readFileSync(join(review, route)), readFileSync(join(root, photo.asset)));
+          } else {
+            assert.doesNotMatch(section, /<img\b|\bdownload>|\.jpg\b|images\.unsplash/);
+            assert.ok(section.includes(creditsCopy[language].sourceOnly));
+            assert.equal(existsSync(join(review, route)), false);
+          }
+          for (const field of [photo.creditLine?.[language] ?? photo.author, photo.title, photo.sourcePage,
+            photo.license, photo.licenseUrl, photo.notice?.[language], photo.independentOriginalUrl,
+            photo.processing.summary?.[language]].filter(Boolean)) assert.ok(section.includes(escape(field)), field);
+        }
       }
       for (const [, href] of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
         if (href.startsWith('#')) assert.ok(html.includes(`id="${href.slice(1)}"`));
@@ -259,12 +333,16 @@ async function checkWebsite() {
       assetRightsApprovalReference: 'Asset clearance fixture',
     };
     const publication = {
-      effectiveOn: '2026-11-21', updatedOn: '2026-11-22',
+      version: '1.0',
+      effectiveOn: '2026-11-21', updatedOn: '2026-11-21',
       siteAndSupportPrivacy: { 'zh-HK': '測試網站與支援文字', en: 'Site & support fixture' },
       retentionDisclosure: { 'zh-HK': '測試保留文字', en: 'Retention fixture' },
     };
     const approvedCopy = { ...content, publication };
     assert.deepEqual(releaseIssues(fixture, approvedCopy), []);
+    const laterPolicy = { ...approvedCopy, publication: { ...publication, updatedOn: '2026-11-22' } };
+    assert.throws(() => buildSite(blocked, fixture, laterPolicy), /updatedOn must equal effectiveOn/);
+    assert.equal(existsSync(blocked), false);
     for (const { field, changes } of [
       { field: 'operatorVerificationReference', changes: { operatorVerificationReference: null } },
       { field: 'origin', changes: { origin: 'https://example.com.' } },
@@ -277,6 +355,7 @@ async function checkWebsite() {
       assert.equal(existsSync(blocked), false);
     }
     for (const { field, changes } of [
+      { field: 'version', changes: { version: 'TBD' } },
       { field: 'effectiveOn', changes: { effectiveOn: '2026-02-30' } },
       { field: 'updatedOn', changes: { updatedOn: '2026-11-20' } },
       { field: 'siteAndSupportPrivacy.zh-HK', changes: { siteAndSupportPrivacy: { ...publication.siteAndSupportPrivacy, 'zh-HK': '待確認' } } },
@@ -301,14 +380,34 @@ async function checkWebsite() {
     const incomplete = { ...approvedCopy, locales: structuredClone(content.locales) };
     incomplete.locales.en.privacy.sections.pop();
     assert.ok(releaseIssues(fixture, incomplete).some((issue) => issue.startsWith('privacy.en')));
+    const wrongRetention = { ...approvedCopy, locales: structuredClone(content.locales) };
+    const section = wrongRetention.locales.en.privacy.sections.find(({ id }) => id === 'retention');
+    section.paragraphs = section.paragraphs.map((paragraph) => paragraph.replace('12 months', '13 months'));
+    assert.throws(() => buildSite(blocked, fixture, wrongRetention), /approved 12-month limit/);
+    assert.equal(existsSync(blocked), false);
     const release = join(temporary, 'release');
     buildSite(release, fixture, approvedCopy);
+    assert.equal(verifyReleaseOutput(release, fixture, approvedCopy), 16);
+    assert.throws(() => verifyReleaseOutput(review, fixture, approvedCopy), /differs from the approved file/);
+    for (const unwanted of ['internal.md', '.env', 'test-compliance.cjs', sourceOnly.route]) {
+      const path = join(release, unwanted);
+      writeFileSync(path, 'internal test material');
+      assert.throws(() => verifyReleaseOutput(release, fixture, approvedCopy), /Unexpected static output entry/);
+      assert.throws(() => buildSite(release, fixture, approvedCopy), /Unexpected static output entry/);
+      assert.equal(readFileSync(path, 'utf8'), 'internal test material');
+      unlinkSync(path);
+    }
+    const symlink = join(release, 'internal-link');
+    symlinkSync(join(root, 'docs'), symlink);
+    assert.throws(() => verifyReleaseOutput(release, fixture, approvedCopy), /Unexpected static output entry: internal-link/);
+    unlinkSync(symlink);
     const releasedPrivacy = readFileSync(join(release, 'en/privacy/index.html'), 'utf8');
     assert.doesNotMatch(releasedPrivacy, /noindex|Review draft|Test fixture only|rel="canonical"|\{operatorName\}/);
     assert.ok(releasedPrivacy.includes(operatorSentences.en));
     assert.match(releasedPrivacy, /<p>Lenny<\/p>/);
     assert.match(releasedPrivacy, /Site &amp; support fixture/);
     assert.match(releasedPrivacy, /Retention fixture/);
+    assert.match(releasedPrivacy, /Policy version · 1\.0/);
     assert.doesNotMatch(releasedPrivacy, /Asset clearance fixture|Verified spelling fixture/);
     // Reload the App screens with the same isolated approved policy used for static output.
     stubs['../content/compliance-policy'] = { ...approvedCopy, getPolicyPublication: () => content.getPolicyPublication(publication) };
@@ -326,15 +425,20 @@ async function checkWebsite() {
             && props.children.includes(label) && props.children.includes(date)));
           assert.ok(html.includes(`${label} · <time datetime="${date}">${date}</time>`));
         }
+        assert.ok(view.some(({ props }) => Array.isArray(props.children)
+          && props.children.includes(content.locales[locale].policyVersion) && props.children.includes(publication.version)));
+        assert.ok(html.includes(`${content.locales[locale].policyVersion} · ${publication.version}`));
         for (const { paragraphs } of doc.props.sections) {
           for (const paragraph of paragraphs) assert.ok(html.includes(`<p>${escape(paragraph)}</p>`));
         }
       }
     } finally {
-      delete stubs['../content/compliance-policy'];
+      stubs['../content/compliance-policy'] = draftPolicy;
       cache.clear();
     }
-    const live = { ...fixture, origin: 'https://release-fixture.iana.org' };
+    // 16:30 UTC falls on the following calendar day in Hong Kong.
+    const live = { ...fixture, origin: 'https://release-fixture.iana.org', firstPublicDeploymentAt: '2026-11-20T16:30:00Z' };
+    assert.deepEqual(releaseIssues(live, laterPolicy), [], 'A subsequent policy revision can update Last Updated');
     const canonicalOutput = join(temporary, 'canonical');
     buildSite(canonicalOutput, live, approvedCopy);
     const routes = ['privacy/', 'support/', 'en/privacy/', 'en/support/'];
@@ -345,25 +449,56 @@ async function checkWebsite() {
       assert.ok(readFileSync(join(canonicalOutput, route, 'index.html'), 'utf8')
         .includes(`rel="canonical" href="${live.origin}/${route}"`));
     }
-    const expected = routes.map((route) => `${live.origin}/${route}`);
+    const pagePaths = ['/', '/privacy/', '/support/', '/credits/explore/', '/en/', '/en/privacy/', '/en/support/', '/en/credits/explore/'];
+    const jpegPaths = photos.filter(({ hosted }) => hosted).map(({ route }) => '/' + route);
+    const excludedPath = '/' + sourceOnly.route;
+    const missing = '/__kongdaily_missing_release_check__/';
+    const expected = [
+      ...pagePaths.flatMap((path) => path === '/' ? [path] : [path, path.slice(0, -1) + ' (HTTP 308)']),
+      ...photos.map(({ route, hosted }) => '/' + route + (hosted ? '' : ' (HTTP 404)')), '/site.css', missing + ' (HTTP 404)',
+    ].map((path) => live.origin + path);
     const readResponse = (output) => async (url, options) => {
-      assert.ok(expected.includes(url));
       assert.equal(options.redirect, 'manual');
-      return new Response(readFileSync(join(output, new URL(url).pathname, 'index.html'), 'utf8'),
-        { headers: { 'content-type': 'text/html; charset=utf-8' } });
+      const path = new URL(url).pathname;
+      if (path === missing || path === excludedPath) return new Response(null, { status: 404 });
+      if (path === '/site.css') return new Response(readFileSync(join(output, path)), { headers: { 'content-type': 'text/css' } });
+      if (jpegPaths.includes(path)) return new Response(readFileSync(join(output, path)), { headers: { 'content-type': 'image/jpeg' } });
+      if (pagePaths.includes(path + '/')) return new Response(null, { status: 308, headers: { location: path + '/' } });
+      assert.ok(pagePaths.includes(path));
+      return new Response(readFileSync(join(output, path, 'index.html')), { headers: { 'content-type': 'text/html; charset=utf-8' } });
     };
     await assert.rejects(verifyPublishedWebsite(fixture, () => assert.fail('No request without an origin')), /actual deployed HTTPS origin/);
+    for (const invalidTime of [null, '2026-11-21T00:30:00', '2026-02-30T00:30:00+08:00']) {
+      await assert.rejects(verifyPublishedWebsite({ ...live, firstPublicDeploymentAt: invalidTime },
+        () => assert.fail('No request without a valid launch timestamp'), approvedCopy), /firstPublicDeploymentAt/);
+    }
+    await assert.rejects(verifyPublishedWebsite({ ...live, firstPublicDeploymentAt: '2026-11-20T15:59:59Z' },
+      () => assert.fail('No request when the Hong Kong day differs'), approvedCopy), /launch date differs/);
+    assert.throws(() => buildSite(blocked, { ...live, firstPublicDeploymentAt: '2026-11-20T15:59:59Z' }, approvedCopy),
+      /launch date differs/);
+    assert.equal(existsSync(blocked), false);
     assert.deepEqual(await verifyPublishedWebsite(live, readResponse(release), approvedCopy), expected);
     assert.deepEqual(await verifyPublishedWebsite(live, readResponse(canonicalOutput), approvedCopy), expected);
     await assert.rejects(verifyPublishedWebsite(live, async () => new Response(null, { status: 302 }), approvedCopy), /public HTTP 200 HTML/);
     await assert.rejects(verifyPublishedWebsite(live, readResponse(review), approvedCopy), /differs from the approved release/);
+    const readRelease = readResponse(release);
+    for (const [path, response, reason] of [
+      ['/credits/explore', new Response(null, { status: 308, headers: { location: 'https://other.iana.org/credits/explore/' } }), /same-origin HTTP 308/],
+      [jpegPaths[0], new Response(null, { status: 302 }), /public HTTP 200 JPEG/],
+      [jpegPaths[0], new Response('Different bytes', { headers: { 'content-type': 'image/jpeg' } }), /SHA-256 differs/],
+      [excludedPath, new Response(sourceOnly.bytes, { headers: { 'content-type': 'image/jpeg' } }), /expected HTTP 404 for a source-only photo/],
+      [missing, new Response('Soft 404', { status: 200 }), /expected HTTP 404/],
+    ]) {
+      await assert.rejects(verifyPublishedWebsite(live, (url, options) =>
+        new URL(url).pathname === path ? response : readRelease(url, options), approvedCopy), reason);
+    }
   } finally {
     rmSync(temporary, { recursive: true, force: true });
   }
 }
 
 checkApp().then(checkWebsite).then(() => {
-  console.log('PASS: bilingual navigation and documents, Dragon’s Back attribution and failure handling, six static pages and publication gate.');
+  console.log('PASS: bilingual policy, eight credits, seven downloadable JPEGs, source-only exclusion, static output allowlist and release gates.');
 }).catch((error) => {
   console.error(error);
   process.exitCode = 1;
