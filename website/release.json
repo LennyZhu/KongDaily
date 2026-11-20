@@ -1,7 +1,7 @@
 {
-  "origin": null,
-  "firstPublicDeploymentAt": null,
+  "origin": "https://kongdaily-site.vercel.app",
+  "firstPublicDeploymentAt": "2026-11-20T11:49:55.999Z",
   "operatorVerificationReference": "Developer confirmation in REL-01C1B1, 2026-11-19 HKT: use the exact policy name Lenny for the individual developer.",
-  "approvalReference": null,
-  "assetRightsApprovalReference": null
+  "approvalReference": "REL-01C1B5 developer instruction received 2026-11-20 HKT: approved zh-HK and English Privacy Policy v1.0, support retention and LandsD disclosure, and the actual first public Hong Kong date rule.",
+  "assetRightsApprovalReference": "REL-01C1B5 developer approval received 2026-11-20 HKT: REL-01C1B4 rights matrix, seven exact downloadable app JPEGs, and Unsplash original-source credit only for West Kowloon Art Park."
 }

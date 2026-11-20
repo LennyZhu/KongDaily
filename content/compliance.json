@@ -2,8 +2,8 @@
   "reviewedOn": "2026-11-20",
   "publication": {
     "version": "1.0",
-    "effectiveOn": null,
-    "updatedOn": null,
+    "effectiveOn": "2026-11-20",
+    "updatedOn": "2026-11-20",
     "siteAndSupportPrivacy": {
       "zh-HK": "KongDaily 的公開網站由 Vercel 託管。瀏覽網站時，託管商可處理 IP 位址等連線資料，以傳送網頁、營運及保護服務。網站本身沒有帳戶、聯絡表格或分析追蹤程式。",
       "en": "KongDaily uses Vercel to host its public website. When you visit, the hosting provider may process connection information such as your IP address to serve pages and operate and protect the service. The site itself has no accounts, contact forms or analytics trackers."

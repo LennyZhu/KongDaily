@@ -2,7 +2,7 @@
   "expo": {
     "name": "KongDaily",
     "slug": "kongdaily",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "platforms": ["ios"],
     "scheme": "kongdaily",
     "orientation": "portrait",
@@ -10,6 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.lennystudio.kongdaily",
+      "icon": "./assets/branding/app-icon-ios.png",
       "infoPlist": {
         "CFBundleAllowMixedLocalizations": true,
         "NSAppTransportSecurity": {
@@ -23,6 +24,17 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "ios": {
+            "image": "./assets/branding/splash-logo.png",
+            "imageWidth": 164,
+            "backgroundColor": "#FAF9F5",
+            "resizeMode": "contain"
+          }
+        }
+      ],
       [
         "expo-localization",
         {

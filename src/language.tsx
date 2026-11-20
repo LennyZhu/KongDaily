@@ -1,4 +1,5 @@
 import { useLocales } from 'expo-localization';
+import { SplashScreen } from 'expo-router';
 import { createContext, useContext, useEffect, useRef, useState, type PropsWithChildren } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -68,7 +69,10 @@ export function LanguageProvider({ children }: PropsWithChildren) {
       <View style={styles.startup}>
         {loadFailed ? (
           <>
-            <Text style={styles.startupText} accessibilityRole="alert">{copy.loadError}</Text>
+            {/* The navigator is not mounted when reading the language fails. */}
+            <Text style={styles.startupText} accessibilityRole="alert" onLayout={SplashScreen.hide}>
+              {copy.loadError}
+            </Text>
             <Pressable
               accessibilityRole="button"
               onPress={() => {

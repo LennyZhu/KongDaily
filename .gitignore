@@ -1,5 +1,7 @@
 node_modules/
 .expo/
+/.vercel/
+/.env*.local
 dist/
 expo-env.d.ts
 .DS_Store
