@@ -1,7 +1,7 @@
 const { copyFileSync, mkdirSync, writeFileSync } = require('node:fs');
 const { join, posix } = require('node:path');
 
-const content = require('../content/compliance.json');
+const content = require('../content/compliance-policy');
 const releaseInputs = require('./release.json');
 
 const pages = ['home', 'privacy', 'support'];
@@ -13,7 +13,7 @@ const requiredSections = {
 
 function provided(value) {
   return typeof value === 'string' && Boolean(value.trim())
-    && !/\b(TBD|TODO|TBC|placeholder)\b|待確認|待填/i.test(value);
+    && !/\b(TBD|TODO|TBC|placeholder)\b|待確認|待填|\{operatorName\}/i.test(value);
 }
 
 function publicHost(hostname) {
@@ -63,8 +63,9 @@ function releaseIssues(input, copy = content) {
   const identity = copy.identity;
   if (identity?.product !== 'KongDaily' || identity.brand !== 'Lenny Studio') issues.push('identity requires the approved KongDaily and Lenny Studio branding');
   if (identity?.operatorType !== 'individual') issues.push('identity.operatorType must remain individual');
+  if (!legalOperator(identity?.operatorName)) issues.push('identity.operatorName must be the verified individual name, separate from the product brand');
   if (!email(identity?.contactEmail)) issues.push('identity.contactEmail must be the verified privacy and support mailbox');
-  if (!httpsOrigin(input.origin)) issues.push('origin must be the approved public HTTPS origin');
+  if (input.origin != null && !httpsOrigin(input.origin)) issues.push('origin must be a public HTTPS origin or null before the first deployment');
   if (!provided(input.operatorVerificationReference)) issues.push('operatorVerificationReference must record verification of the legal name');
   if (!calendarDate(input.effectiveOn)) issues.push('effectiveOn must be an approved calendar date');
   if (!calendarDate(input.updatedOn)) issues.push('updatedOn must be an approved calendar date');
@@ -72,7 +73,6 @@ function releaseIssues(input, copy = content) {
     const labels = copy.locales?.[locale];
     if (!completeDocument(labels?.privacy, requiredSections.privacy, 'rights')) issues.push(`privacy.${locale} must contain the complete policy and contact section`);
     if (!completeDocument(labels?.support, requiredSections.support, 'contact')) issues.push(`support.${locale} must contain the complete FAQ and contact section`);
-    if (!legalOperator(input.operator?.[locale])) issues.push(`operator.${locale} must name the verified legal operator, separate from the product brand`);
     if (!provided(input.siteAndSupportPrivacy?.[locale])) issues.push(`siteAndSupportPrivacy.${locale} requires approved hosting and support data handling copy`);
     if (!provided(input.retentionDisclosure?.[locale])) issues.push(`retentionDisclosure.${locale} requires the approved retention and deletion disclosure`);
   }
@@ -95,7 +95,7 @@ function directory(locale, page) {
 
 function renderPage(locale, page, release) {
   const labels = content.locales[locale];
-  const { brand, product, contactEmail } = content.identity;
+  const { brand, product, operatorName, contactEmail } = content.identity;
   const brandName = `${product} by ${brand}`;
   const document = labels[page];
   const here = directory(locale, page);
@@ -103,7 +103,7 @@ function renderPage(locale, page, release) {
   const alternate = locale === 'en' ? 'zh-HK' : 'en';
   const languageName = alternate === 'en' ? 'English' : '繁體中文';
   const stylesheet = posix.relative(here, 'site.css');
-  const canonical = release ? new URL(here === '.' ? '/' : here + '/', release.origin).href : '';
+  const canonical = release?.origin ? new URL(here === '.' ? '/' : here + '/', release.origin).href : '';
   const date = release?.updatedOn ?? content.reviewedOn;
   const updated = `<p class="date">${labels.reviewDate} · <time datetime="${date}">${date}</time></p>`;
   const review = release ? '' : `<aside class="review"><strong>${labels.reviewStatus}</strong><p>${escape(labels.reviewNotice)}</p></aside>`;
@@ -115,7 +115,7 @@ function renderPage(locale, page, release) {
     </section>`).join('\n    ');
   const operator = release ? `<section class="operator">
       <h2>${locale === 'en' ? 'Legal operator' : '法定營運者'}</h2>
-      <p>${escape(release.operator[locale])}</p>
+      <p>${escape(operatorName)}</p>
       ${page === 'privacy' ? `<p>${labels.effectiveDate} · <time datetime="${release.effectiveOn}">${release.effectiveOn}</time></p>
       <p>${escape(release.siteAndSupportPrivacy[locale])}</p>
       <p>${escape(release.retentionDisclosure[locale])}</p>` : ''}
@@ -175,26 +175,48 @@ function buildSite(output, release) {
   copyFileSync(join(__dirname, 'site.css'), join(output, 'site.css'));
 }
 
-if (require.main === module) {
-  const [mode, ...extra] = process.argv.slice(2);
-  if (extra.length || (mode && !['--release', '--check-release'].includes(mode))) {
-    console.error('Usage: node website/build.cjs [--release | --check-release]');
-    process.exitCode = 1;
-  } else {
-    try {
-      if (mode === '--check-release') {
-        requireReleaseInputs(releaseInputs);
-        console.log('Release inputs passed the publication check.');
-      } else {
-        const output = join(__dirname, 'dist', mode ? 'release' : 'review');
-        buildSite(output, mode ? releaseInputs : undefined);
-        console.log(output);
+async function verifyPublishedWebsite(release, fetchPage = fetch) {
+  if (!httpsOrigin(release?.origin)) throw new Error('Live verification requires the actual deployed HTTPS origin.');
+  requireReleaseInputs(release);
+  const verified = [];
+  for (const locale of locales) {
+    for (const page of ['privacy', 'support']) {
+      const url = new URL(directory(locale, page) + '/', release.origin).href;
+      const response = await fetchPage(url, { redirect: 'manual', signal: AbortSignal.timeout(10_000) });
+      if (response.status !== 200 || !/^text\/html(?:\s*;|$)/i.test(response.headers.get('content-type') ?? '')) {
+        throw new Error(`Live verification failed for ${url}: expected a public HTTP 200 HTML response on the exact route.`);
       }
-    } catch (error) {
-      console.error(error.message);
-      process.exitCode = 1;
+      const html = await response.text();
+      // The first deployment can precede any assigned origin and omit canonical tags.
+      if (html !== renderPage(locale, page, release) && html !== renderPage(locale, page, { ...release, origin: null })) {
+        throw new Error(`Live verification failed for ${url}: HTML differs from the approved release.`);
+      }
+      verified.push(url);
     }
+  }
+  return verified;
+}
+
+async function main() {
+  const [mode, ...extra] = process.argv.slice(2);
+  if (extra.length || (mode && !['--release', '--check-release', '--check-live'].includes(mode))) {
+    throw new Error('Usage: node website/build.cjs [--release | --check-release | --check-live]');
+  }
+  if (mode === '--check-release') {
+    requireReleaseInputs(releaseInputs);
+    console.log('Pre-deployment release inputs passed.');
+  } else if (mode === '--check-live') {
+    console.log((await verifyPublishedWebsite(releaseInputs)).join('\n'));
+  } else {
+    const output = join(__dirname, 'dist', mode ? 'release' : 'review');
+    buildSite(output, mode ? releaseInputs : undefined);
+    console.log(output);
   }
 }
 
-module.exports = { buildSite, releaseIssues };
+if (require.main === module) main().catch((error) => {
+  console.error(error.message);
+  process.exitCode = 1;
+});
+
+module.exports = { buildSite, releaseIssues, verifyPublishedWebsite };

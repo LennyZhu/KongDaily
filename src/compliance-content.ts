@@ -1,4 +1,4 @@
-import content from '../content/compliance.json';
+import content from '../content/compliance-policy';
 
 import type { LanguagePreference } from './i18n';
 

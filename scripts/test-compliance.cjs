@@ -9,13 +9,18 @@ const { getReactNavigationConfig } = require('expo-router/build/getReactNavigati
 const { getStateFromPath } = require('expo-router/build/react-navigation/core/getStateFromPath');
 const { resolveHref } = require('expo-router/build/link/href');
 
-const content = require('../content/compliance.json');
+const content = require('../content/compliance-policy');
 const confirmedEmail = 'lenny996@163.com';
 const contactHref = `mailto:${confirmedEmail}`;
 const brand = 'KongDaily by Lenny Studio';
 assert.equal(content.identity.contactEmail, confirmedEmail);
 assert.equal(content.identity.operatorType, 'individual');
-const { buildSite, releaseIssues } = require('../website/build.cjs');
+assert.equal(content.identity.operatorName, 'Lenny');
+const operatorSentences = {
+  'zh-HK': 'KongDaily 由個人開發者 Lenny 以 Lenny Studio 品牌提供。',
+  en: 'KongDaily is provided by Lenny, an individual developer operating under the Lenny Studio brand.',
+};
+const { buildSite, releaseIssues, verifyPublishedWebsite } = require('../website/build.cjs');
 const root = join(__dirname, '..');
 const src = join(root, 'src');
 
@@ -108,6 +113,9 @@ async function checkApp() {
         assert.equal(doc.props.sections.length, 8);
       } else {
         assert.deepEqual(doc.props.sections, content.locales[locale][page].sections);
+        if (page === 'privacy') {
+          assert.ok(view.some(({ props }) => typeof props.children === 'string' && props.children.includes(operatorSentences[locale])));
+        }
         assert.ok(view.some(({ props }) => props.children === content.locales[locale].reviewStatus));
         const contacts = view.filter(({ props }) => props.accessibilityRole === 'link'
           && elements(props.children).some((node) => node.props.children === confirmedEmail));
@@ -150,7 +158,7 @@ async function checkApp() {
   }
 }
 
-function checkWebsite() {
+async function checkWebsite() {
   const escape = (value) => value.replace(/[&<>"']/g, (char) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
   assert.deepEqual(
@@ -163,7 +171,7 @@ function checkWebsite() {
   const review = join(temporary, 'review');
   try {
     const blocked = join(temporary, 'must-not-write');
-    assert.equal(releaseIssues({}).length, 12);
+    assert.equal(releaseIssues({}).length, 9);
     assert.throws(() => buildSite(blocked, {}), /Publication blocked/);
     assert.throws(() => buildSite(blocked, null), /Publication blocked/);
     assert.equal(existsSync(blocked), false);
@@ -188,7 +196,9 @@ function checkWebsite() {
       const [, switchHref] = html.match(/class="language" href="([^"]+)" lang="[^"]+" hreflang="(?:en|zh-HK)"/);
       const pageDirectory = page === 'home' ? '' : page;
       assert.equal(resolve(dirname(file), switchHref), resolve(review, alternate === 'en' ? 'en' : '.', pageDirectory));
-      assert.doesNotMatch(html, /<script\b|<form\b|<iframe\b|class="operator"/i);
+      assert.doesNotMatch(html, /<script\b|<form\b|<iframe\b|class="operator"|\{operatorName\}/i);
+      assert.match(html, /<meta name="viewport" content="width=device-width, initial-scale=1">/);
+      if (page === 'privacy') assert.ok(html.includes(operatorSentences[language]));
       const mailLinks = [...html.matchAll(/href="(mailto:[^"]+)"/g)].map((match) => match[1]);
       assert.deepEqual(mailLinks, page === 'home' ? [] : [contactHref]);
       for (const { id, title, paragraphs, links } of document.sections ?? []) {
@@ -217,8 +227,7 @@ function checkWebsite() {
 
     // Synthetic values exercise rendering only in this temporary directory. No requests are made.
     const fixture = {
-      origin: 'https://release-fixture.iana.org',
-      operator: { 'zh-HK': '測試營運者', en: 'Operator fixture' },
+      origin: null,
       operatorVerificationReference: 'Verified spelling fixture',
       effectiveOn: '2026-11-19', updatedOn: '2026-11-19',
       siteAndSupportPrivacy: { 'zh-HK': '測試網站與支援文字', en: 'Site & support fixture' },
@@ -228,10 +237,7 @@ function checkWebsite() {
     };
     assert.deepEqual(releaseIssues(fixture), []);
     for (const { field, changes } of [
-      { field: 'operator.en', changes: { operator: { ...fixture.operator, en: null } } },
-      { field: 'operator.zh-HK', changes: { operator: { ...fixture.operator, 'zh-HK': ' Lenny   Studio ' } } },
       { field: 'operatorVerificationReference', changes: { operatorVerificationReference: null } },
-      { field: 'origin', changes: { origin: null } },
       { field: 'origin', changes: { origin: 'https://example.com.' } },
       { field: 'retentionDisclosure.en', changes: { retentionDisclosure: { ...fixture.retentionDisclosure, en: null } } },
       { field: 'assetRightsApprovalReference', changes: { assetRightsApprovalReference: null } },
@@ -246,6 +252,8 @@ function checkWebsite() {
       { contactEmail: 'placeholder@example.com' },
       { brand: 'Another brand' },
       { operatorType: 'company' },
+      { operatorName: null },
+      { operatorName: ' Lenny   Studio ' },
     ]) {
       assert.equal(releaseIssues(fixture, { ...content, identity: { ...content.identity, ...changes } }).length, 1);
     }
@@ -255,22 +263,41 @@ function checkWebsite() {
     const release = join(temporary, 'release');
     buildSite(release, fixture);
     const releasedPrivacy = readFileSync(join(release, 'en/privacy/index.html'), 'utf8');
-    assert.doesNotMatch(releasedPrivacy, /noindex|Review draft|Test fixture only/);
+    assert.doesNotMatch(releasedPrivacy, /noindex|Review draft|Test fixture only|rel="canonical"|\{operatorName\}/);
+    assert.ok(releasedPrivacy.includes(operatorSentences.en));
+    assert.match(releasedPrivacy, /<p>Lenny<\/p>/);
     assert.match(releasedPrivacy, /Site &amp; support fixture/);
     assert.match(releasedPrivacy, /Retention fixture/);
     assert.doesNotMatch(releasedPrivacy, /Asset clearance fixture|Verified spelling fixture/);
-    for (const route of ['privacy/', 'en/privacy/', 'support/', 'en/support/']) {
+    const live = { ...fixture, origin: 'https://release-fixture.iana.org' };
+    const canonicalOutput = join(temporary, 'canonical');
+    buildSite(canonicalOutput, live);
+    const routes = ['privacy/', 'support/', 'en/privacy/', 'en/support/'];
+    for (const route of routes) {
       const html = readFileSync(join(release, route, 'index.html'), 'utf8');
-      assert.ok(html.includes(`rel="canonical" href="${fixture.origin}/${route}"`));
+      assert.doesNotMatch(html, /rel="canonical"/);
       assert.deepEqual([...html.matchAll(/href="(mailto:[^"]+)"/g)].map((match) => match[1]), [contactHref]);
+      assert.ok(readFileSync(join(canonicalOutput, route, 'index.html'), 'utf8')
+        .includes(`rel="canonical" href="${live.origin}/${route}"`));
     }
+    const expected = routes.map((route) => `${live.origin}/${route}`);
+    const readResponse = (output) => async (url, options) => {
+      assert.ok(expected.includes(url));
+      assert.equal(options.redirect, 'manual');
+      return new Response(readFileSync(join(output, new URL(url).pathname, 'index.html'), 'utf8'),
+        { headers: { 'content-type': 'text/html; charset=utf-8' } });
+    };
+    await assert.rejects(verifyPublishedWebsite(fixture, () => assert.fail('No request without an origin')), /actual deployed HTTPS origin/);
+    assert.deepEqual(await verifyPublishedWebsite(live, readResponse(release)), expected);
+    assert.deepEqual(await verifyPublishedWebsite(live, readResponse(canonicalOutput)), expected);
+    await assert.rejects(verifyPublishedWebsite(live, async () => new Response(null, { status: 302 })), /public HTTP 200 HTML/);
+    await assert.rejects(verifyPublishedWebsite(live, readResponse(review)), /differs from the approved release/);
   } finally {
     rmSync(temporary, { recursive: true, force: true });
   }
 }
 
-checkApp().then(() => {
-  checkWebsite();
+checkApp().then(checkWebsite).then(() => {
   console.log('PASS: bilingual navigation and documents, Dragon’s Back attribution and failure handling, six static pages and publication gate.');
 }).catch((error) => {
   console.error(error);

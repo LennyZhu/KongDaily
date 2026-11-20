@@ -4,6 +4,7 @@
     "product": "KongDaily",
     "brand": "Lenny Studio",
     "operatorType": "individual",
+    "operatorName": "Lenny",
     "contactEmail": "lenny996@163.com"
   },
   "locales": {
@@ -27,7 +28,7 @@
           {
             "id": "scope",
             "title": "適用範圍",
-            "paragraphs": ["本說明涵蓋 KongDaily 的 iOS 版本。KongDaily 是由個人開發者以 Lenny Studio 品牌提供的獨立 App。查看巴士、天氣、附近設施或精選地點，以及使用收藏，均毋須建立帳戶。"]
+            "paragraphs": ["本說明涵蓋 KongDaily 的 iOS 版本。KongDaily 由個人開發者 {operatorName} 以 Lenny Studio 品牌提供。查看巴士、天氣、附近設施或精選地點，以及使用收藏，均毋須建立帳戶。"]
           },
           {
             "id": "location",
@@ -116,7 +117,7 @@
           {
             "id": "scope",
             "title": "Scope",
-            "paragraphs": ["This notice covers the iOS version of KongDaily, a standalone app offered by an individual developer under the Lenny Studio brand. You can use bus information, weather, Nearby, Explore and bookmarks without creating an account."]
+            "paragraphs": ["This notice covers the iOS version of KongDaily. KongDaily is provided by {operatorName}, an individual developer operating under the Lenny Studio brand. You can use bus information, weather, Nearby, Explore and bookmarks without creating an account."]
           },
           {
             "id": "location",
