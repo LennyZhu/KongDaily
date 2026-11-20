@@ -1,5 +1,6 @@
 {
   "ios": {
-    "NSLocationWhenInUseUsageDescription": "用於尋找你附近的生活設施及巴士站，並顯示與你所在位置的距離。"
+    "NSLocationWhenInUseUsageDescription": "用於尋找你附近的生活設施及巴士站，並顯示與你所在位置的距離。",
+    "NSMotionUsageDescription": "KongDaily 使用的定位程式庫包含可選的活動偵測功能。KongDaily 不會使用你的動作與健身資料。"
   }
 }

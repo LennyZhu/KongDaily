@@ -62,7 +62,7 @@
           "locationWhenInUsePermission": "Used to find nearby facilities and bus stops and show their distance from your location.",
           "locationAlwaysPermission": false,
           "locationAlwaysAndWhenInUsePermission": false,
-          "motionUsagePermission": false
+          "motionUsagePermission": "KongDaily's location library includes optional motion activity detection. KongDaily does not use your Motion & Fitness data."
         }
       ]
     ],
