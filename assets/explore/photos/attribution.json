@@ -1,0 +1,321 @@
+{
+  "dragons-back-to-tei-wan-tai-tam-gap": {
+    "asset": "assets/explore/photos/dragons-back.jpg",
+    "title": "USS Essex visit to Hong Kong 150610-N-FV739-266",
+    "author": "Christopher A. Veloicaza / U.S. Navy",
+    "sourcePage": "https://commons.wikimedia.org/wiki/File:USS_Essex_visit_to_Hong_Kong_150610-N-FV739-266.jpg",
+    "sourceRevision": 1162849767,
+    "originalFileUrl": "https://upload.wikimedia.org/wikipedia/commons/e/e2/USS_Essex_visit_to_Hong_Kong_150610-N-FV739-266.jpg",
+    "originalSha1": "43866d7ad882fb616ad6fea8409b2de1be842fa0",
+    "originalSha256": null,
+    "downloadUrl": "https://d1ldvf68ux039x.cloudfront.net/thumbs/photos/1506/1990058/2000w_q95.jpg",
+    "downloadedOn": "2026-11-20",
+    "downloadSha256": "373e15fd9b3adbfb969e48495053120a9a00413ffab8864831147e14ee58468f",
+    "downloadPixels": [
+      1999,
+      1331
+    ],
+    "license": "Public domain (U.S. Navy)",
+    "licenseUrl": "https://www.dvidshub.net/about/copyright",
+    "commercialAppDistributionEvidence": "DVIDS identifies the photograph as an official U.S. Navy work on Dragon’s Back. Its public-use guidance authorizes commercial use and requires non-endorsement. The selected crop excludes hikers and identifiable military markings.",
+    "description": {
+      "zh-HK": "龍脊山徑沿翠綠山脊延伸，兩側可見石澳一帶的海岸。",
+      "en": "The Dragon’s Back trail follows a green ridge above the coast near Shek O."
+    },
+    "processing": {
+      "cropPixels": {
+        "x": 0,
+        "y": 0,
+        "width": 1999,
+        "height": 770
+      },
+      "pixels": [
+        1480,
+        570
+      ],
+      "format": "JPEG",
+      "colorSpace": "sRGB",
+      "quality": 73,
+      "metadata": "Source EXIF omitted"
+    },
+    "sha256": "5822dbb21799c40d8e0303ace426764823eb35f75e7c4aedf8fb2be254b09f90",
+    "bytes": 236467,
+    "originalPublication": "https://www.dvidshub.net/image/1990058/uss-essex-visit-hong-kong",
+    "notice": {
+      "zh-HK": "美國戰爭部影像資料的使用不表示或構成美國戰爭部背書。",
+      "en": "The appearance of U.S. Department of War (DoW) visual information does not imply or constitute DoW endorsement."
+    }
+  },
+  "peak-circle-walk": {
+    "asset": "assets/explore/photos/peak-circle-walk.jpg",
+    "title": "Lugard road",
+    "author": "Ngchikit",
+    "sourcePage": "https://commons.wikimedia.org/wiki/File:Lugard_road.jpg",
+    "sourceRevision": 1190317114,
+    "originalFileUrl": "https://upload.wikimedia.org/wikipedia/commons/6/65/Lugard_road.jpg",
+    "originalSha1": "e6ede5dae50d9a3a1e94abeca1291dcb0b6fa7eb",
+    "originalSha256": null,
+    "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/65/Lugard_road.jpg/1280px-Lugard_road.jpg?utm_campaign=index&utm_content=thumbnail&utm_source=commons.wikimedia.org",
+    "downloadedOn": "2026-11-20",
+    "downloadSha256": "9828cad5f6618ac8fe8c16fb3b258b8c31134fe82d6b0c75970ab3dbd3f6efb0",
+    "downloadPixels": [
+      1280,
+      960
+    ],
+    "license": "Public domain (author dedication)",
+    "licenseUrl": "https://commons.wikimedia.org/wiki/Template:PD-user",
+    "commercialAppDistributionEvidence": "The Commons file records the author’s worldwide public-domain dedication and an unconditional grant where dedication is unavailable.",
+    "description": {
+      "zh-HK": "盧吉道的山邊步道，欄杆沿山坡延伸。",
+      "en": "The hillside footpath on Lugard Road, with railings following the slope."
+    },
+    "processing": {
+      "cropPixels": null,
+      "pixels": [
+        1280,
+        960
+      ],
+      "format": "JPEG",
+      "colorSpace": "sRGB",
+      "quality": 73,
+      "metadata": "Source EXIF omitted"
+    },
+    "sha256": "507f5f412bcdb32ec2813dded3976481f79809225924b84b418921607ab19b4d",
+    "bytes": 467358
+  },
+  "west-kowloon-art-park": {
+    "asset": "assets/explore/photos/west-kowloon-art-park.jpg",
+    "title": "A group of people standing on top of a lush green field",
+    "author": "Raymond Yeung",
+    "sourcePage": "https://unsplash.com/photos/a-group-of-people-standing-on-top-of-a-lush-green-field-RIY7fmUzar4",
+    "originalFileUrl": "https://unsplash.com/photos/RIY7fmUzar4/download?force=true",
+    "originalSha1": null,
+    "originalSha256": "1a94a0a43c3284ae4a3eb5090218b2124e0807bce8e00ddcebdc8c9e18fc474c",
+    "downloadUrl": "https://unsplash.com/photos/RIY7fmUzar4/download?force=true",
+    "downloadedOn": "2026-11-20",
+    "downloadSha256": "1a94a0a43c3284ae4a3eb5090218b2124e0807bce8e00ddcebdc8c9e18fc474c",
+    "downloadPixels": [
+      3307,
+      1860
+    ],
+    "license": "Unsplash License",
+    "licenseUrl": "https://unsplash.com/license",
+    "commercialAppDistributionEvidence": "The original listing identifies Art Park and the free Unsplash License, which expressly permits commercial downloading, modification and distribution. The photo is part of an editorial place guide, not a competing photo service or sale of the image.",
+    "description": {
+      "zh-HK": "西九藝術公園的草地及海濱長廊，遠方可見維港天際線。",
+      "en": "The Art Park lawn and waterfront promenade with the Victoria Harbour skyline in the distance."
+    },
+    "processing": {
+      "cropPixels": null,
+      "pixels": [
+        1480,
+        832
+      ],
+      "format": "JPEG",
+      "colorSpace": "sRGB",
+      "quality": 73,
+      "metadata": "Source EXIF omitted"
+    },
+    "sha256": "1428e2ad4c6a97ade65e341bd761695259a538c6005f429084813ba13ed46577",
+    "bytes": 272343,
+    "resolvedDownloadUrl": "https://images.unsplash.com/photo-1737868163327-58bd6851b535?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&dl=raymond-yeung-RIY7fmUzar4-unsplash.jpg"
+  },
+  "avenue-of-stars": {
+    "asset": "assets/explore/photos/avenue-of-stars.jpg",
+    "title": "2023 in Avenue of Stars, Hong Kong 1",
+    "author": "EditQ",
+    "sourcePage": "https://commons.wikimedia.org/wiki/File:2023_in_Avenue_of_Stars,_Hong_Kong_1.jpg",
+    "sourceRevision": 1032664014,
+    "originalFileUrl": "https://upload.wikimedia.org/wikipedia/commons/6/6a/2023_in_Avenue_of_Stars%2C_Hong_Kong_1.jpg",
+    "originalSha1": "84d39d3379bf6e82022995795d50f6710d3ea4a0",
+    "originalSha256": null,
+    "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6a/2023_in_Avenue_of_Stars%2C_Hong_Kong_1.jpg/1280px-2023_in_Avenue_of_Stars%2C_Hong_Kong_1.jpg?utm_campaign=index&utm_content=thumbnail&utm_source=commons.wikimedia.org",
+    "downloadedOn": "2026-11-20",
+    "downloadSha256": "ee45bfd7a92002fde375289b481447520a6663761154edea56d3765354d28668",
+    "downloadPixels": [
+      1280,
+      960
+    ],
+    "license": "CC0 1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "commercialAppDistributionEvidence": "The photographer marked this own work CC0 on the file page. CC0 permits commercial copying, modification and distribution.",
+    "description": {
+      "zh-HK": "星光大道的海濱步道與欄杆，對岸是港島天際線。",
+      "en": "The Avenue of Stars promenade and railings with the Hong Kong Island skyline across the harbour."
+    },
+    "processing": {
+      "cropPixels": null,
+      "pixels": [
+        1280,
+        960
+      ],
+      "format": "JPEG",
+      "colorSpace": "sRGB",
+      "quality": 73,
+      "metadata": "Source EXIF omitted"
+    },
+    "sha256": "0ed86502fca360f467d8d42ad9e0b75f19e1607ff687a9b8b9706889b0f3fa9c",
+    "bytes": 321392
+  },
+  "hong-kong-park": {
+    "asset": "assets/explore/photos/hong-kong-park.jpg",
+    "title": "Hong Kong, Part 8 - HongKong8568",
+    "author": "lumoplank",
+    "sourcePage": "https://commons.wikimedia.org/wiki/File:Hong_Kong,_Part_8_-_HongKong8568.jpg",
+    "sourceRevision": 1298268952,
+    "originalFileUrl": "https://upload.wikimedia.org/wikipedia/commons/9/91/Hong_Kong%2C_Part_8_-_HongKong8568.jpg",
+    "originalSha1": "0754db25d88b919acfcf28cf380b2b47ba721cdd",
+    "originalSha256": null,
+    "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/91/Hong_Kong%2C_Part_8_-_HongKong8568.jpg/1280px-Hong_Kong%2C_Part_8_-_HongKong8568.jpg?utm_campaign=index&utm_content=thumbnail&utm_source=commons.wikimedia.org",
+    "downloadedOn": "2026-11-20",
+    "downloadSha256": "de7061265080d9fab7d674027741e0c6699548722b90a65eff49418271c984a6",
+    "downloadPixels": [
+      1280,
+      960
+    ],
+    "license": "CC0 1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "commercialAppDistributionEvidence": "The Commons file records the source Flickr photo and the 19 July 2026 CC0 review. CC0 permits commercial copying, modification and distribution.",
+    "description": {
+      "zh-HK": "香港公園的人工瀑布流入池塘，旁邊有石橋。",
+      "en": "The artificial waterfall in Hong Kong Park flows into a pond beside a stone bridge."
+    },
+    "processing": {
+      "cropPixels": null,
+      "pixels": [
+        1280,
+        960
+      ],
+      "format": "JPEG",
+      "colorSpace": "sRGB",
+      "quality": 73,
+      "metadata": "Source EXIF omitted"
+    },
+    "sha256": "eb62e56c6c204a4de0f3eed1b26d6bb94e2fa75038f28ba61a560faf57c74add",
+    "bytes": 647022,
+    "originalPublication": "https://www.flickr.com/photos/199350666@N08/55305026400"
+  },
+  "kowloon-walled-city-park": {
+    "asset": "assets/explore/photos/kowloon-walled-city-park.jpg",
+    "title": "Hong Kong street 01",
+    "author": "Wilfredor",
+    "sourcePage": "https://commons.wikimedia.org/wiki/File:Hong_Kong_street_01.jpg",
+    "sourceRevision": 1302129190,
+    "originalFileUrl": "https://upload.wikimedia.org/wikipedia/commons/c/c4/Hong_Kong_street_01.jpg",
+    "originalSha1": "f18dd7f81af3b6826334e2f5bff54b2c3cb79fe5",
+    "originalSha256": null,
+    "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c4/Hong_Kong_street_01.jpg/1280px-Hong_Kong_street_01.jpg?utm_campaign=index&utm_content=thumbnail&utm_source=commons.wikimedia.org",
+    "downloadedOn": "2026-11-20",
+    "downloadSha256": "cc98fc1a7b4d1d145bc358f834659460f05715c749cfca5e50f7c839fc1a05bf",
+    "downloadPixels": [
+      1280,
+      850
+    ],
+    "license": "CC0 1.0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "commercialAppDistributionEvidence": "The photographer marked this own work CC0 on the file page, which identifies Kowloon Walled City Park in multiple languages. CC0 permits commercial copying, modification and distribution.",
+    "description": {
+      "zh-HK": "九龍寨城公園內綠瓦紅柱的中式涼亭。",
+      "en": "A Chinese garden pavilion with a green tiled roof and red pillars in Kowloon Walled City Park."
+    },
+    "processing": {
+      "cropPixels": null,
+      "pixels": [
+        1280,
+        850
+      ],
+      "format": "JPEG",
+      "colorSpace": "sRGB",
+      "quality": 73,
+      "metadata": "Source EXIF omitted"
+    },
+    "sha256": "a28f9ec8fda2db702b4eaefb7f7c692eae1e3d8d23883dab0c158a8e97f2a5d8",
+    "bytes": 566668
+  },
+  "tai-po-waterfront-park": {
+    "asset": "assets/explore/photos/tai-po-waterfront-park.jpg",
+    "title": "TaiPoWaterfrontPark Promenade 1",
+    "author": "Chong Fat",
+    "sourcePage": "https://commons.wikimedia.org/wiki/File:TaiPoWaterfrontPark_Promenade_1.jpg",
+    "sourceRevision": 1091776386,
+    "originalFileUrl": "https://upload.wikimedia.org/wikipedia/commons/4/49/TaiPoWaterfrontPark_Promenade_1.jpg",
+    "originalSha1": "ccafc147fe818876d5aec5dde251b438b876c0a2",
+    "originalSha256": null,
+    "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/49/TaiPoWaterfrontPark_Promenade_1.jpg/1280px-TaiPoWaterfrontPark_Promenade_1.jpg?utm_campaign=index&utm_content=thumbnail&utm_source=commons.wikimedia.org",
+    "downloadedOn": "2026-11-20",
+    "downloadSha256": "8954bcfb8fcfa148698f08df7a8e303eaa9ec1d21ddc42931f098be9926eb928",
+    "downloadPixels": [
+      1280,
+      960
+    ],
+    "license": "Public domain (author dedication)",
+    "licenseUrl": "https://commons.wikimedia.org/wiki/Template:PD-user",
+    "commercialAppDistributionEvidence": "The Commons file records the author’s worldwide public-domain dedication and an unconditional grant where dedication is unavailable.",
+    "description": {
+      "zh-HK": "大埔海濱公園的海濱長廊，沿途有欄杆、路燈及樹蔭。",
+      "en": "The Tai Po Waterfront Park promenade lined with railings, lamps and shade trees."
+    },
+    "processing": {
+      "cropPixels": null,
+      "pixels": [
+        1280,
+        960
+      ],
+      "format": "JPEG",
+      "colorSpace": "sRGB",
+      "quality": 73,
+      "metadata": "Source EXIF omitted"
+    },
+    "sha256": "f249c8e015e62ef511580c1d2d59b956f5bc3975c76cfc6f8263eaea9967081f",
+    "bytes": 385080
+  },
+  "victoria-peak-garden": {
+    "asset": "assets/explore/photos/victoria-peak-garden.jpg",
+    "title": "Victoria Peak Garden Lawn Plants 201607",
+    "author": "Wpcpey",
+    "sourcePage": "https://commons.wikimedia.org/wiki/File:Victoria_Peak_Garden_Lawn_Plants_201607.jpg",
+    "sourceRevision": 1279883312,
+    "authorUploadRevision": 202529515,
+    "creditTemplateRevision": 880186713,
+    "capturedOn": "2016-07-22",
+    "originalFileUrl": "https://upload.wikimedia.org/wikipedia/commons/6/6b/Victoria_Peak_Garden_Lawn_Plants_201607.jpg",
+    "originalSha1": "8db5b0c70a14a089544460e8746a584dca9e720e",
+    "originalSha256": "ef999bc776a7acd4757f679793b0d66fe6152cdfd796114f10e895c4bf2a3ccb",
+    "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/6/6b/Victoria_Peak_Garden_Lawn_Plants_201607.jpg",
+    "downloadedOn": "2026-11-20",
+    "downloadSha256": "ef999bc776a7acd4757f679793b0d66fe6152cdfd796114f10e895c4bf2a3ccb",
+    "downloadPixels": [
+      2656,
+      1768
+    ],
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "commercialAppDistributionEvidence": "Wpcpey’s own 2016 upload explicitly applies CC BY 4.0 to this JPEG in the Licensing section, as does the current file revision. A separate author credit template mentions CC BY 3.0. CC BY 4.0 permits commercial use and redistribution subject to attribution and no restrictions on recipients exercising their licensed rights. App Store packaging and terms still require release review.",
+    "creditLine": {
+      "zh-HK": "維基百科用戶-Wpcpey",
+      "en": "Wikipedia user -Wpcpey"
+    },
+    "description": {
+      "zh-HK": "從高處俯瞰山頂花園的草坪、對稱花圃和中央涼亭，後方是林木茂密的山坡。",
+      "en": "A view over Victoria Peak Garden’s lawn, symmetrical flower beds and central pavilion, with a wooded hillside behind them."
+    },
+    "processing": {
+      "cropPixels": null,
+      "pixels": [
+        1480,
+        985
+      ],
+      "format": "JPEG",
+      "colorSpace": "sRGB",
+      "quality": 73,
+      "metadata": "Source EXIF omitted",
+      "summary": {
+        "zh-HK": "隨 App 提供的版本縮放至 1480 × 985 並重新壓縮，移除原 EXIF。列表及詳情只在顯示時裁切以填滿版框。",
+        "en": "The bundled copy was resized to 1480 × 985, recompressed and stripped of source EXIF. The list and detail views crop the display to fit their frames."
+      }
+    },
+    "sha256": "59f27e7e1e3d876e1a9c6876b1d0450c5bc1c9c32c74c435b341dbebf783f4cb",
+    "bytes": 735374,
+    "independentOriginalUrl": "https://upload.wikimedia.org/wikipedia/commons/6/6b/Victoria_Peak_Garden_Lawn_Plants_201607.jpg"
+  }
+}

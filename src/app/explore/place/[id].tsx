@@ -2,9 +2,10 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef } from 'react';
 import { Alert, Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
 
-import { ExploreArtwork, exploreCategoryIcons } from '@/components/explore-artwork';
+import { ExplorePlacePhoto, exploreCategoryIcons } from '@/components/explore-artwork';
 import { AppText, EmptyState, Icon, Screen, type IconName } from '@/components/ui';
-import { getExplorePlace, getExploreTrailhead, homeFeaturedPlaceIds, type ExplorePlace } from '@/explore-places';
+import { getExplorePhoto } from '@/explore-place-images';
+import { getExplorePlace, getExploreTrailhead, type ExplorePlace } from '@/explore-places';
 import { isOfficialExploreUrl, selectExploreSources } from '@/explore-sources';
 import { useLanguage } from '@/language';
 import { colors, radius, space, touchTarget } from '@/theme';
@@ -15,8 +16,21 @@ export default function ExplorePlaceScreen() {
   const { explore } = copy;
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const place = typeof id === 'string' ? getExplorePlace(id) : undefined;
+  const photo = place ? getExplorePhoto(place.id) : undefined;
+  const credit = photo?.creditLine?.[locale];
   const trailhead = supportsUnifiedMaps() ? getExploreTrailhead(place) : undefined;
   const backToExplore = () => router.dismissTo('/explore');
+  const photoCreditLink = photo && place ? (
+    <Pressable accessibilityRole="link" onPress={() => router.push({
+      pathname: '/settings/credits', params: { photo: place.id },
+    })} style={({ pressed }) => [styles.sourceLink, pressed && styles.pressed]}>
+      <Icon name="photo" size={16} />
+      <AppText variant={credit ? 'detail' : 'homeCardTitle'} tone="primary" style={styles.copy}>
+        {credit ? `${copy.compliance.photoCredit} · ${credit}` : copy.compliance.photoCredit}
+      </AppText>
+      <Icon name="chevron.right" size={13} />
+    </Pressable>
+  ) : null;
 
   return (
     <>
@@ -45,7 +59,8 @@ export default function ExplorePlaceScreen() {
               </View>
               <AppText variant="display" accessibilityRole="header" style={styles.title}>{place.title[locale]}</AppText>
             </View>
-            <ExploreArtwork category={place.category} banner />
+            <ExplorePlacePhoto placeId={place.id} banner />
+            {credit && photoCreditLink}
             <AppText>{place.summary[locale]}</AppText>
             <View style={styles.section}>
               <AppText variant="homeHeading" accessibilityRole="header">{explore.highlights}</AppText>
@@ -63,15 +78,7 @@ export default function ExplorePlaceScreen() {
               <TravelRow icon="info.circle" title={explore.cautions} body={place.cautions[locale]} />
             </View>
             <OfficialSources place={place} />
-            {place.id === homeFeaturedPlaceIds.dragon && (
-              <Pressable accessibilityRole="link" onPress={() => router.push({
-                pathname: '/settings/credits', params: { photo: 'dragons-back' },
-              })} style={({ pressed }) => [styles.sourceLink, pressed && styles.pressed]}>
-                <Icon name="photo" size={16} />
-                <AppText variant="homeCardTitle" tone="primary" style={styles.copy}>{copy.compliance.dragonPhoto}</AppText>
-                <Icon name="chevron.right" size={13} />
-              </Pressable>
-            )}
+            {!credit && photoCreditLink}
             {trailhead && <TrailheadDirections name={trailhead.name[locale]} url={trailhead.url} />}
           </>
         ) : (

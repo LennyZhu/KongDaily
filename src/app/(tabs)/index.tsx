@@ -9,6 +9,7 @@ import { FeaturedCard, HomeHero, HomeLink, HomeSection, QuickLinkCard } from '@/
 import { HomeFavoriteBus } from '@/components/saved-bus-ui';
 import { AppText, EmptyState, Icon, Screen, type IconName } from '@/components/ui';
 import { WeatherWarningLink } from '@/components/weather-warning-ui';
+import { getExplorePhoto } from '@/explore-place-images';
 import { getExplorePlace, homeFeaturedPlaceIds } from '@/explore-places';
 import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
@@ -39,7 +40,7 @@ const quickLinkRows = [
 ] as const satisfies readonly (readonly [QuickLink, QuickLink, QuickLink])[];
 
 const featuredCards = [
-  { id: homeFeaturedPlaceIds.dragon, source: require('../../../assets/home/dragons-back.jpg') },
+  { id: homeFeaturedPlaceIds.dragon, source: getExplorePhoto(homeFeaturedPlaceIds.dragon)?.source },
   { id: homeFeaturedPlaceIds.westKowloon, source: require('../../../assets/home/west-kowloon.jpg') },
 ] as const;
 
@@ -113,7 +114,7 @@ export default function HomeScreen() {
           <View style={styles.row}>
             {featuredCards.map(({ id, source }) => {
               const place = getExplorePlace(id);
-              if (!place) return null;
+              if (!place || !source) return null;
               return (
                 <FeaturedCard key={place.id}
                   href={{ pathname: '/explore/place/[id]', params: { id: place.id } }}

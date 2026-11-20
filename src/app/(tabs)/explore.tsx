@@ -2,8 +2,9 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, type ComponentRef } from 'react';
 import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 
-import { ExploreArtwork, exploreCategoryIcons } from '@/components/explore-artwork';
+import { ExplorePlacePhoto, exploreCategoryIcons } from '@/components/explore-artwork';
 import { AppText, EmptyState, Icon, PageHeading, Screen } from '@/components/ui';
+import { getExplorePhoto } from '@/explore-place-images';
 import { getExplorePlaces, type ExploreCategory, type ExplorePlace } from '@/explore-places';
 import { useLanguage } from '@/language';
 import { colors, radius, space, touchTarget } from '@/theme';
@@ -103,15 +104,17 @@ function PlaceCard({ place, compact, onPress }: {
   const title = place.title[locale];
   const subtitle = [copy.explore.categories[place.category], place.district[locale]].filter(Boolean);
   const summary = place.summary[locale];
+  const credit = getExplorePhoto(place.id)?.creditLine?.[locale];
 
   return (
-    <Pressable ref={ref} accessibilityRole="button" accessibilityLabel={[title, ...subtitle, summary].join(', ')}
+    <Pressable ref={ref} accessibilityRole="button" accessibilityLabel={[title, ...subtitle, credit, summary].filter(Boolean).join(', ')}
       onPress={() => onPress(place.id, ref.current)}
       style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
-      <ExploreArtwork category={place.category} compact={compact} />
+      <ExplorePlacePhoto placeId={place.id} compact={compact} />
       <View style={styles.cardText}>
         <AppText variant="weatherTitle">{title}</AppText>
         <AppText variant="caption" tone="primary">{subtitle.join(' · ')}</AppText>
+        {credit && <AppText variant="caption" tone="muted">{credit}</AppText>}
         <AppText variant="detail" tone="muted">{summary}</AppText>
       </View>
       <Icon name="chevron.right" size={12} />

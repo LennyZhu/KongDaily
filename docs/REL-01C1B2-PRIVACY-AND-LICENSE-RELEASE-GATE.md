@@ -57,6 +57,8 @@ App 和網站的審閱版已共用 LandsD、SQLite、Apple 平台服務及主動
 
 ## 龍脊照片 · 保留與移除
 
+**UI-05C4 更新。** 原 CC BY-SA 4.0 龍脊照片已退出首頁及 Metro 資源引用。首頁和探索共用另有公開商用條件的龍脊實景照，App 署名已更新。若發行素材仍含舊圖，須換成已核實的版本。探索山頂花園仍缺可確認隨 App 分發的現況照片，素材審批及網站 Gate 維持待處理。以下保留原決策紀錄。 [UI-05C4 實作及分發證據](UI-05C4-EXPLORE-REAL-PHOTO-IMPLEMENTATION.md)
+
 原作為 Bjørn Christian Tørrissen（Uspn）的 *Dragons-Back-Northwards*，Commons 記錄 5,184 × 3,460 JPEG，CC BY-SA 4.0。C0 已驗證本機圖像與原作的像素關聯。這輪重新量度 `assets/home/dragons-back.jpg` 為 720 × 480、SHA-256 `8a03f2f99a28c0353f8e821692f2499b7215a56c83460e9ad23bc57f5d209a8a`，與已比對版本相同。實體 JPEG 經縮小及重壓縮，符合純技術轉換的現有證據。首頁卡片的填滿裁切和漸層是畫面處理。若以合成畫面作商店截圖等另行分發，須另外判定是否構成改作。現有龍脊詳情及 App 署名頁離線可讀作者、作品、修改和許可說明，原作與許可可使用連結查閱。 [原作及授權](https://commons.wikimedia.org/wiki/File:Dragons-Back-Northwards.jpg) · [App 署名](../src/compliance-credits.ts) · [卡片實作](../src/components/home-ui.tsx)
 
 ### A · 保留照片 · BLOCKED

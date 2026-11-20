@@ -44,7 +44,6 @@ const modules = {
     useLocalSearchParams: () => params, useRouter: () => router },
   'expo-linear-gradient': { LinearGradient: 'LinearGradient' },
   '@/components/ui': { AppText: 'AppText', EmptyState: 'EmptyState', Icon: 'Icon', PageHeading: 'PageHeading', Screen: 'Screen' },
-  '@/components/explore-artwork': { ExploreArtwork: 'ExploreArtwork', exploreCategoryIcons: {} },
   '@/components/bus-ui': { BusAction: 'BusAction' },
   '@/components/saved-bus-ui': { HomeFavoriteBus: 'HomeFavoriteBus' },
   '@/components/weather-warning-ui': { WeatherWarningLink: 'WeatherWarningLink' },
@@ -55,6 +54,7 @@ const modules = {
   '@/weather': {},
   '@/weather-hooks': {},
   '../assets/data/explore-places.json': bundle,
+  '../assets/explore/photos/attribution.json': require('../assets/explore/photos/attribution.json'),
 };
 
 // Run the shipped components and press handlers with native services stubbed and no network.
@@ -83,6 +83,8 @@ const { messages } = load('i18n.ts');
 modules['@/language'] = { useLanguage: () => ({ copy: messages[locale], locale }) };
 modules['@/theme'] = load('theme.ts');
 const placeModule = modules['@/explore-places'] = load('explore-places.ts');
+const { getExplorePhoto } = modules['@/explore-place-images'] = load('explore-place-images.ts');
+const { ExplorePlacePhoto } = modules['@/components/explore-artwork'] = load('components/explore-artwork.tsx');
 modules['@/explore-sources'] = load('explore-sources.ts');
 const homeUi = modules['@/components/home-ui'] = load('components/home-ui.tsx');
 const home = load('app/(tabs)/index.tsx').default;
@@ -135,9 +137,39 @@ async function main() {
 
   for (locale of Object.keys(approvedCopy)) {
     const [label, action, hint] = approvedCopy[locale];
+    params = {};
+    const allCards = elements(explore()).filter(({ type }) => type.name === 'PlaceCard');
+    assert.equal(allCards.length, bundle.places.length);
     for (const place of bundle.places) {
       params = { id: place.id };
       const tree = elements(detail());
+      const banner = tree.find(({ type }) => type === ExplorePlacePhoto);
+      const card = allCards.find(({ props }) => props.place.id === place.id);
+      const renderedCard = card.type(card.props);
+      const cardElements = elements(renderedCard);
+      const tile = cardElements.find(({ type }) => type === ExplorePlacePhoto);
+      assert.equal(tile.props.placeId, place.id);
+      assert.equal(banner.props.placeId, place.id);
+      const asset = getExplorePhoto(place.id);
+      const tileView = tile.type(tile.props);
+      const bannerView = banner.type(banner.props);
+      const creditLine = asset?.creditLine?.[locale];
+      if (creditLine) {
+        assert.ok(cardElements.some(({ props }) => props.children === creditLine));
+        assert.ok(renderedCard.props.accessibilityLabel.includes(creditLine));
+      }
+      if (asset) {
+        const tileImage = elements(tileView).find(({ type }) => type === 'Image');
+        const bannerImage = elements(bannerView).find(({ type }) => type === 'Image');
+        assert.equal(tileImage.props.source, asset.source);
+        assert.equal(bannerImage.props.source, asset.source);
+        assert.equal(tileImage.props.accessible, false);
+        assert.equal(bannerImage.props.accessibilityLabel, asset.description[locale]);
+        assert.equal(bannerImage.props.resizeMode, 'cover');
+      } else {
+        assert.equal(tileView, null);
+        assert.equal(bannerView, null);
+      }
       for (const key of ['title', 'summary', 'transport', 'cautions']) {
         assert.ok(tree.some(({ props }) => props.children === place[key][locale] || props.body === place[key][locale]),
           place.id + ' is missing offline ' + key);
@@ -195,6 +227,7 @@ async function main() {
 
     const homeCard = elements(home()).find(({ type, props }) =>
       type === homeUi.FeaturedCard && props.href.params.id === dragon);
+    assert.equal(homeCard.props.source, getExplorePhoto(dragon).source, 'Home must use the current Dragon’s Back photo');
     const homeLink = homeUi.FeaturedCard(homeCard.props);
     homeUi.HomeLink(homeLink.props).props.onPress();
     assert.equal(navigation.at(-1).method, 'navigate');

@@ -10,6 +10,7 @@ const { getStateFromPath } = require('expo-router/build/react-navigation/core/ge
 const { resolveHref } = require('expo-router/build/link/href');
 
 const content = require('../content/compliance-policy');
+const photoCredits = require('../assets/explore/photos/attribution.json');
 const confirmedEmail = 'lenny996@163.com';
 const contactHref = `mailto:${confirmedEmail}`;
 const brand = 'KongDaily by Lenny Studio';
@@ -47,7 +48,7 @@ const stubs = {
     changeLanguage: (value) => { changeLanguage = value; },
   }) },
   '@/components/ui': Object.fromEntries(['AppText', 'EmptyState', 'Icon', 'PageHeading', 'Screen'].map((name) => [name, name])),
-  '@/components/explore-artwork': { ExploreArtwork: 'ExploreArtwork', exploreCategoryIcons: {} },
+  '@/components/explore-artwork': { ExplorePlacePhoto: 'ExplorePlacePhoto', exploreCategoryIcons: {} },
 };
 const cache = new Map();
 function load(base) {
@@ -61,6 +62,7 @@ function load(base) {
   const mod = { exports: {} };
   new Function('module', 'exports', 'require', outputText)(mod, mod.exports, (id) => {
     if (Object.hasOwn(stubs, id)) return stubs[id];
+    if (id.endsWith('.jpg')) return resolve(dirname(file), id);
     if (id.startsWith('@/')) return load(join(src, id.slice(2)));
     if (id.startsWith('.')) return load(resolve(dirname(file), id));
     return require(id);
@@ -94,8 +96,8 @@ function keysOf(value, prefix = '') {
 assert.deepEqual(keysOf(messages['zh-HK']), keysOf(messages.en), 'i18n parity');
 
 const dragonId = homeFeaturedPlaceIds.dragon;
-const expectedHash = '8a03f2f99a28c0353f8e821692f2499b7215a56c83460e9ad23bc57f5d209a8a';
-assert.equal(createHash('sha256').update(readFileSync(join(root, 'assets/home/dragons-back.jpg'))).digest('hex'), expectedHash);
+const dragonPhoto = photoCredits[dragonId];
+assert.equal(createHash('sha256').update(readFileSync(join(root, dragonPhoto.asset))).digest('hex'), dragonPhoto.sha256);
 
 async function checkApp() {
   for (locale of ['zh-HK', 'en']) {
@@ -110,7 +112,9 @@ async function checkApp() {
       const view = elements(doc.type(doc.props));
       if (page === 'credits') {
         assert.equal(doc.props.title, messages[locale].compliance.credits);
-        assert.equal(doc.props.sections.length, 8);
+        assert.equal(doc.props.sections.length, 7 + Object.keys(photoCredits).length);
+        assert.ok(doc.props.sections.some(({ id, paragraphs }) => id === 'other-photos'
+          && paragraphs.some((line) => line.includes('Kevin Huynh') && line.includes('Jeanne Rose Gomez'))));
       } else {
         assert.deepEqual(doc.props.sections, content.locales[locale][page].sections);
         if (page === 'privacy') {
@@ -134,24 +138,42 @@ async function checkApp() {
 
     for (const place of [...getExplorePlaces(), { id: 'unknown' }]) {
       params = { id: place.id };
-      const credit = elements(exploreDetail()).find(({ props }) =>
+      const photo = photoCredits[place.id];
+      const creditLine = photo?.creditLine?.[locale];
+      const linkText = [messages[locale].compliance.photoCredit, creditLine].filter(Boolean).join(' · ');
+      const detailNodes = elements(exploreDetail());
+      const credit = detailNodes.find(({ props }) =>
         props.accessibilityRole === 'link' && elements(props.children).some((node) =>
-          node.props.children === messages[locale].compliance.dragonPhoto));
-      assert.equal(Boolean(credit), place.id === dragonId);
-      if (credit) credit.props.onPress();
+          node.props.children === linkText));
+      assert.equal(Boolean(credit), Boolean(photo));
+      if (credit) {
+        if (creditLine) {
+          const hero = detailNodes.find(({ type, props }) => type === 'ExplorePlacePhoto' && props.banner);
+          assert.equal(detailNodes[detailNodes.indexOf(hero) + 1], credit, 'Place credit immediately after its image');
+          assert.ok(credit.props.style({ pressed: false })[0].minHeight >= 44);
+        }
+        credit.props.onPress();
+        const route = getStateFromPath(resolveHref(pushes.at(-1)), config).routes.at(-1);
+        assert.equal(route.name, 'settings/credits');
+        assert.equal(route.params.photo, place.id);
+        const first = getComplianceCredits(locale, route.params.photo)[0];
+        assert.equal(first.id, place.id);
+        assert.ok(first.paragraphs[0].includes(photo.author));
+        assert.ok(first.paragraphs[0].includes(photo.license));
+        assert.ok(first.paragraphs[1].includes(photo.processing.pixels.join(' × ')));
+        assert.deepEqual(first.links.slice(0, 2).map(({ url }) => url), [photo.sourcePage, photo.licenseUrl]);
+        if (photo.independentOriginalUrl) {
+          assert.equal(first.links[2].url, photo.independentOriginalUrl);
+          assert.ok(first.paragraphs.includes(photo.processing.summary[locale]));
+        }
+      }
     }
-    const creditsRoute = getStateFromPath(resolveHref(pushes.at(-1)), config).routes.at(-1);
-    assert.equal(creditsRoute.name, 'settings/credits');
-    assert.equal(creditsRoute.params.photo, 'dragons-back');
-    params = creditsRoute.params;
+    params = { photo: 'dragons-back' };
     const credits = screens.credits();
     const record = credits.props.sections[0];
-    assert.equal(record.id, 'dragons-back');
-    assert.match(record.paragraphs.join(' '), /Bjørn Christian Tørrissen.*CC BY-SA 4\.0.*720 × 480/);
-    assert.deepEqual(record.links.map(({ url }) => url), [
-      'https://commons.wikimedia.org/wiki/File:Dragons-Back-Northwards.jpg',
-      'https://creativecommons.org/licenses/by-sa/4.0/',
-    ]);
+    assert.equal(record.id, dragonId);
+    assert.ok(record.paragraphs.includes(dragonPhoto.notice[locale]));
+    assert.ok(!JSON.stringify(credits.props.sections).includes('Dragons-Back-Northwards'));
     assert.deepEqual(getComplianceCredits(locale, ['dragons-back', 'invalid']), getComplianceCredits(locale));
     const docLinks = elements(credits.type(credits.props)).filter(({ props }) => props.accessibilityRole === 'link');
     assert.ok(docLinks.every(({ props }) => props.style({ pressed: false })[0].minHeight >= 44));

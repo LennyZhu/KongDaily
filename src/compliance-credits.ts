@@ -1,22 +1,37 @@
 import type { ComplianceLocale, ComplianceSection } from './compliance-content';
+import { getExplorePlace, homeFeaturedPlaceIds } from './explore-places';
+import photoCredits from '../assets/explore/photos/attribution.json';
 
 const text = (zh: string, en: string) => ({ 'zh-HK': zh, en });
 const source = (url: string, zh: string, en = zh) => ({ url, label: text(zh, en) });
 
-const dragonPhoto = {
-  id: 'dragons-back',
-  title: text('龍脊照片', 'Dragon’s Back photograph'),
-  paragraphs: [
-    text('《Dragons-Back-Northwards》由 Bjørn Christian Tørrissen（Uspn）拍攝，經 Wikimedia Commons 按 CC BY-SA 4.0 International 提供。',
-      'Dragons-Back-Northwards by Bjørn Christian Tørrissen (Uspn), via Wikimedia Commons under CC BY-SA 4.0 International.'),
-    text('隨 App 的 JPEG 已縮小至 720 × 480 並重新壓縮。首頁卡片以填滿方式裁切顯示，另加漸層。',
-      'The bundled JPEG was resized to 720 × 480 and recompressed. The Home card crops the display to fill the frame and overlays a gradient.'),
-  ],
-  links: [
-    source('https://commons.wikimedia.org/wiki/File:Dragons-Back-Northwards.jpg', 'Wikimedia Commons 原作與作者資料', 'Original work and photographer on Wikimedia Commons'),
-    source('https://creativecommons.org/licenses/by-sa/4.0/', 'CC BY-SA 4.0 授權', 'CC BY-SA 4.0 licence'),
-  ],
-};
+const explorePhotoCredits = Object.entries(photoCredits).map(([id, credit]) => {
+  const place = getExplorePlace(id);
+  const dimensions = credit.processing.pixels.join(' × ');
+  const crop = credit.processing.cropPixels;
+  const catalogueTitle = place?.title ?? text(credit.title, credit.title);
+  const attribution = 'creditLine' in credit ? credit.creditLine : text(credit.author, credit.author);
+  return {
+    id,
+    title: text(`${catalogueTitle['zh-HK']} · 照片`, `${catalogueTitle.en} · Photo`),
+    paragraphs: [
+      text(`《${credit.title}》由 ${attribution['zh-HK']} 拍攝。授權：${credit.license}。`,
+        `“${credit.title}” by ${attribution.en}. Licence: ${credit.license}.`),
+      'summary' in credit.processing ? credit.processing.summary : crop
+        ? text(`隨 App 提供的照片取原圖上方的山脊，縮放至 ${dimensions} 並重新壓縮。首頁卡片另加漸層。`,
+          `The bundled photo is cropped to the upper ridgeline, resized to ${dimensions} and recompressed. The Home card adds a gradient.`)
+        : text(`隨 App 提供 ${dimensions} 的 JPEG 版本，已重新壓縮。列表和詳情按版框裁切顯示。`,
+          `The bundled ${dimensions} JPEG was recompressed. The list and detail views crop the display to fit their frames.`),
+      ...('notice' in credit ? [credit.notice] : []),
+    ],
+    links: [
+      source(credit.sourcePage, '原作與攝影者', 'Original work and photographer'),
+      source(credit.licenseUrl, '授權及使用條款', 'Licence and usage terms'),
+      ...('independentOriginalUrl' in credit ? [source(credit.independentOriginalUrl, '下載 Commons 原圖', 'Download original from Commons')] : []),
+      ...('originalPublication' in credit ? [source(credit.originalPublication, '原始發佈頁', 'Original publication')] : []),
+    ],
+  };
+});
 
 const sourceGroups = [
   {
@@ -97,10 +112,10 @@ const sourceGroups = [
       source('https://static.csdi.gov.hk/csdi-webpage/doc/TNC', '空間數據共享平台使用條款', 'CSDI Portal terms'),
     ],
   },
-  dragonPhoto,
+  ...explorePhotoCredits,
   {
     id: 'other-photos',
-    title: text('維港與西九照片', 'Victoria Harbour and West Kowloon photographs'),
+    title: text('首頁維港與西九照片', 'Home photos of Victoria Harbour and West Kowloon'),
     paragraphs: [
       text('維港照片由 Kevin Huynh 拍攝，來自 Pexels。西九照片由 Jeanne Rose Gomez 拍攝，來自 Unsplash。',
         'The Victoria Harbour photograph is by Kevin Huynh via Pexels. The West Kowloon photograph is by Jeanne Rose Gomez via Unsplash.'),
@@ -115,9 +130,9 @@ const sourceGroups = [
 ];
 
 export function getComplianceCredits(locale: ComplianceLocale, photo?: string | string[]): readonly ComplianceSection[] {
-  const groups = photo === dragonPhoto.id
-    ? [dragonPhoto, ...sourceGroups.filter(({ id }) => id !== dragonPhoto.id)]
-    : sourceGroups;
+  const photoId = photo === 'dragons-back' ? homeFeaturedPlaceIds.dragon : photo;
+  const selected = explorePhotoCredits.find(({ id }) => id === photoId);
+  const groups = selected ? [selected, ...sourceGroups.filter(({ id }) => id !== selected.id)] : sourceGroups;
   return groups.map(({ id, title, paragraphs, links }) => ({
     id,
     title: title[locale],

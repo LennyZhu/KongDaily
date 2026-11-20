@@ -1,7 +1,9 @@
 import { Image, StyleSheet, View } from 'react-native';
 
-import { Icon, type IconName } from '@/components/ui';
+import type { IconName } from '@/components/ui';
+import { getExplorePhoto } from '@/explore-place-images';
 import type { ExploreCategory } from '@/explore-places';
+import { useLanguage } from '@/language';
 import { homeColors, radius } from '@/theme';
 
 export const exploreCategoryIcons = {
@@ -11,39 +13,27 @@ export const exploreCategoryIcons = {
   pets: 'pawprint',
 } as const satisfies Record<ExploreCategory, IconName>;
 
-const artwork = {
-  hiking: {
-    tile: require('../../assets/explore/hiking-tile.png'),
-    banner: require('../../assets/explore/hiking-banner.png'),
-  },
-  waterfront: {
-    tile: require('../../assets/explore/waterfront-tile.png'),
-    banner: require('../../assets/explore/waterfront-banner.png'),
-  },
-};
-
-export function ExploreArtwork({ category, banner = false, compact = false }: {
-  category: ExploreCategory;
+export function ExplorePlacePhoto({ placeId, banner = false, compact = false }: {
+  placeId: string;
   banner?: boolean;
   compact?: boolean;
 }) {
-  const aspect = banner ? styles.banner : [styles.tile, compact && styles.compact];
-  const motif = category === 'hiking' || category === 'waterfront' ? artwork[category] : undefined;
+  const { locale } = useLanguage();
+  const photo = getExplorePhoto(placeId);
+  if (!photo) return null;
+
   return (
-    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
-      style={[styles.artwork, aspect, { backgroundColor: category === 'pets' ? homeColors.cream : homeColors.green }]}>
-      {motif ? (
-        <Image accessible={false} source={banner ? motif.banner : motif.tile}
-          resizeMode="cover" style={styles.image} />
-      ) : (
-        <Icon name={exploreCategoryIcons[category]} size={banner ? 52 : 26} />
-      )}
+    <View style={[styles.artwork, banner ? styles.banner : styles.tile, !banner && compact && styles.compact]}>
+      <Image source={photo.source} resizeMode="cover" style={styles.image}
+        accessible={banner} accessibilityLabel={banner ? photo.description[locale] : undefined}
+        accessibilityRole={banner ? 'image' : undefined}
+        accessibilityElementsHidden={!banner} importantForAccessibility={banner ? 'auto' : 'no'} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  artwork: { overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  artwork: { overflow: 'hidden', backgroundColor: homeColors.green },
   tile: { width: 66, height: 66, borderRadius: radius.control },
   compact: { width: 44, height: 44 },
   banner: { height: 142, borderRadius: radius.media },
