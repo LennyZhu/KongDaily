@@ -3,7 +3,9 @@
     "name": "KongDaily",
     "slug": "kongdaily",
     "version": "1.0.0",
-    "platforms": ["ios"],
+    "platforms": [
+      "ios"
+    ],
     "scheme": "kongdaily",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -15,7 +17,14 @@
         "CFBundleAllowMixedLocalizations": true,
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false
-        }
+        },
+        "CFBundleLocalizations": [
+          "en",
+          "zh-HK",
+          "en",
+          "zh-HK"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "locales": {
@@ -39,7 +48,10 @@
         "expo-localization",
         {
           "supportedLocales": {
-            "ios": ["en", "zh-HK"]
+            "ios": [
+              "en",
+              "zh-HK"
+            ]
           }
         }
       ],
