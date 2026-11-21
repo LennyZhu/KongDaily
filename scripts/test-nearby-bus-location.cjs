@@ -1301,6 +1301,7 @@ test('MTR detail shows separate official branch orders and a supplemental Raceco
   await page.settle();
   assert.ok(page.shows('東鐵綫'));
   assert.equal(page.mtrForecastProps(), undefined);
+  assert.ok(!page.shows(page.mtrCopy.forecastDisclaimer));
   assert.equal(page.directionFilters().options.length, 4);
   const orderedStops = () => page.detailRows().filter(({ sequence }) => sequence !== undefined);
   assert.deepEqual(orderedStops().map(({ sequence }) => sequence), Array.from({ length: 14 }, (_, i) => i + 1));
@@ -1321,12 +1322,25 @@ test('MTR detail shows separate official branch orders and a supplemental Raceco
   assert.equal(station.mtrForecastProps().station.id, 'HOK');
   assert.equal(station.mtrForecastProps().initialLine, undefined);
   assert.ok(station.shows(station.mtrCopy.attribution) && station.shows(station.mtrCopy.disclaimer));
+  const { mtrSource } = page.mtr();
+  assert.ok(station.shows(station.mtrCopy.offlineUpdated(mtrSource.resourceUpdatedOn)));
+  assert.ok(station.shows(station.mtrCopy.snapshotDate(mtrSource.fetchedOn)));
+  assert.ok(station.shows(station.mtrCopy.forecastDisclaimer));
   assert.deepEqual(station.openedLinks, []);
   station.press(station.mtrCopy.dataset);
-  assert.deepEqual(station.openedLinks, [page.mtr().mtrSource.resource]);
+  station.press(station.mtrCopy.nextTrains.dataset);
+  assert.deepEqual(station.openedLinks, [mtrSource.resource, 'https://data.gov.hk/en-data/dataset/mtr-data2-nexttrain-data']);
   assert.deepEqual(station.detailRows().map(({ entry }) => entry.id), ['AEL', 'TCL']);
   station.press('Airport Express');
   assert.deepEqual(station.routes, [{ pathname: '/mtr/[kind]', params: { kind: 'line', code: 'AEL' } }]);
+
+  const racecourse = mount(t, { mtrDetail: { kind: 'station', code: 'RAC', line: 'EAL' } });
+  await racecourse.settle();
+  assert.ok(racecourse.shows(racecourse.mtrCopy.racecourseSourceNote));
+  assert.ok(!station.shows(station.mtrCopy.racecourseSourceNote));
+  racecourse.press(racecourse.mtrCopy.racecourseDictionary);
+  racecourse.press(racecourse.mtrCopy.serviceHours);
+  assert.deepEqual(racecourse.openedLinks, [mtrSource.racecourseCodeSource, mtrSource.racecourseHours]);
 
   const invalid = mount(t, { mtrDetail: { kind: 'station', code: ['HOK', 'KOW'] } });
   await invalid.settle();
@@ -1538,6 +1552,7 @@ test('Light Rail details switch official visits, open stable stop IDs and link t
   await route.settle();
   assert.ok(route.shows(route.lightRailCopy.route('761P')));
   assert.equal(route.lightRailForecastProps(), undefined);
+  assert.ok(!route.shows(route.mtrCopy.forecastDisclaimer));
   assert.ok(route.shows(`離線路線資料更新日期 ${route.lightRail().lightRailSource.resourceUpdatedOn}`));
   assert.deepEqual(route.directionFilters().options, [['1', '天逸 → 元朗'], ['2', '元朗 → 天逸']]);
   route.directionFilters().onSelect('2');
@@ -1567,13 +1582,16 @@ test('Light Rail details switch official visits, open stable stop IDs and link t
   const routesIndex = elements.findIndex(({ props }) => props.children === stop.lightRailCopy.lines);
   assert.ok(stopIdIndex >= 0 && stopIdIndex < forecastIndex && forecastIndex < routesIndex);
   assert.ok(stop.shows(`Offline route data updated ${stop.lightRail().lightRailSource.resourceUpdatedOn}`));
+  assert.ok(stop.shows(stop.mtrCopy.forecastDisclaimer));
   assert.deepEqual(stop.detailRows().map(({ entry }) => entry.id), ['507', '614', '614P']);
   stop.press('Route 614P');
   assert.deepEqual(stop.routes, [{ pathname: '/light-rail/[kind]', params: { kind: 'route', id: '614P' } }]);
   assert.deepEqual(stop.openedLinks, []);
   stop.press(stop.lightRailCopy.dataset);
   stop.press(stop.lightRailCopy.timetable);
-  assert.deepEqual(stop.openedLinks, [stop.lightRail().lightRailSource.resource, stop.lightRail().lightRailSource.timetable.en]);
+  stop.press(stop.lightRailCopy.nextTrains.dataset);
+  assert.deepEqual(stop.openedLinks, [stop.lightRail().lightRailSource.resource, stop.lightRail().lightRailSource.timetable.en,
+    'https://data.gov.hk/en-data/dataset/mtr-lrnt_data-light-rail-nexttrain-data']);
 
   const invalid = mount(t, { lightRailDetail: { kind: 'stop', id: ['250', '550'] } });
   await invalid.settle();

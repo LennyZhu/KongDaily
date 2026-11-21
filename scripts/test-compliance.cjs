@@ -11,6 +11,8 @@ const { resolveHref } = require('expo-router/build/link/href');
 
 const content = require('../content/compliance-policy');
 const photoCredits = require('../assets/explore/photos/attribution.json');
+const { source: mtrSource } = require('../assets/data/mtr-static.json');
+const { source: lightRailSource } = require('../assets/data/light-rail-static.json');
 const confirmedEmail = 'lenny996@163.com';
 const contactHref = `mailto:${confirmedEmail}`;
 const brand = 'KongDaily by Lenny Studio';
@@ -104,6 +106,41 @@ const dragonId = homeFeaturedPlaceIds.dragon;
 const dragonPhoto = photoCredits[dragonId];
 assert.equal(createHash('sha256').update(readFileSync(join(root, dragonPhoto.asset))).digest('hex'), dragonPhoto.sha256);
 
+function checkRailwayCredits(sections, language) {
+  const { mtr, lightRail } = messages[language];
+  const railwayResources = {
+    'mtr-offline': ['mtr-data-routes-fares-barrier-free-facilities/resource/8daba4fe-b879-4a51-8962-27b4cffdc61c', mtr.dataset],
+    'light-rail-offline': ['mtr-data-routes-fares-barrier-free-facilities/resource/d0662909-9919-4f01-b4f9-eccc4b2acbb5', lightRail.dataset],
+    'mtr-realtime': ['mtr-data2-nexttrain-data/resource/103472ed-01be-4dda-92c6-30530dee022f', mtr.nextTrains.dataset],
+    'light-rail-realtime': ['mtr-lrnt_data-light-rail-nexttrain-data/resource/d26e774b-b5ef-409f-8d4d-e61a3d323f9d', lightRail.nextTrains.dataset],
+  };
+  const byId = new Map(sections.map((section) => [section.id, section]));
+  assert.deepEqual([...byId.keys()], ['bus', ...Object.keys(railwayResources), 'weather', 'facilities', 'geometry', 'explore', 'terms',
+    ...Object.keys(photoCredits), 'other-photos']);
+  const attribution = language === 'en' ? /MTR Corporation Limited.*provides.*owns its intellectual property rights.*DATA\.GOV\.HK.*HKSAR Government/
+    : /香港鐵路有限公司提供.*知識產權屬香港鐵路有限公司.*香港特別行政區政府.*DATA\.GOV\.HK/;
+  for (const [id, [resource, label]] of Object.entries(railwayResources)) {
+    const section = byId.get(id);
+    assert.ok(section.title.match(language === 'en' ? /^(Offline|Real-time) (MTR|Light Rail)/ : /^(港鐵|輕鐵)(離線|即時)/));
+    assert.match(section.paragraphs[0], attribution);
+    assert.deepEqual(section.links[0], { url: `https://data.gov.hk/en-data/dataset/${resource}`, label });
+    if (id.endsWith('-realtime')) {
+      assert.deepEqual(section.paragraphs.slice(1), [mtr.forecastDisclaimer]);
+      assert.ok(!section.paragraphs.some((paragraph) => /\d{4}-\d{2}-\d{2}/.test(paragraph)));
+    }
+  }
+  const mtrOffline = byId.get('mtr-offline');
+  const lightRailOffline = byId.get('light-rail-offline');
+  assert.deepEqual(mtrOffline.paragraphs.slice(1), [mtr.offlineUpdated(mtrSource.resourceUpdatedOn), mtr.disclaimer, mtr.racecourseSourceNote]);
+  assert.deepEqual(lightRailOffline.paragraphs.slice(1), [mtr.offlineUpdated(lightRailSource.resourceUpdatedOn), lightRail.coverage]);
+  assert.match(mtr.racecourseSourceNote, language === 'en' ? /CSV omits Racecourse \(RAC\).*public data dictionary/ : /主 CSV 未收錄馬場站（RAC）.*公開資料字典/);
+  assert.deepEqual(mtrOffline.links.slice(1), [
+    { url: mtrSource.racecourseCodeSource, label: mtr.racecourseDictionary },
+    { url: mtrSource.racecourseHours, label: mtr.serviceHours },
+  ]);
+  assert.match(byId.get('terms').paragraphs.join(' '), language === 'en' ? /independent developer.*solely as data sources/ : /獨立開發者.*僅作資料來源署名/);
+}
+
 async function checkApp() {
   for (locale of ['zh-HK', 'en']) {
     const links = elements(settings()).filter(({ props }) => props.accessibilityRole === 'link');
@@ -117,7 +154,7 @@ async function checkApp() {
       const view = elements(doc.type(doc.props));
       if (page === 'credits') {
         assert.equal(doc.props.title, messages[locale].compliance.credits);
-        assert.equal(doc.props.sections.length, 7 + Object.keys(photoCredits).length);
+        checkRailwayCredits(doc.props.sections, locale);
         assert.ok(doc.props.sections.some(({ id, paragraphs }) => id === 'other-photos'
           && paragraphs.some((line) => line.includes('Kevin Huynh') && line.includes('Jeanne Rose Gomez'))));
       } else {

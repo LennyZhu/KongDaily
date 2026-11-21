@@ -83,8 +83,9 @@ function LightRailSources({ forecast }: { forecast: boolean }) {
     <View style={styles.rows}>
       <AppText variant="homeHeading" accessibilityRole="header">{copy.mtr.source}</AppText>
       <AppText variant="detail" tone="muted">{copy.mtr.attribution}</AppText>
-      <AppText variant="detail" tone="muted">{labels.updated(lightRailSource.resourceUpdatedOn)}</AppText>
+      <AppText variant="detail" tone="muted">{copy.mtr.offlineUpdated(lightRailSource.resourceUpdatedOn)}</AppText>
       <AppText variant="detail" tone="muted">{labels.coverage}</AppText>
+      {forecast && <AppText variant="detail" tone="muted">{copy.mtr.forecastDisclaimer}</AppText>}
       {links.map(([label, url]) => (
         <Pressable key={url} accessibilityRole="link" accessibilityHint={copy.compliance.externalLink}
           onPress={() => { void Linking.openURL(url).catch(() => Alert.alert(copy.compliance.linkFailed)); }}

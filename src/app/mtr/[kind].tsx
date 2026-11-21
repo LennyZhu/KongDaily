@@ -85,14 +85,20 @@ function MtrSources({ forecast, racecourse }: { forecast: boolean; racecourse: b
     [copy.mtr.terms, 'https://data.gov.hk/en/terms-and-conditions'],
   ];
   if (forecast) links.push([copy.mtr.nextTrains.dataset, mtrForecastSource]);
-  if (racecourse) links.push([copy.mtr.serviceHours, mtrSource.racecourseHours]);
+  if (racecourse) links.push(
+    [copy.mtr.racecourseDictionary, mtrSource.racecourseCodeSource],
+    [copy.mtr.serviceHours, mtrSource.racecourseHours],
+  );
 
   return (
     <View style={styles.rows}>
       <AppText variant="homeHeading" accessibilityRole="header">{copy.mtr.source}</AppText>
       <AppText variant="detail" tone="muted">{copy.mtr.attribution}</AppText>
+      <AppText variant="detail" tone="muted">{copy.mtr.offlineUpdated(mtrSource.resourceUpdatedOn)}</AppText>
       <AppText variant="detail" tone="muted">{copy.mtr.snapshotDate(mtrSource.fetchedOn)}</AppText>
       <AppText variant="detail" tone="muted">{copy.mtr.disclaimer}</AppText>
+      {racecourse && <AppText variant="detail" tone="muted">{copy.mtr.racecourseSourceNote}</AppText>}
+      {forecast && <AppText variant="detail" tone="muted">{copy.mtr.forecastDisclaimer}</AppText>}
       {links.map(([label, url]) => (
         <Pressable key={url} accessibilityRole="link" accessibilityHint={copy.compliance.externalLink}
           onPress={() => { void Linking.openURL(url).catch(() => Alert.alert(copy.compliance.linkFailed)); }}

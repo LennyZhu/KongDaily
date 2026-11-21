@@ -1,9 +1,15 @@
 import type { ComplianceLocale, ComplianceSection } from './compliance-content';
 import { getExplorePlace, homeFeaturedPlaceIds } from './explore-places';
+import { messages, type Messages } from './i18n';
+import { lightRailSource } from './light-rail-static';
+import { mtrSource } from './mtr-static';
 import photoCredits from '../assets/explore/photos/attribution.json';
 
 const text = (zh: string, en: string) => ({ 'zh-HK': zh, en });
 const source = (url: string, zh: string, en = zh) => ({ url, label: text(zh, en) });
+const railwayText = (select: (copy: Messages) => string) => text(select(messages['zh-HK']), select(messages.en));
+const railwayAttribution = railwayText((copy) => copy.mtr.attribution);
+const forecastDisclaimer = railwayText((copy) => copy.mtr.forecastDisclaimer);
 
 const explorePhotoCredits = Object.entries(photoCredits).map(([id, credit]) => {
   const place = getExplorePlace(id);
@@ -49,6 +55,49 @@ const sourceGroups = [
       source('https://data.gov.hk/en-data/dataset/nlb-bus-nlb-bus-service-v2', '新大嶼山巴士 · DATA.GOV.HK', 'New Lantao Bus · DATA.GOV.HK'),
       source('https://data.gov.hk/en-data/dataset/hk-td-tis_14-routes-fares-xml', '運輸署車費資料 · DATA.GOV.HK', 'Transport Department fares · DATA.GOV.HK'),
     ],
+  },
+  {
+    id: 'mtr-offline',
+    title: text('港鐵離線綫路及車站', 'Offline MTR lines and stations'),
+    paragraphs: [
+      railwayAttribution,
+      railwayText((copy) => copy.mtr.offlineUpdated(mtrSource.resourceUpdatedOn)),
+      railwayText((copy) => copy.mtr.disclaimer),
+      railwayText((copy) => copy.mtr.racecourseSourceNote),
+    ],
+    links: [
+      { url: mtrSource.resource, label: railwayText((copy) => copy.mtr.dataset) },
+      { url: mtrSource.racecourseCodeSource, label: railwayText((copy) => copy.mtr.racecourseDictionary) },
+      { url: mtrSource.racecourseHours, label: railwayText((copy) => copy.mtr.serviceHours) },
+    ],
+  },
+  {
+    id: 'light-rail-offline',
+    title: text('輕鐵離線路線及車站', 'Offline Light Rail routes and stops'),
+    paragraphs: [
+      railwayAttribution,
+      railwayText((copy) => copy.mtr.offlineUpdated(lightRailSource.resourceUpdatedOn)),
+      railwayText((copy) => copy.lightRail.coverage),
+    ],
+    links: [{ url: lightRailSource.resource, label: railwayText((copy) => copy.lightRail.dataset) }],
+  },
+  {
+    id: 'mtr-realtime',
+    title: text('港鐵即時列車預報', 'Real-time MTR train predictions'),
+    paragraphs: [railwayAttribution, forecastDisclaimer],
+    links: [{
+      url: 'https://data.gov.hk/en-data/dataset/mtr-data2-nexttrain-data/resource/103472ed-01be-4dda-92c6-30530dee022f',
+      label: railwayText((copy) => copy.mtr.nextTrains.dataset),
+    }],
+  },
+  {
+    id: 'light-rail-realtime',
+    title: text('輕鐵即時列車預報', 'Real-time Light Rail train predictions'),
+    paragraphs: [railwayAttribution, forecastDisclaimer],
+    links: [{
+      url: 'https://data.gov.hk/en-data/dataset/mtr-lrnt_data-light-rail-nexttrain-data/resource/d26e774b-b5ef-409f-8d4d-e61a3d323f9d',
+      label: railwayText((copy) => copy.lightRail.nextTrains.dataset),
+    }],
   },
   {
     id: 'weather',
@@ -107,8 +156,10 @@ const sourceGroups = [
     id: 'terms',
     title: text('開放數據使用條款', 'Open data terms'),
     paragraphs: [
-      text('各資料來源適用其公布的條款。刊載機構及來源供查閱，KongDaily 為獨立 App。',
-        'Each source is subject to its published terms. KongDaily is an independent app and lists providers so you can consult the original sources.'),
+      text('各資料來源適用其公布的條款。刊載機構及來源供查閱。',
+        'Each source is subject to its published terms. Provider details are listed so you can consult the original sources.'),
+      text('KongDaily 由獨立開發者營運。香港鐵路有限公司及香港特別行政區政府在此僅作資料來源署名。',
+        'KongDaily is operated by an independent developer. MTR Corporation Limited and the Hong Kong SAR Government are credited here solely as data sources.'),
     ],
     links: [
       source('https://data.gov.hk/tc/terms-and-conditions', 'DATA.GOV.HK 使用條款', 'DATA.GOV.HK terms'),
