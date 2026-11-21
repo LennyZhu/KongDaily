@@ -261,8 +261,15 @@ function mountHook() {
     clearInterval: (id) => ticks.delete(id),
   });
   const useHook = load('mtr-next-train-hooks').useMtrNextTrains;
+  const useNextTrainReading = load('next-train-hooks').useNextTrainReading;
+  const simulatedClock = () => now;
   return {
     render(line, station) { cursor = 0; return useHook(line, station); },
+    renderLightRail(station) {
+      cursor = 0;
+      const read = react.useCallback(() => new Promise((resolve) => calls.push({ station, resolve })), [station]);
+      return useNextTrainReading(station, read, simulatedClock);
+    },
     focus(value) {
       focused = value;
       cleanup?.();
@@ -420,6 +427,261 @@ if (process.env.MTR_PROBE_DIR) {
       const payload = parseMtrForecast(data, line, station);
       const view = mtrForecastView(reading(payload, { serverNow: date + age * 1000 }), start);
       assert.equal(view.kind, expected, pair);
+    }
+  });
+}
+
+const { createLightRailNextTrainClient } = source('light-rail-next-train-client');
+const { parseLightRailForecast, lightRailForecastView, supportsLightRailForecast } = source('light-rail-realtime');
+const { lightRailStops } = source('light-rail-static');
+
+function railTrain(overrides = {}) {
+  return {
+    route_no: '507', special: 0, additionalInfo1: '', dest_en: 'Tin King', dest_ch: '田景',
+    arrival_departure: 'A', time_en: '5 mins', time_ch: '5 分鐘', stop: 0, train_length: 2, ...overrides,
+  };
+}
+function railPlatform(platform_id, ...route_list) {
+  return { platform_id, route_list };
+}
+function railBody(...platform_list) {
+  return { status: 1, system_time: timestamp, platform_list };
+}
+
+test('Light Rail coverage matches all 68 official directory IDs and uses Hoi Wong Road ID 250', () => {
+  assert.equal(lightRailStops.length, 68);
+  assert.ok(lightRailStops.every(({ id }) => supportsLightRailForecast(id)));
+  const stop = lightRailStops.find(({ id }) => id === '250');
+  assert.equal(stop.en, 'Hoi Wong Road');
+  for (const invalid of ['9999', 'TSP', '0250', '705', '250&with_special=0']) assert.equal(supportsLightRailForecast(invalid), false);
+  assert.equal(parseLightRailForecast({ ...railBody(), station_id: 920 }, '250').kind, 'failed');
+  assert.equal(parseLightRailForecast({ ...railBody(), station_id: 250 }, '250').kind, 'forecast');
+});
+
+test('Light Rail preserves official platform order, same-platform routes, later trains and provider destinations', () => {
+  const payload = parseLightRailForecast(railBody(
+    railPlatform(2, railTrain({ time_en: '5 min' }), railTrain({ route_no: '614', dest_en: 'Yuen Long', dest_ch: '元朗' })),
+    railPlatform(4, railTrain({ route_no: '705', dest_en: 'TSW Circular', dest_ch: '天水圍循環綫' })),
+    railPlatform(2, railTrain({ time_en: '9 mins', time_ch: '9 分鐘' })),
+  ), '250');
+  assert.deepEqual(payload.platforms.map(({ id, trains }) => [id, trains.map(({ route }) => route.code)]),
+    [[2, ['507', '614', '507']], [4, ['705']]]);
+  assert.deepEqual(payload.platforms[0].trains[1].destination, { en: 'Yuen Long', zh: '元朗' });
+  assert.equal(payload.platforms[1].trains[0].destination.en, 'TSW Circular');
+  assert.deepEqual(payload.platforms[0].trains.map(({ time }) => time.minutes), [5, 5, 9]);
+});
+
+test('Light Rail parses numeric and qualitative official snapshot times without inventing a zero-minute countdown', () => {
+  const payload = parseLightRailForecast(railBody(railPlatform(1,
+    railTrain({ time_en: '1 min', time_ch: '1 分鐘' }),
+    railTrain({ time_en: '-', time_ch: '-' }),
+    railTrain({ arrival_departure: 'D', time_en: 'Departing', time_ch: '正在離開' }),
+    railTrain({ time_en: 'Arriving', time_ch: '即將抵達' }),
+    railTrain({ arrival_departure: 'unknown', time_en: '7 mins', time_ch: '7 分鐘' }),
+    railTrain({ arrival_departure: 'D', time_en: 'Arriving', time_ch: '即將抵達' }),
+    railTrain({ time_en: '8 mins', time_ch: '7 分鐘' }),
+    railTrain({ time_en: 'undefined', time_ch: 'not provided' }),
+  )), '250');
+  assert.deepEqual(payload.platforms[0].trains.map(({ event, time }) => [event, time.kind, time.minutes]), [
+    ['arrival', 'minutes', 1], ['arrival', 'imminent', undefined], ['departure', 'departing', undefined],
+    ['arrival', 'arriving', undefined], ['estimate', 'minutes', 7], ['estimate', 'unknown', undefined],
+    ['arrival', 'unknown', undefined], ['arrival', 'unknown', undefined],
+  ]);
+  assert.deepEqual(lightRailForecastView(reading(payload), clockAfter(30_000)).platforms[0].trains[0].time, { kind: 'minutes', minutes: 1 });
+  assert.equal(lightRailForecastView(reading(payload), clockAfter(60_000)).kind, 'stale');
+});
+
+test('Light Rail special-service fixtures use the v1.2 public identifier, notes, and conservative stop handling', () => {
+  // Synthetic field values model the official 901/902 examples; they are not live predictions.
+  const payload = parseLightRailForecast(railBody(railPlatform(1,
+    railTrain({ route_no: '901', special: 1, additionalInfo1: '507*', routeRemarkEng2: 'English fixture note', routeRemarkChi2: '繁中測試備註' }),
+    railTrain({ route_no: '902', special: 1, additionalInfo1: 'SPR' }),
+    railTrain({ route_no: '902', special: 1, additionalInfo1: 'unexpected' }),
+    railTrain({ route_no: undefined, special: 1, additionalInfo1: '751P*' }),
+    railTrain({ route_no: '505', stop: 1 }),
+    railTrain({ route_no: '507', stop: undefined }),
+  )), '140');
+  const trains = payload.platforms[0].trains;
+  assert.deepEqual(trains.map(({ route }) => [route.kind, route.code]),
+    [['special', '507*'], ['special', undefined], ['special', undefined], ['special', '751P*'], ['regular', '505'], ['regular', '507']]);
+  assert.deepEqual(trains[0].remark, { en: 'English fixture note', zh: '繁中測試備註' });
+  assert.equal(trains[4].serviceIssue, true);
+  assert.equal(trains[4].time.kind, 'unknown');
+  assert.equal(trains[5].serviceIssue, false);
+  assert.equal(trains[5].time.kind, 'unknown');
+});
+
+test('Light Rail freshness, valid empty, invalid structure, unavailable provider and unknown stop differ', () => {
+  const view = (input, id = '250') => lightRailForecastView(reading(parseLightRailForecast(input, id)), start);
+  assert.equal(view(railBody()).kind, 'empty');
+  assert.equal(view(railBody(railPlatform(1))).kind, 'empty');
+  assert.equal(view({ status: 0 }).kind, 'providerUnavailable');
+  assert.equal(view({ status: 0 }, '9999').kind, 'unsupported');
+  assert.equal(view({ status: 1 }).kind, 'failed');
+  assert.equal(view(railBody(railPlatform(0, railTrain()))).kind, 'failed');
+  assert.equal(view(railBody(railPlatform(1, null))).kind, 'failed');
+  assert.equal(view({ ...railBody(railPlatform(1, railTrain())), system_time: '2026-11-21 23:58:00' }).kind, 'stale');
+  assert.equal(view({ ...railBody(railPlatform(1, railTrain())), system_time: '-' }).kind, 'stale');
+  const midnight = { ...railBody(railPlatform(1, railTrain())), system_time: '2026-11-22 00:00:01' };
+  const sample = reading(parseLightRailForecast(midnight, '250'), { receivedAt: clockAfter(12_000), serverNow: wall + 12_000 });
+  const next = lightRailForecastView(sample, clockAfter(12_000));
+  assert.equal(next.kind, 'ready');
+  assert.equal(formatHongKongTime(next.updatedAt, true), midnight.system_time);
+});
+
+test('Light Rail sends only the selected ID and with_special, reuses requests and honors endpoint backoff', async () => {
+  const calls = [];
+  let now = start;
+  let reply;
+  const read = createLightRailNextTrainClient({
+    clock: () => now, request: (url, options) => {
+      calls.push({ url: new URL(url), options });
+      return new Promise((resolve) => { reply = resolve; });
+    },
+  });
+  assert.equal((await read('9999')).payload.kind, 'unsupported');
+  const first = read('250');
+  assert.equal(first, read('250'));
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url.origin, 'https://rt.data.gov.hk');
+  assert.equal(calls[0].url.pathname, '/v1/transport/mtr/lrt/getSchedule');
+  assert.deepEqual([...calls[0].url.searchParams], [['station_id', '250'], ['with_special', '1']]);
+  assert.equal(calls[0].options.credentials, 'omit');
+  reply(new Response(JSON.stringify(railBody(railPlatform(1, railTrain())))));
+  const cached = await first;
+  assert.equal(await read('250'), cached);
+  now = clockAfter(20_000);
+  const limited = read('250');
+  reply(new Response('', { status: 429, headers: { 'retry-after': '90' } }));
+  assert.equal((await limited).payload.kind, 'rateLimited');
+  assert.equal((await read('920')).payload.kind, 'rateLimited');
+  assert.equal(calls.length, 2);
+  now = clockAfter(110_000);
+  const next = read('920');
+  assert.equal(calls.at(-1).url.searchParams.get('station_id'), '920');
+  reply(new Response('', { status: 500 }));
+  assert.equal((await next).payload.kind, 'failed');
+});
+
+test('Light Rail uses the common abort timeout and retries after the cooldown', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let signal;
+  let now = start;
+  let count = 0;
+  const read = createLightRailNextTrainClient({
+    clock: () => now,
+    request: (_, options) => {
+      if (++count === 1) { signal = options.signal; return new Promise(() => {}); }
+      return Promise.resolve(new Response(JSON.stringify(railBody())));
+    },
+  });
+  const timeout = read('250');
+  t.mock.timers.tick(8000);
+  assert.equal((await timeout).payload.kind, 'failed');
+  assert.equal(signal.aborted, true);
+  assert.equal((await read('250')).payload.kind, 'failed');
+  assert.equal(count, 1);
+  now = clockAfter(20_000);
+  assert.equal((await read('250')).payload.kind, 'forecast');
+  assert.equal(count, 2);
+});
+
+test('Light Rail stop changes and blur discard obsolete responses and the foreground resumes only the selected stop', async () => {
+  const page = mountHook();
+  page.renderLightRail('250').refresh();
+  assert.equal(page.calls.length, 1);
+  assert.equal(page.renderLightRail('920').reading, undefined);
+  assert.deepEqual(page.calls.map(({ station }) => station), ['250', '920']);
+  const current = reading({ kind: 'providerUnavailable' });
+  page.calls[1].resolve(current);
+  page.calls[0].resolve(reading({ kind: 'failed' }));
+  await nextTick();
+  assert.equal(page.renderLightRail('920').reading, current);
+  page.advance(5000);
+  assert.equal(page.calls.length, 2);
+  page.state('background');
+  assert.equal(page.ticks.size, 0);
+  page.renderLightRail('920').refresh();
+  assert.equal(page.calls.length, 2);
+  page.state('active');
+  assert.equal(page.calls[2].station, '920');
+  page.focus(false);
+  const before = page.callbacks();
+  page.calls[2].resolve(reading({ kind: 'failed' }));
+  await nextTick();
+  assert.equal(page.callbacks(), before);
+  assert.equal(page.listeners(), 0);
+  assert.equal(page.ticks.size, 0);
+});
+
+for (const locale of ['zh-HK', 'en']) {
+  test(`Light Rail forecast renders real field semantics and no links to fabricated variants (${locale})`, () => {
+    const copy = source('i18n').messages[locale];
+    let requested;
+    let now = start;
+    const view = reading(parseLightRailForecast(railBody(
+      railPlatform(1, railTrain({ time_en: '-', time_ch: '-' }), railTrain({
+        route_no: '901', special: 1, additionalInfo1: '507*', routeRemarkEng2: 'English fixture note', routeRemarkChi2: '繁中測試備註',
+      })),
+      railPlatform(3, railTrain({ route_no: '505', arrival_departure: 'D', time_en: 'Departing', time_ch: '正在離開' })),
+    ), '250'));
+    const load = sources({
+      react: { useCallback: (fn) => fn },
+      'react-native': {
+        ActivityIndicator: 'ActivityIndicator', Pressable: 'Pressable', View: 'View', StyleSheet: { create: (styles) => styles },
+      },
+      '@/components/ui': { AppText: 'AppText', Icon: 'Icon' },
+      '@/language': { useLanguage: () => ({ copy, locale }) },
+      '@/light-rail-next-train-client': { readLightRailNextTrains: (id) => { requested = id; } },
+      '@/next-train-hooks': { useNextTrainReading: (key, read) => {
+        assert.equal(key, '250');
+        read();
+        return { reading: view, now, busy: false, refresh() {} };
+      } },
+    });
+    function elements(node) {
+      if (Array.isArray(node)) return node.flatMap(elements);
+      if (!node?.props) return [];
+      return [node, ...elements(node.props.children)];
+    }
+    const { LightRailNextTrains } = load('components/light-rail-next-trains');
+    const nodes = elements(LightRailNextTrains({ stationId: '250' }));
+    assert.equal(requested, '250');
+    const strings = nodes.filter(({ type }) => type === 'AppText').map(({ props }) => props.children);
+    const labels = copy.lightRail.nextTrains;
+    for (const content of [labels.platform(1), labels.platform(3), labels.arrival, labels.departure, labels.atStop, labels.departing,
+      labels.special, copy.lightRail.route('507*'), labels.updated(timestamp), locale === 'en' ? 'Tin King' : '田景',
+      locale === 'en' ? 'English fixture note' : '繁中測試備註']) assert.ok(strings.includes(content), content);
+    assert.ok(!strings.includes(copy.lightRail.route('901')));
+    assert.equal(nodes.filter(({ type }) => type === 'Pressable').length, 1, 'Only the refresh action is interactive');
+    now = clockAfter(60_000);
+    const stale = elements(LightRailNextTrains({ stationId: '250' })).map(({ props }) => props.children);
+    assert.ok(stale.includes(labels.stale) && stale.includes(labels.updated(timestamp)));
+    assert.ok(!stale.includes(labels.platform(1)) && !stale.includes(labels.minutes(5)));
+  });
+}
+
+if (process.env.LIGHT_RAIL_PROBE_DIR) {
+  test('Light Rail current official GET snapshots replay with their original HTTP timestamps', () => {
+    const dir = process.env.LIGHT_RAIL_PROBE_DIR;
+    const targets = [['250', [1, 2]], ['920', [1]], ['140', [1, 2, 3]], ['550', [1, 2, 4, 5]], ['9999', []]];
+    for (const [id, platforms] of targets) {
+      const data = JSON.parse(readFileSync(join(dir, id + '.json'), 'utf8'));
+      const headers = readFileSync(join(dir, id + '.headers'), 'utf8');
+      assert.match(headers, /^HTTP\/2 200/m);
+      const date = Date.parse(headers.match(/^date: (.+)$/im)[1]);
+      const payload = parseLightRailForecast(data, id);
+      const view = lightRailForecastView(reading(payload, { serverNow: date }), start);
+      if (id === '9999') {
+        assert.equal(data.status, 0);
+        assert.equal(view.kind, 'unsupported');
+        continue;
+      }
+      assert.equal(view.kind, 'ready');
+      assert.deepEqual(view.platforms.map(({ id }) => id), platforms);
+      assert.ok(view.platforms.every(({ trains }) => trains.length > 0));
+      if (id === '250') assert.deepEqual(view.platforms.map(({ trains }) => trains.length), [4, 5]);
+      if (id === '920') assert.ok(view.platforms[0].trains.every(({ event, route }) => event === 'departure' && route.code === '505'));
     }
   });
 }

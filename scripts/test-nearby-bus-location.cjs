@@ -330,11 +330,13 @@ function mount(t, {
   t.after(unmount);
   return {
     calls, labels, landmarks, requests, queries, routes, settings, alerts, openedLinks, settle, press, shows, unmount, findAction,
+    visibleElements,
     transportCopy: copy.transport, busCopy: copy.bus, mtrCopy: copy.mtr, lightRailCopy: copy.lightRail,
     catalogueRoutes, theme: source('theme'),
     mtr: () => source('mtr-static'),
     lightRail: () => source('light-rail-static'),
     mtrForecastProps: () => visibleElements().find(({ type }) => type.name === 'MtrNextTrains')?.props,
+    lightRailForecastProps: () => visibleElements().find(({ type }) => type.name === 'LightRailNextTrains')?.props,
     detailRows: () => visibleElements().filter(({ type }) => ['MtrEntryRow', 'LightRailEntryRow'].includes(type.name)).map(({ props }) => props),
     directionFilters: () => visibleElements().find(({ type }) => type === 'Filters')?.props,
     openResult: (index) => elements(tree.props.renderItem({ item: tree.props.data[index] }))
@@ -1441,6 +1443,8 @@ test('Light Rail details switch official visits, open stable stop IDs and link t
   const route = mount(t, { lightRailDetail: { kind: 'route', id: '761P' } });
   await route.settle();
   assert.ok(route.shows(route.lightRailCopy.route('761P')));
+  assert.equal(route.lightRailForecastProps(), undefined);
+  assert.ok(route.shows(`離線路線資料更新日期 ${route.lightRail().lightRailSource.resourceUpdatedOn}`));
   assert.deepEqual(route.directionFilters().options, [['1', '天逸 → 元朗'], ['2', '元朗 → 天逸']]);
   route.directionFilters().onSelect('2');
   await route.settle();
@@ -1462,6 +1466,13 @@ test('Light Rail details switch official visits, open stable stop IDs and link t
   const stop = mount(t, { lightRailDetail: { kind: 'stop', id: '250' }, locale: 'en' });
   await stop.settle();
   assert.ok(stop.shows('Hoi Wong Road') && stop.shows('海皇路') && stop.shows(stop.lightRailCopy.stopId('250')));
+  assert.deepEqual(stop.lightRailForecastProps(), { stationId: '250' });
+  const elements = stop.visibleElements();
+  const stopIdIndex = elements.findIndex(({ props }) => props.children === stop.lightRailCopy.stopId('250'));
+  const forecastIndex = elements.findIndex(({ type }) => type.name === 'LightRailNextTrains');
+  const routesIndex = elements.findIndex(({ props }) => props.children === stop.lightRailCopy.lines);
+  assert.ok(stopIdIndex >= 0 && stopIdIndex < forecastIndex && forecastIndex < routesIndex);
+  assert.ok(stop.shows(`Offline route data updated ${stop.lightRail().lightRailSource.resourceUpdatedOn}`));
   assert.deepEqual(stop.detailRows().map(({ entry }) => entry.id), ['507', '614', '614P']);
   stop.press('Route 614P');
   assert.deepEqual(stop.routes, [{ pathname: '/light-rail/[kind]', params: { kind: 'route', id: '614P' } }]);

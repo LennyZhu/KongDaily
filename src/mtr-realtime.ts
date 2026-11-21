@@ -1,8 +1,11 @@
 import { findMtrStation, type MtrLineCode } from '@/mtr-static';
+import { nextTrainExpired, nextTrainTiming, parseHongKongTime, type NextTrainReading, type NextTrainFailure } from '@/next-train-time';
+import type { NextTrainClock as MtrClock } from '@/next-train-time';
+
+export { nextTrainClock as mtrClock, formatHongKongTime, parseHongKongTime } from '@/next-train-time';
 
 export const mtrForecastSource = 'https://data.gov.hk/en-data/dataset/mtr-data2-nexttrain-data';
 export const mtrServiceAlertUrl = 'https://www.mtr.com.hk/alert/alert_title_wap.html';
-export const mtrForecastLifetime = 60_000;
 
 // Next Train Data Dictionary v1.7, parameter tables. Keep this independent of new static CSV entries.
 const stationsByLine = {
@@ -29,8 +32,6 @@ export function supportsMtrForecast(line: string, station: string) {
 
 const directions = ['UP', 'DOWN'] as const;
 const minute = 60_000;
-const hongKongOffset = 8 * 60 * minute;
-const timeTolerance = 5_000;
 type Direction = typeof directions[number];
 type Train = {
   sequence: number;
@@ -43,31 +44,8 @@ type Train = {
 type Group = { direction: Direction; trains: Train[] };
 type Notice = { kind: 'special' | 'suspended'; updatedAt?: number };
 type Forecast = { kind: 'forecast'; groups: Group[]; updatedAt?: number; delayed: boolean };
-export type MtrPayload = Forecast | Notice | { kind: 'failed' | 'unsupported' | 'rateLimited' };
-export type MtrClock = { wall: number; monotonic: number };
-export type MtrReading = {
-  payload: MtrPayload;
-  receivedAt: MtrClock;
-  serverNow: number;
-  retryAt: number;
-};
-
-export function mtrClock(): MtrClock {
-  return { wall: Date.now(), monotonic: performance.now() };
-}
-
-export function parseHongKongTime(value: unknown) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)) return undefined;
-  const iso = value.replace(' ', 'T') + 'Z';
-  const utc = Date.parse(iso);
-  if (!Number.isFinite(utc) || new Date(utc).toISOString() !== iso.replace('Z', '.000Z')) return undefined;
-  return utc - hongKongOffset;
-}
-
-export function formatHongKongTime(timestamp: number, withSeconds = false) {
-  return new Date(timestamp + hongKongOffset).toISOString().slice(0, withSeconds ? 19 : 16).replace('T', ' ');
-}
-
+export type MtrPayload = Forecast | Notice | NextTrainFailure;
+export type MtrReading = NextTrainReading<MtrPayload>;
 function record(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
 }
@@ -134,13 +112,12 @@ export function parseMtrForecast(body: unknown, line: string, station: string): 
 }
 
 export function mtrForecastView(reading: MtrReading, now: MtrClock) {
-  const { payload, receivedAt } = reading;
+  const { payload } = reading;
   if (payload.kind !== 'forecast' && payload.kind !== 'special' && payload.kind !== 'suspended') return payload;
-  const elapsed = Math.max(0, now.monotonic - receivedAt.monotonic, now.wall - receivedAt.wall);
-  const reference = reading.serverNow + elapsed;
+  const timing = nextTrainTiming(reading, now);
+  const { reference } = timing;
   const updated = payload.updatedAt;
-  if (elapsed >= mtrForecastLifetime
-    || (updated !== undefined && (reference - updated >= mtrForecastLifetime || updated > reference + timeTolerance))
+  if (nextTrainExpired(timing, updated)
     || (updated === undefined && payload.kind === 'forecast' && payload.groups.length > 0)) return { kind: 'stale' as const };
   if (payload.kind !== 'forecast') return payload;
 

@@ -2,9 +2,11 @@ import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
 
+import { LightRailNextTrains } from '@/components/light-rail-next-trains';
 import { LightRailEntryRow, lightRailEndpoints } from '@/components/light-rail-ui';
 import { AppText, EmptyState, Filters, Icon, PageHeading, Screen } from '@/components/ui';
 import { useLanguage } from '@/language';
+import { lightRailForecastSource } from '@/light-rail-realtime';
 import { findLightRailRoute, findLightRailStop, lightRailSource, type LightRailRoute } from '@/light-rail-static';
 import { space, touchTarget } from '@/theme';
 
@@ -16,13 +18,21 @@ export default function LightRailDetailsScreen() {
   if (!entry) return <Screen hasHeader><EmptyState icon="train.side.front.car" title={labels.unavailable} /></Screen>;
 
   const isRoute = entry.kind === 'light-rail-route';
+  const heading = (
+    <PageHeading title={isRoute ? labels.route(entry.id) : locale === 'en' ? entry.en : entry.zh}
+      description={isRoute ? (entry.circular ? labels.circular : undefined) : locale === 'en' ? entry.zh : entry.en} />
+  );
   return (
     <Screen hasHeader contentStyle={styles.section}>
-      <PageHeading title={isRoute ? labels.route(entry.id) : locale === 'en' ? entry.en : entry.zh}
-        description={isRoute ? (entry.circular ? labels.circular : undefined) : locale === 'en' ? entry.zh : entry.en} />
+      {isRoute ? heading : (
+        <View style={styles.rows}>
+          {heading}
+          <AppText variant="detail" tone="muted">{labels.stopId(entry.id)}</AppText>
+        </View>
+      )}
+      {!isRoute && <LightRailNextTrains key={entry.id} stationId={entry.id} />}
       {isRoute ? <LightRailRouteStops key={entry.id} route={entry} /> : (
         <View style={styles.rows}>
-          <AppText variant="detail" tone="muted">{labels.stopId(entry.id)}</AppText>
           <AppText variant="homeHeading" accessibilityRole="header">{labels.lines}</AppText>
           {entry.routes.map((id) => {
             const route = findLightRailRoute(id);
@@ -30,7 +40,7 @@ export default function LightRailDetailsScreen() {
           })}
         </View>
       )}
-      <LightRailSources />
+      <LightRailSources forecast={!isRoute} />
     </Screen>
   );
 }
@@ -59,7 +69,7 @@ function LightRailRouteStops({ route }: { route: LightRailRoute }) {
   );
 }
 
-function LightRailSources() {
+function LightRailSources({ forecast }: { forecast: boolean }) {
   const { copy, locale } = useLanguage();
   const labels = copy.lightRail;
   const links = [
@@ -67,6 +77,7 @@ function LightRailSources() {
     [labels.timetable, lightRailSource.timetable[locale]],
     [copy.mtr.terms, 'https://data.gov.hk/en/terms-and-conditions'],
   ];
+  if (forecast) links.push([labels.nextTrains.dataset, lightRailForecastSource]);
 
   return (
     <View style={styles.rows}>
