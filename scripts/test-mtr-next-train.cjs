@@ -374,8 +374,12 @@ test('rail preview asks for the line at shared stations and never fetches an inv
   assert.deepEqual(pick.options, [['AEL', 'Airport Express'], ['TCL', 'Tung Chung Line']]);
   assert.deepEqual(shared.requests, []);
   pick.onSelect('TCL');
-  shared.render('HOK');
-  assert.deepEqual(shared.requests, [['TCL', 'HOK']]);
+  const tcl = shared.render('HOK').find(({ type }) => type === 'Filters').props;
+  assert.equal(tcl.selected, 'TCL');
+  tcl.onSelect('AEL');
+  const ael = shared.render('HOK').find(({ type }) => type === 'Filters').props;
+  assert.equal(ael.selected, 'AEL');
+  assert.deepEqual(shared.requests, [['TCL', 'HOK'], ['AEL', 'HOK']]);
   const fromLine = renderRailUi('en', reading({ kind: 'failed' }));
   fromLine.render('HOK', 'AEL');
   assert.deepEqual(fromLine.requests, [['AEL', 'HOK']]);

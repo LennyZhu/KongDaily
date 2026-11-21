@@ -27,6 +27,7 @@ export default function MtrDetailsScreen() {
         <MtrLineStations key={entry.id} line={entry} />
       ) : (
         <>
+          <MtrNextTrains key={JSON.stringify([entry.id, lineContext])} station={entry} initialLine={lineContext} />
           <View style={styles.rows}>
             {entry.supplemental && <AppText variant="detail" tone="muted">{copy.mtr.racecourse}</AppText>}
             <AppText variant="homeHeading" accessibilityRole="header">{copy.mtr.lines}</AppText>
@@ -35,7 +36,6 @@ export default function MtrDetailsScreen() {
               return membership && <MtrEntryRow key={lineCode} entry={membership} />;
             })}
           </View>
-          <MtrNextTrains key={JSON.stringify([entry.id, lineContext])} station={entry} initialLine={lineContext} />
         </>
       )}
       <MtrSources forecast={entry.kind === 'mtr-station'} racecourse={entry.kind === 'mtr-station' && entry.supplemental} />

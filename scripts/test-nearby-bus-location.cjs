@@ -1271,6 +1271,29 @@ test('MTR detail shows separate official branch orders and a supplemental Raceco
   assert.deepEqual(invalid.detailRows(), []);
 });
 
+for (const locale of ['zh-HK', 'en']) {
+  test(`MTR Admiralty details put the forecast before all four linked lines (${locale})`, async (t) => {
+    const station = mount(t, { locale, mtrDetail: { kind: 'station', code: 'ADM', line: 'ISL' } });
+    await station.settle();
+    const elements = station.visibleElements();
+    const [title, description] = locale === 'en' ? ['Admiralty', '金鐘'] : ['金鐘', 'Admiralty'];
+    const headingIndex = elements.findIndex(({ props }) => props.title === title && props.description === description);
+    const forecastIndex = elements.findIndex(({ type }) => type.name === 'MtrNextTrains');
+    const linesIndex = elements.findIndex(({ props }) => props.children === station.mtrCopy.lines);
+    const sourcesIndex = elements.findIndex(({ props }) => props.children === station.mtrCopy.source);
+    assert.ok(headingIndex >= 0 && headingIndex < forecastIndex && forecastIndex < linesIndex && linesIndex < sourcesIndex);
+    assert.equal(station.mtrForecastProps().station.id, 'ADM');
+    assert.equal(station.mtrForecastProps().initialLine, 'ISL');
+
+    const rows = station.detailRows();
+    assert.deepEqual(rows.map(({ entry }) => entry.id), ['EAL', 'ISL', 'SIL', 'TWL']);
+    for (const { entry } of rows) {
+      station.press(station.mtr().mtrName(entry, locale));
+      assert.deepEqual(station.routes.at(-1), { pathname: '/mtr/[kind]', params: { kind: 'line', code: entry.id } });
+    }
+  });
+}
+
 test('All search separates Bus, MTR and Light Rail identities and restores nearby buses after clearing', async (t) => {
   const page = mount(t, { transport: true, locale: 'en', delayCatalogue: true });
   await page.settle();
