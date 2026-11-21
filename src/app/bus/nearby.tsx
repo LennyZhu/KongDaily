@@ -121,6 +121,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   const railCopy = mtrMode ? copy.mtr : lightRailMode ? copy.lightRail : undefined;
   const normalizedQuery = normalizeBusQuery(query);
   const searching = transport && (showBuses || Boolean(railCopy)) && normalizedQuery.length > 0;
+  const needsNearbyLocation = showBuses && !searching;
   const searchingBuses = searching && showBuses;
   const mixedSearch = searching && transportMode === 'all';
   const searchRoutes = useMemo(() => busSources.flatMap((source) => catalogue.feeds[source]?.routes ?? []), [catalogue.feeds]);
@@ -202,12 +203,14 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   }, [transport, updateReference]);
 
   useFocusEffect(useCallback(() => {
+    setLocating(false);
+    if (!needsNearbyLocation) return;
+
     function resumeLocation() {
       locationActive.current = true;
       void requestLocation(false);
     }
 
-    setLocating(false);
     const subscription = AppState.addEventListener('change', (state) => {
       // iOS can become temporarily inactive while the permission prompt is open.
       if (state === 'background') {
@@ -225,7 +228,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
       locationActive.current = false;
       cancelLocation();
     };
-  }, [cancelLocation, requestLocation]));
+  }, [cancelLocation, needsNearbyLocation, requestLocation]));
 
   function updateRadius(value: BusSearchRadius) {
     setPickingRadius(false);

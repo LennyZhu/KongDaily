@@ -623,6 +623,7 @@ for (const locale of ['zh-HK', 'en']) {
     page.press(page.busCopy.clearInput);
     await page.settle();
     assert.deepEqual(page.rows(), allRoutes);
+    assert.equal(page.requests.length, 2);
     for (const mode of ['ferry', 'tram', 'minibus']) {
       page.press(copy.modes[mode]);
       await page.settle();
@@ -634,10 +635,12 @@ for (const locale of ['zh-HK', 'en']) {
       assert.deepEqual(page.routes, []);
       assert.deepEqual(page.rows(), []);
       assert.equal(page.etaRoutes().length, 0);
+      assert.equal(page.requests.length, 2);
     }
     page.press(copy.modes.bus);
     await page.settle();
     assert.deepEqual(page.rows(), allRoutes);
+    assert.equal(page.requests.length, 3);
     assert.equal(page.searchInput().placeholder, copy.searchBuses);
     page.press(labels.byStop);
     await page.settle();
@@ -652,6 +655,7 @@ for (const locale of ['zh-HK', 'en']) {
     assert.equal(routeTab.children[1].props.tone, 'muted');
     const allStops = page.rows();
     assert.ok(allStops.length > 1 && allStops.every((row) => 'stops' in row));
+    assert.equal(page.requests.length, 3);
     page.press(copy.modes.ferry);
     await page.settle();
     page.press(copy.modes.all);
@@ -661,7 +665,7 @@ for (const locale of ['zh-HK', 'en']) {
     assert.ok(!page.shows(labels.distanceNote));
     assert.ok(!page.shows(labels.currentLocation));
     assert.ok(!page.locateButton());
-    assert.equal(page.requests.length, 1);
+    assert.equal(page.requests.length, 4);
     assert.equal(page.queries.length, 1);
   });
 
@@ -737,6 +741,7 @@ for (const locale of ['zh-HK', 'en']) {
     await page.settle();
     assert.ok(!page.shows(range1000) && !page.shows(labels.distanceNote) && !page.shows(labels.partialCoverage));
     assert.throws(() => page.findAction(copy.distanceInfo), /Missing action/);
+    assert.equal(page.requests.length, 1);
     page.press(copy.modes.all);
     await page.settle();
     page.press(copy.changeReference);
@@ -745,7 +750,7 @@ for (const locale of ['zh-HK', 'en']) {
     await page.settle();
     assert.ok(page.shows(labels.landmarkReference(labels.landmarks.shaTin)));
     assert.equal(page.findAction(copy.changeReference).props.accessibilityState.expanded, false);
-    assert.equal(page.requests.length, 1);
+    assert.equal(page.requests.length, 2);
   });
 }
 
@@ -1114,6 +1119,64 @@ test('a transport filter change does not let a pending GPS fix replace a selecte
   assert.equal(page.queries.length, 1);
 });
 
+for (const [railMode, busMode] of [['mtr', 'bus'], ['lightRail', 'all']]) {
+  test(`${railMode} skips bus location on return and foreground, then resumes nearby ${busMode}`, async (t) => {
+    const page = mount(t, { transport: true });
+    const { labels, landmarks, transportCopy: copy } = page;
+    await page.settle();
+    page.fix(0, landmarks.central);
+    await page.settle();
+    page.press(copy.straightLineRadius(labels.metres(500)));
+    await page.settle();
+    page.press(labels.kilometres(1));
+    await page.settle();
+    const nearby = page.rows();
+    assert.ok(nearby.length > 0);
+
+    page.focus(false);
+    page.focus(true);
+    await page.settle();
+    assert.equal(page.requests.length, 2);
+    const locationCalls = { ...page.calls };
+    const queryCount = page.queries.length;
+    page.press(copy.modes[railMode]);
+    await page.settle();
+    page.fix(1, landmarks.shaTin);
+    page.press(labels.byStop);
+    await page.settle();
+    const directory = page.rows();
+    const listKey = page.list().key;
+    const scrolls = page.attachList();
+    page.showRows([2], 140);
+    page.openResult(2);
+    page.focus(false);
+    page.focus(true);
+    await page.settle();
+    page.appState('background');
+    page.appState('active');
+    await page.settle();
+    page.paint();
+    assert.deepEqual(page.calls, locationCalls);
+    assert.equal(page.requests.length, 2);
+    assert.equal(page.queries.length, queryCount);
+    assert.deepEqual(page.etaRoutes(), []);
+    assert.equal(page.rows(), directory);
+    assert.equal(page.list().key, listKey);
+    assert.deepEqual(scrolls, []);
+
+    page.press(copy.modes[busMode]);
+    await page.settle();
+    assert.equal(page.requests.length, 3);
+    assert.deepEqual(page.rows(), nearby);
+    assert.ok(page.findAction(copy.straightLineRadius(labels.kilometres(1))));
+    page.fix(2, landmarks.central);
+    await page.settle();
+    assert.deepEqual(page.rows(), nearby);
+    assert.equal(page.queries.length, queryCount + 1);
+    assert.equal(page.calls.prompt, 0);
+  });
+}
+
 test('MTR snapshot preserves each official line/station identity and every ordered visit', (t) => {
   const page = mount(t);
   const { mtrLines, mtrStations, findMtrLine, findMtrStation, searchMtr, mtrSource } = page.mtr();
@@ -1304,6 +1367,7 @@ test('All search separates Bus, MTR and Light Rail identities and restores nearb
   page.searchInput().onChangeText('Yuen Long');
   await page.settle();
   assert.ok(page.shows(page.busCopy.loading));
+  assert.equal(page.requests.length, 1);
   assert.deepEqual(page.rows().map(({ kind, id }) => [kind, id]), [['mtr-station', 'YUL'], ['light-rail-stop', '600']]);
   page.finishCatalogue();
   await page.settle();
@@ -1318,10 +1382,17 @@ test('All search separates Bus, MTR and Light Rail identities and restores nearb
   assert.equal(page.list().props.keyExtractor(page.rows()[lightRailRow]), 'light-rail-stop:600');
   page.openResult(lightRailRow);
   assert.deepEqual(page.routes.at(-1), { pathname: '/light-rail/[kind]', params: { kind: 'stop', id: '600' } });
+  page.focus(false);
+  page.focus(true);
+  page.appState('background');
+  page.appState('active');
+  await page.settle();
+  assert.equal(page.requests.length, 1);
+  assert.equal(page.searchInput().value, 'Yuen Long');
   page.press(page.busCopy.clearInput);
   await page.settle();
   assert.deepEqual(page.rows(), nearby);
-  assert.equal(page.requests.length, 1);
+  assert.equal(page.requests.length, 2);
   assert.equal(page.catalogueReads(), 1);
 });
 
