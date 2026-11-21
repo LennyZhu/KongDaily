@@ -28,7 +28,7 @@ const blocked = { granted: false, canAskAgain: false };
 
 function mount(t, {
   permission = granted, servicesEnabled = true, appState = 'active', locale = 'zh-HK', transport = false,
-  intent, delayCatalogue = false, offlineCatalogue = false, mtrDetail,
+  intent, delayCatalogue = false, offlineCatalogue = false, mtrDetail, lightRailDetail,
 } = {}) {
   const events = new EventEmitter();
   const requests = [];
@@ -136,7 +136,7 @@ function mount(t, {
     },
     'expo-router': {
       useRouter: () => ({ push: (href) => routes.push(href) }),
-      useLocalSearchParams: () => mtrDetail ?? { intent },
+      useLocalSearchParams: () => mtrDetail ?? lightRailDetail ?? { intent },
       useFocusEffect: (effect) => load(require.resolve('expo-router/build/useFocusEffect')).useFocusEffect(effect),
     },
     './link/useLoadedNavigation': { useOptionalNavigation: () => navigation },
@@ -226,6 +226,7 @@ function mount(t, {
   const transportEntry = transport && source('app/transport').default();
   if (transportEntry) assert.equal(transportEntry.type, busScreen);
   const screen = mtrDetail ? source('app/mtr/[kind]').default
+    : lightRailDetail ? source('app/light-rail/[kind]').default
     : transportEntry ? () => transportEntry.type(transportEntry.props) : busScreen;
   const copy = source('i18n').messages[locale];
   const labels = copy.nearbyBus;
@@ -246,8 +247,9 @@ function mount(t, {
           const search = controls.find(({ type }) => type.name === 'TransportSearch');
           searchTree = search && search.type(search.props);
         }
-        if (mtrDetail) {
-          const stationList = elements(screenTree, false).find(({ type }) => type.name === 'MtrLineStations');
+        if (mtrDetail || lightRailDetail) {
+          const stationList = elements(screenTree, false)
+            .find(({ type }) => type.name === (mtrDetail ? 'MtrLineStations' : 'LightRailRouteStops'));
           lineStationsTree = stationList && stationList.type(stationList.props);
         }
         effects.forEach((run) => run());
@@ -266,8 +268,9 @@ function mount(t, {
       const name = node.type?.name;
       if (name === 'TransportModePicker') children = modePickerTree;
       else if (name === 'TransportSearch') children = searchTree;
-      else if (name === 'MtrLineStations') children = lineStationsTree;
-      else if (name?.startsWith('Transport') || ['Loading', 'MtrEntryRow', 'MtrSources'].includes(name)) children = node.type(node.props);
+      else if (name === 'MtrLineStations' || name === 'LightRailRouteStops') children = lineStationsTree;
+      else if (name?.startsWith('Transport')
+        || ['Loading', 'MtrEntryRow', 'MtrSources', 'LightRailEntryRow', 'LightRailSources'].includes(name)) children = node.type(node.props);
     }
     return [node, ...elements(children, expand)];
   }
@@ -327,10 +330,12 @@ function mount(t, {
   t.after(unmount);
   return {
     calls, labels, landmarks, requests, queries, routes, settings, alerts, openedLinks, settle, press, shows, unmount, findAction,
-    transportCopy: copy.transport, busCopy: copy.bus, mtrCopy: copy.mtr, catalogueRoutes, theme: source('theme'),
+    transportCopy: copy.transport, busCopy: copy.bus, mtrCopy: copy.mtr, lightRailCopy: copy.lightRail,
+    catalogueRoutes, theme: source('theme'),
     mtr: () => source('mtr-static'),
+    lightRail: () => source('light-rail-static'),
     mtrForecastProps: () => visibleElements().find(({ type }) => type.name === 'MtrNextTrains')?.props,
-    detailRows: () => visibleElements().filter(({ type }) => type.name === 'MtrEntryRow').map(({ props }) => props),
+    detailRows: () => visibleElements().filter(({ type }) => ['MtrEntryRow', 'LightRailEntryRow'].includes(type.name)).map(({ props }) => props),
     directionFilters: () => visibleElements().find(({ type }) => type === 'Filters')?.props,
     openResult: (index) => elements(tree.props.renderItem({ item: tree.props.data[index] }))
       .find(({ type, props }) => type === 'Pressable' || (type.name === 'BusRouteRow' && props.onPress)).props.onPress(),
@@ -616,7 +621,7 @@ for (const locale of ['zh-HK', 'en']) {
     page.press(page.busCopy.clearInput);
     await page.settle();
     assert.deepEqual(page.rows(), allRoutes);
-    for (const mode of ['lightRail', 'ferry', 'tram', 'minibus']) {
+    for (const mode of ['ferry', 'tram', 'minibus']) {
       page.press(copy.modes[mode]);
       await page.settle();
       assert.ok(page.findAction(copy.modes[mode]).props.accessibilityState.selected);
@@ -1264,7 +1269,7 @@ test('MTR detail shows separate official branch orders and a supplemental Raceco
   assert.deepEqual(invalid.detailRows(), []);
 });
 
-test('All search shows MTR immediately and keeps bus search and nearby state separate', async (t) => {
+test('All search separates Bus, MTR and Light Rail identities and restores nearby buses after clearing', async (t) => {
   const page = mount(t, { transport: true, locale: 'en', delayCatalogue: true });
   await page.settle();
   page.fix(0, page.landmarks.central);
@@ -1274,16 +1279,20 @@ test('All search shows MTR immediately and keeps bus search and nearby state sep
   page.searchInput().onChangeText('Yuen Long');
   await page.settle();
   assert.ok(page.shows(page.busCopy.loading));
-  assert.deepEqual(page.rows().map(({ id }) => id), ['YUL']);
+  assert.deepEqual(page.rows().map(({ kind, id }) => [kind, id]), [['mtr-station', 'YUL'], ['light-rail-stop', '600']]);
   page.finishCatalogue();
   await page.settle();
   const busRow = page.rows().findIndex(({ number }) => number === 'B2');
   const mtrRow = page.rows().findIndex(({ id }) => id === 'YUL');
-  assert.ok(busRow >= 0 && mtrRow > busRow);
+  const lightRailRow = page.rows().findIndex(({ kind, id }) => kind === 'light-rail-stop' && id === '600');
+  assert.ok(busRow >= 0 && mtrRow > busRow && lightRailRow > mtrRow);
   assert.equal(page.renderRow(busRow).props.modeLabel, page.transportCopy.modes.bus);
   assert.equal(page.list().props.keyExtractor(page.rows()[mtrRow]), 'mtr-station:YUL');
   page.openResult(mtrRow);
   assert.deepEqual(page.routes.at(-1), { pathname: '/mtr/[kind]', params: { kind: 'station', code: 'YUL' } });
+  assert.equal(page.list().props.keyExtractor(page.rows()[lightRailRow]), 'light-rail-stop:600');
+  page.openResult(lightRailRow);
+  assert.deepEqual(page.routes.at(-1), { pathname: '/light-rail/[kind]', params: { kind: 'stop', id: '600' } });
   page.press(page.busCopy.clearInput);
   await page.settle();
   assert.deepEqual(page.rows(), nearby);
@@ -1291,17 +1300,178 @@ test('All search shows MTR immediately and keeps bus search and nearby state sep
   assert.equal(page.catalogueReads(), 1);
 });
 
-test('All search keeps the offline MTR results if the bus catalogue fails', async (t) => {
+test('All search keeps both offline rail sources if the bus catalogue fails', async (t) => {
   const page = mount(t, { transport: true, locale: 'en', permission: blocked, offlineCatalogue: true });
   await page.settle();
   page.searchInput().onChangeText('Tung Chung Line');
   await page.settle();
   assert.ok(page.shows(page.busCopy.loadFailed));
   assert.deepEqual(page.rows().map(({ kind, id }) => [kind, id]), [['mtr-line', 'TCL']]);
+  page.searchInput().onChangeText('Yuen Long');
+  await page.settle();
+  assert.deepEqual(page.rows().map(({ kind, id }) => [kind, id]), [['mtr-station', 'YUL'], ['light-rail-stop', '600']]);
   page.searchInput().onChangeText('unknown station or route');
   await page.settle();
   assert.ok(page.shows(page.busCopy.loadFailed));
-  assert.ok(page.shows(page.mtrCopy.noMatches));
+  assert.ok(page.shows(page.transportCopy.noRailMatches));
   assert.ok(!page.shows(page.transportCopy.noMatches));
   assert.equal(page.catalogueReads(), 1);
+});
+
+test('Light Rail snapshot keeps official identities, asymmetric directions, loops and every repeat visit', (t) => {
+  const page = mount(t);
+  const { lightRailRoutes, lightRailStops, findLightRailRoute, findLightRailStop, searchLightRail, lightRailSource } = page.lightRail();
+  assert.equal(lightRailSource.csvSha256, 'f2fec60de38b72f38d3478fcdeecea4e3332b300b73c23bf41b22d412a2c2066');
+  assert.deepEqual(lightRailRoutes.map(({ id }) => id), ['505', '507', '610', '614', '614P', '615', '615P', '705', '706', '751', '761P']);
+  assert.equal(lightRailStops.length, 68);
+  assert.equal(new Set(lightRailStops.map(({ id }) => id)).size, 68);
+  assert.equal(new Set(lightRailStops.map(({ code }) => code)).size, 68);
+  const memberships = new Map(lightRailStops.map(({ id }) => [id, new Set()]));
+  let count = 0;
+  for (const route of lightRailRoutes) {
+    assert.deepEqual(route.patterns.map(({ direction }) => direction), ['1', '2']);
+    for (const { visits } of route.patterns) {
+      assert.ok(visits.length > 0);
+      visits.forEach(({ stopId, sequence }, i) => {
+        assert.equal(sequence, i + 1);
+        assert.ok(findLightRailStop(stopId));
+        memberships.get(stopId).add(route.id);
+        count++;
+      });
+    }
+  }
+  assert.equal(count, 382);
+  for (const stop of lightRailStops) {
+    assert.ok(stop.zh && stop.en);
+    assert.deepEqual(stop.routes, [...memberships.get(stop.id)]);
+  }
+  const hoiWong = findLightRailStop('250');
+  assert.deepEqual(hoiWong, {
+    kind: 'light-rail-stop', id: '250', code: 'TSP', zh: '海皇路', en: 'Hoi Wong Road', routes: ['507', '614', '614P'],
+  });
+  for (const term of ['250', ' Ｔｓｐ ', '海皇路', ' hOI  woNG roAd ']) assert.equal(searchLightRail(term)[0], hoiWong);
+  assert.deepEqual(searchLightRail('屯門泳池'), []);
+  for (const code of ['505', '610', '751']) assert.equal(searchLightRail(code)[0], findLightRailRoute(code));
+  const asymmetric = findLightRailRoute('505').patterns;
+  assert.deepEqual(asymmetric.map(({ visits }) => [visits[0].stopId, visits.at(-1).stopId, visits.length]),
+    [['920', '100', 16], ['100', '920', 14]]);
+  assert.deepEqual(lightRailRoutes.filter(({ circular }) => circular).map(({ id }) => id), ['705', '706']);
+  for (const [code, expected] of [['705', [5, 12]], ['706', [12, 5]]]) {
+    const pair = findLightRailRoute(code).patterns.map(({ visits }) => visits);
+    assert.deepEqual(pair.map((visits) => visits.length), expected);
+    assert.deepEqual(pair.map((visits) => [visits[0].stopId, visits.at(-1).stopId]),
+      [['430', '500'], ['500', '430']]);
+  }
+  for (const [route, directionIndex, stop] of [['507', 1, '140'], ['751', 0, '550'], ['761P', 1, '550']]) {
+    const visits = findLightRailRoute(route).patterns[directionIndex].visits.filter(({ stopId }) => stop === stopId);
+    assert.equal(visits.length, 2);
+    assert.notEqual(visits[0].sequence, visits[1].sequence);
+  }
+  for (const special of ['507P', '720', '751P', '610P']) {
+    assert.equal(findLightRailRoute(special), undefined);
+    assert.deepEqual(searchLightRail(special), []);
+  }
+});
+
+for (const locale of ['zh-HK', 'en']) {
+  test(`Light Rail directory and search stay offline and keep their scope on returning from details (${locale})`, async (t) => {
+    const page = mount(t, { transport: true, permission: blocked, locale });
+    const { transportCopy: copy, lightRailCopy: rail, labels } = page;
+    await page.settle();
+    page.press(copy.modes.lightRail);
+    await page.settle();
+    assert.ok(page.shows(rail.lines));
+    assert.equal(page.searchInput().placeholder, rail.search);
+    assert.equal(page.rows().length, 11);
+    assert.ok(page.rows().every(({ kind }) => kind === 'light-rail-route'));
+    assert.throws(() => page.findAction(copy.distanceInfo), /Missing action/);
+
+    page.press(labels.byStop);
+    await page.settle();
+    assert.ok(page.shows(rail.stations));
+    assert.equal(page.rows().length, 68);
+    const directoryScope = page.list().key;
+    const scrolls = page.attachList();
+    const directoryRows = page.rows();
+    page.showRows([20], 440);
+    page.openResult(20);
+    assert.deepEqual(page.routes.at(-1), {
+      pathname: '/light-rail/[kind]', params: { kind: 'stop', id: directoryRows[20].id },
+    });
+    page.focus(false);
+    page.focus(true);
+    await page.settle();
+    page.paint();
+    assert.equal(page.list().key, directoryScope);
+    assert.equal(page.rows(), directoryRows);
+    assert.deepEqual(scrolls, []);
+
+    page.searchInput().onChangeText('６１０');
+    await page.settle();
+    assert.ok(page.shows(rail.results));
+    assert.equal(page.rows()[0].kind, 'light-rail-route');
+    assert.equal(page.rows()[0].id, '610');
+    page.openResult(0);
+    assert.deepEqual(page.routes.at(-1), { pathname: '/light-rail/[kind]', params: { kind: 'route', id: '610' } });
+    const searchScope = page.list().key;
+    page.focus(false);
+    page.focus(true);
+    await page.settle();
+    assert.equal(page.searchInput().value, '６１０');
+    assert.equal(page.list().key, searchScope);
+    page.searchInput().onChangeText(locale === 'en' ? 'Hoi WOnG road' : '海皇路');
+    await page.settle();
+    assert.deepEqual(page.rows().map(({ kind, id }) => [kind, id]), [['light-rail-stop', '250']]);
+    page.press(page.busCopy.clearInput);
+    await page.settle();
+    assert.ok(page.shows(rail.stations));
+    assert.equal(page.list().key, directoryScope);
+    assert.equal(page.rows(), directoryRows);
+    assert.equal(page.catalogueReads(), 0);
+    assert.equal(page.requests.length, 0);
+    assert.equal(page.queries.length, 0);
+    assert.deepEqual(page.etaRoutes(), []);
+    page.press(copy.modes.mtr);
+    await page.settle();
+    assert.ok(page.shows(page.mtrCopy.lines));
+  });
+}
+
+test('Light Rail details switch official visits, open stable stop IDs and link to official sources', async (t) => {
+  const route = mount(t, { lightRailDetail: { kind: 'route', id: '761P' } });
+  await route.settle();
+  assert.ok(route.shows(route.lightRailCopy.route('761P')));
+  assert.deepEqual(route.directionFilters().options, [['1', '天逸 → 元朗'], ['2', '元朗 → 天逸']]);
+  route.directionFilters().onSelect('2');
+  await route.settle();
+  const visits = route.detailRows();
+  assert.equal(visits.length, 15);
+  assert.deepEqual(visits.slice(-2).map(({ entry, sequence }) => [entry.id, sequence]), [['550', 14], ['550', 15]]);
+  route.press('天逸');
+  assert.deepEqual(route.routes, [{ pathname: '/light-rail/[kind]', params: { kind: 'stop', id: '550' } }]);
+
+  const circular = mount(t, { lightRailDetail: { kind: 'route', id: '705' }, locale: 'en' });
+  await circular.settle();
+  assert.ok(circular.shows(circular.lightRailCopy.circularNote));
+  assert.deepEqual(circular.directionFilters().options, [['1', 'Segment 1'], ['2', 'Segment 2']]);
+  assert.equal(circular.detailRows().length, 5);
+  circular.directionFilters().onSelect('2');
+  await circular.settle();
+  assert.equal(circular.detailRows().length, 12);
+
+  const stop = mount(t, { lightRailDetail: { kind: 'stop', id: '250' }, locale: 'en' });
+  await stop.settle();
+  assert.ok(stop.shows('Hoi Wong Road') && stop.shows('海皇路') && stop.shows(stop.lightRailCopy.stopId('250')));
+  assert.deepEqual(stop.detailRows().map(({ entry }) => entry.id), ['507', '614', '614P']);
+  stop.press('Route 614P');
+  assert.deepEqual(stop.routes, [{ pathname: '/light-rail/[kind]', params: { kind: 'route', id: '614P' } }]);
+  assert.deepEqual(stop.openedLinks, []);
+  stop.press(stop.lightRailCopy.dataset);
+  stop.press(stop.lightRailCopy.timetable);
+  assert.deepEqual(stop.openedLinks, [stop.lightRail().lightRailSource.resource, stop.lightRail().lightRailSource.timetable.en]);
+
+  const invalid = mount(t, { lightRailDetail: { kind: 'stop', id: ['250', '550'] } });
+  await invalid.settle();
+  assert.ok(invalid.shows(invalid.lightRailCopy.unavailable));
+  assert.deepEqual(invalid.detailRows(), []);
 });

@@ -57,6 +57,7 @@ function RootStack() {
         headerShadowVisible: false,
       }} />
       <Stack.Screen name="mtr/[kind]" options={{ title: copy.transport.modes.mtr }} />
+      <Stack.Screen name="light-rail/[kind]" options={{ title: copy.transport.modes.lightRail }} />
       <Stack.Screen name="bus/nearby" options={{
         title: copy.bus.shortcuts.nearby,
         headerStyle: { backgroundColor: colors.tintedBackground },

@@ -9,10 +9,12 @@ import { useBusCatalogue } from '@/bus-hooks';
 import { busSources, matchBusRoutes, normalizeBusQuery, routePlaceName, type BusRoute } from '@/bus-routes';
 import { routeStopKey } from '@/bus-stops';
 import { BusRouteRow } from '@/components/bus-ui';
+import { LightRailEntryRow } from '@/components/light-rail-ui';
 import { MtrEntryRow } from '@/components/mtr-ui';
 import { TransportSearch, TransportModePicker, TransportUnavailable, type TransportMode } from '@/components/transport-ui';
 import { AppText, EmptyState, Icon } from '@/components/ui';
 import { useLanguage } from '@/language';
+import { lightRailRoutes, lightRailStops, searchLightRail, type LightRailEntry } from '@/light-rail-static';
 import { mtrLines, mtrStations, searchMtr, type MtrEntry } from '@/mtr-static';
 import {
   kmbNearbyNeedsRefresh, prepareNearbyBusIndex, readNearbyBusStops, refreshKmbNearbyStops,
@@ -31,7 +33,7 @@ type Reference = { kind: 'current'; point: Coordinates } | { kind: 'landmark'; l
 type Results = { reference: Reference; radius: BusSearchRadius; stops?: NearbyBusStop[]; routes?: NearbyRoute[] | 'error' };
 type Mode = 'routes' | 'stops';
 type NearbyItem = NearbyRoute | NearbyStopGroup;
-type ListItem = NearbyItem | BusRoute | MtrEntry;
+type ListItem = NearbyItem | BusRoute | MtrEntry | LightRailEntry;
 const emptyRoutes: NearbyRoute[] = [];
 const emptyStops: NearbyBusStop[] = [];
 const emptySearchResults: BusRoute[] = [];
@@ -61,6 +63,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   const catalogue = useBusCatalogue(transport && catalogueRequested);
   const [mode, setMode] = useState<Mode>('routes');
   const [mtrView, setMtrView] = useState<Mode>('routes');
+  const [lightRailView, setLightRailView] = useState<Mode>('routes');
   const [expandedStopGroups, setExpandedStopGroups] = useState<Set<string>>(() => new Set());
   const [radiusMeters, setRadiusMeters] = useState<BusSearchRadius>(500);
   const [pickingRadius, setPickingRadius] = useState(false);
@@ -114,8 +117,10 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   const stops = resultForRadius?.stops ?? emptyStops;
   const showBuses = transportMode === 'all' || transportMode === 'bus';
   const mtrMode = transport && transportMode === 'mtr';
+  const lightRailMode = transport && transportMode === 'lightRail';
+  const railCopy = mtrMode ? copy.mtr : lightRailMode ? copy.lightRail : undefined;
   const normalizedQuery = normalizeBusQuery(query);
-  const searching = transport && (showBuses || mtrMode) && normalizedQuery.length > 0;
+  const searching = transport && (showBuses || Boolean(railCopy)) && normalizedQuery.length > 0;
   const searchingBuses = searching && showBuses;
   const mixedSearch = searching && transportMode === 'all';
   const searchRoutes = useMemo(() => busSources.flatMap((source) => catalogue.feeds[source]?.routes ?? []), [catalogue.feeds]);
@@ -123,21 +128,22 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
     [normalizedQuery, searchRoutes, searchingBuses]);
   const searchResults = useMemo(() => {
     if (mtrMode && searching) return searchMtr(normalizedQuery);
-    if (mixedSearch) return [...busResults, ...searchMtr(normalizedQuery)];
+    if (lightRailMode && searching) return searchLightRail(normalizedQuery);
+    if (mixedSearch) return [...busResults, ...searchMtr(normalizedQuery), ...searchLightRail(normalizedQuery)];
     return busResults;
-  }, [busResults, mixedSearch, mtrMode, normalizedQuery, searching]);
+  }, [busResults, lightRailMode, mixedSearch, mtrMode, normalizedQuery, searching]);
   const searchFailed = busSources.some((source) => catalogue.failed[source]);
-  const showSearchCount = mtrMode || (mixedSearch
+  const showSearchCount = Boolean(railCopy) || (mixedSearch
     ? searchResults.length > 0 || (!catalogue.loading && !searchFailed)
     : searchRoutes.length > 0 && (!catalogue.loading || busResults.length > 0));
   const stopGroups = useMemo(() => showBuses && mode === 'stops' ? groupNearbyStops(stops) : [], [mode, showBuses, stops]);
   const routeResult = resultForRadius?.routes;
   const routeRows = showBuses && !searching && mode === 'routes' && Array.isArray(routeResult) ? routeResult : emptyRoutes;
-  const view = mtrMode ? mtrView : mode;
-  const directory = mtrView === 'routes' ? mtrLines : mtrStations;
-  const rows = searching ? searchResults : mtrMode ? directory : mode === 'routes' ? routeRows : stopGroups;
+  const view = mtrMode ? mtrView : lightRailMode ? lightRailView : mode;
+  const directory = mtrMode ? (view === 'routes' ? mtrLines : mtrStations) : (view === 'routes' ? lightRailRoutes : lightRailStops);
+  const rows = searching ? searchResults : railCopy ? directory : mode === 'routes' ? routeRows : stopGroups;
   const nearbyScope = `${mode}:${referenceRevision}:${radiusMeters}`;
-  const contentScope = searching ? 'search' : mtrMode ? `directory:${mtrView}` : nearbyScope;
+  const contentScope = searching ? 'search' : railCopy ? `directory:${view}` : nearbyScope;
   const listScope = transport ? `${transportMode}:${contentScope}` : nearbyScope;
   const browseScope = searching ? `${listScope}:${normalizedQuery}` : listScope;
   const { recordVisible, scrollProps } = useTransportListPosition<ListItem>(transport, browseScope, rows, listRef, browseKey);
@@ -340,7 +346,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
     setTransportMode(next);
     if (next !== 'all' && next !== 'bus') {
       setFocusSearchOnMount(false);
-      if (next !== 'mtr') Keyboard.dismiss();
+      if (next !== 'mtr' && next !== 'lightRail') Keyboard.dismiss();
     } else if (normalizedQuery) {
       setCatalogueRequested(true);
     }
@@ -364,8 +370,9 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
       onViewableItemsChanged={onViewableItemsChanged}
       renderItem={({ item }) => {
         if ('kind' in item) {
-          const row = <MtrEntryRow entry={item} />;
-          return mixedSearch ? <View style={styles.mixedMtrRow}>{row}</View> : row;
+          const row = item.kind === 'light-rail-route' || item.kind === 'light-rail-stop'
+            ? <LightRailEntryRow entry={item} /> : <MtrEntryRow entry={item} />;
+          return mixedSearch ? <View style={styles.mixedRailRow}>{row}</View> : row;
         }
         if ('number' in item) {
           return <BusRouteRow copy={copy.bus} locale={locale} route={item} modeLabel={mixedSearch ? copy.transport.modes.bus : undefined} onPress={() => {
@@ -384,7 +391,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
       ListHeaderComponent={searching ? (
         <View style={[styles.transportHeader, searchingBuses && styles.searchFeedback]}>
           <AppText variant="homeHeading" accessibilityRole="header">
-            {mtrMode ? copy.mtr.results : mixedSearch ? copy.transport.searchResults : copy.transport.busResults}
+            {railCopy?.results ?? (mixedSearch ? copy.transport.searchResults : copy.transport.busResults)}
           </AppText>
           {showSearchCount && (
             <AppText variant="detail" tone="muted">{copy.bus.resultCount(searchResults.length)}</AppText>
@@ -420,7 +427,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
           {showBuses && !transport && locationIssueNote}
           {showBuses && !transport && refreshFailed && <AppText variant="detail" tone="muted" accessibilityRole="alert">{labels.refreshFailed}</AppText>}
           {showBuses && !transport && distanceNote}
-          {(showBuses || mtrMode) && <View accessibilityRole="tablist" style={[styles.segment, transport && styles.transportSegment]}>
+          {(showBuses || railCopy) && <View accessibilityRole="tablist" style={[styles.segment, transport && styles.transportSegment]}>
             {(['routes', 'stops'] as const).map((option) => {
               const selected = view === option;
               const tone = selected ? (transport ? 'primary' : 'onPrimary') : (transport ? 'muted' : 'primary');
@@ -432,12 +439,17 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
                       setMtrView(option);
                       return;
                     }
+                    if (lightRailMode) {
+                      setLightRailView(option);
+                      return;
+                    }
                     setVisible([]);
                     setMode(option);
                   }}
                   style={({ pressed }) => [styles.segmentOption, selected && (transport ? styles.transportSegmentSelected : styles.segmentSelected),
                     pressed && styles.pressed]}>
-                  <Icon name={option === 'routes' ? (mtrMode ? 'tram.fill.tunnel' : 'bus') : 'mappin'} size={16} color={colors[tone]} />
+                  <Icon name={option === 'routes' ? (mtrMode ? 'tram.fill.tunnel' : lightRailMode ? 'train.side.front.car' : 'bus') : 'mappin'}
+                    size={16} color={colors[tone]} />
                   <AppText variant="detail" tone={tone} style={styles.shrink}>
                     {option === 'routes' ? labels.byRoute : labels.byStop}
                   </AppText>
@@ -445,8 +457,8 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
               );
             })}
           </View>}
-          {mtrMode && <AppText variant="homeHeading" accessibilityRole="header">
-            {mtrView === 'routes' ? copy.mtr.lines : copy.mtr.stations}
+          {railCopy && <AppText variant="homeHeading" accessibilityRole="header">
+            {view === 'routes' ? railCopy.lines : railCopy.stations}
           </AppText>}
           {showBuses && <View style={[styles.heading, transport && styles.transportHeading]}>
             <AppText variant="homeHeading" accessibilityRole="header" style={[styles.copy, transport && styles.transportHeadingTitle]}>
@@ -507,14 +519,15 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
         </View>
       )}
       ListEmptyComponent={searching ? (
-        mtrMode || (!catalogue.loading && (mixedSearch || searchRoutes.length > 0)) ? (
+        railCopy || (!catalogue.loading && (mixedSearch || searchRoutes.length > 0)) ? (
           <View style={searchingBuses && styles.searchFeedback}>
             <EmptyState icon="magnifyingglass"
-              title={mtrMode || (mixedSearch && searchFailed) ? copy.mtr.noMatches : mixedSearch ? copy.transport.noMatches : copy.bus.noResults}
+              title={railCopy?.noMatches ?? (mixedSearch
+                ? (searchFailed ? copy.transport.noRailMatches : copy.transport.noMatches) : copy.bus.noResults)}
               detail={transportMode === 'bus' ? copy.bus.searchHint : undefined} />
           </View>
         ) : null
-      ) : mtrMode ? <EmptyState icon="tram.fill.tunnel" title={copy.mtr.noDirectory} />
+      ) : railCopy ? <EmptyState icon={mtrMode ? 'tram.fill.tunnel' : 'train.side.front.car'} title={railCopy.noDirectory} />
         : !showBuses ? <TransportUnavailable copy={copy.transport} mode={transportMode} /> : transport && !reference ? null : (
         <View style={styles.header}>
           {index === 'loading' ? <Loading label={labels.preparing} />
@@ -549,8 +562,8 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   return (
     <View style={styles.transportPage}>
       <View style={styles.transportControls}>
-        {(showBuses || mtrMode) && (
-          <TransportSearch label={mtrMode ? copy.mtr.search : transportMode === 'all' ? copy.transport.searchAll : copy.transport.searchBuses}
+        {(showBuses || railCopy) && (
+          <TransportSearch label={railCopy?.search ?? (transportMode === 'all' ? copy.transport.searchAll : copy.transport.searchBuses)}
             clearLabel={copy.bus.clearInput} cancelLabel={copy.bus.cancel} query={query} onChange={editQuery}
             autoFocus={focusSearchOnMount} />
         )}
@@ -752,7 +765,7 @@ const styles = StyleSheet.create({
   transportContent: { paddingTop: space.sm },
   searchContent: { paddingHorizontal: 0, gap: 0 },
   searchFeedback: { paddingHorizontal: homeLayout.gutter, paddingBottom: space.sm },
-  mixedMtrRow: { paddingHorizontal: homeLayout.gutter, paddingBottom: space.sm },
+  mixedRailRow: { paddingHorizontal: homeLayout.gutter, paddingBottom: space.sm },
   header: { gap: space.md },
   transportHeader: { gap: space.sm },
   panel: { backgroundColor: colors.surface, borderRadius: radius.media, borderColor: colors.border, borderWidth: StyleSheet.hairlineWidth },
