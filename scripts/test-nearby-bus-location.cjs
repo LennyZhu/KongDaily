@@ -26,11 +26,16 @@ const granted = { granted: true, canAskAgain: true };
 const promptable = { granted: false, canAskAgain: true };
 const blocked = { granted: false, canAskAgain: false };
 
-function mount(t, { permission = granted, servicesEnabled = true, appState = 'active', locale = 'zh-HK' } = {}) {
+function mount(t, {
+  permission = granted, servicesEnabled = true, appState = 'active', locale = 'zh-HK', transport = false,
+  intent, delayCatalogue = false,
+} = {}) {
   const events = new EventEmitter();
   const requests = [];
   const queries = [];
   const routes = [];
+  const settings = [];
+  const alerts = [];
   const calls = { services: 0, permission: 0, prompt: 0 };
   let permissionOnRequest = granted;
   let focused = true;
@@ -38,8 +43,18 @@ function mount(t, { permission = granted, servicesEnabled = true, appState = 'ac
   let dirty = true;
   let cursor = 0;
   let effects = [];
+  let screenTree;
   let tree;
+  let modePickerTree;
+  let searchTree;
+  let etaRoutes;
+  let etaNow = 0;
+  let dismissals = 0;
+  let catalogueReads = 0;
+  let finishCatalogue;
   const slots = [];
+  const frames = new Map();
+  let frameId = 0;
 
   const react = {
     useState(initial) {
@@ -75,6 +90,7 @@ function mount(t, { permission = granted, servicesEnabled = true, appState = 'ac
       });
     },
   };
+  react.useLayoutEffect = react.useEffect;
 
   const AppState = {
     currentState: appState,
@@ -91,11 +107,17 @@ function mount(t, { permission = granted, servicesEnabled = true, appState = 'ac
       return () => events.off(event, listener);
     },
   };
-  const native = Object.fromEntries(['ActivityIndicator', 'FlatList', 'Pressable', 'View'].map((name) => [name, name]));
+  const native = Object.fromEntries(['ActivityIndicator', 'FlatList', 'Pressable', 'ScrollView', 'TextInput', 'View'].map((name) => [name, name]));
   const setVisible = () => {};
   const mocks = {
     react,
-    'react-native': { ...native, AppState, StyleSheet: { create: (styles) => styles } },
+    'expo-linear-gradient': { LinearGradient: 'LinearGradient' },
+    'react-native': {
+      ...native, AppState, StyleSheet: { create: (styles) => styles }, useWindowDimensions: () => ({ width: 320 }),
+      Keyboard: { dismiss: () => { dismissals++; } },
+      Linking: { openSettings: () => new Promise((resolve, reject) => settings.push({ resolve, reject })) },
+      Alert: { alert: (message) => alerts.push(message) },
+    },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ bottom: 0 }) },
     'expo-location': {
       Accuracy: { High: 4 },
@@ -109,6 +131,7 @@ function mount(t, { permission = granted, servicesEnabled = true, appState = 'ac
     },
     'expo-router': {
       useRouter: () => ({ push: (href) => routes.push(href) }),
+      useLocalSearchParams: () => ({ intent }),
       useFocusEffect: (effect) => load(require.resolve('expo-router/build/useFocusEffect')).useFocusEffect(effect),
     },
     './link/useLoadedNavigation': { useOptionalNavigation: () => navigation },
@@ -121,8 +144,23 @@ function mount(t, { permission = granted, servicesEnabled = true, appState = 'ac
         return db.prepare(sql).all(...params);
       },
     }) },
-    '@/bus-data': { requestBusJson: () => assert.fail('Unexpected bus network request') },
-    '@/nearby-stop-eta-hooks': { useStationEta: () => ({ records: {}, rateLimits: {}, now: 0, setVisible }) },
+    '@/components/home-ui': { HarbourBackdrop: 'HarbourBackdrop' },
+    '@/components/saved-bus-ui': { FavoriteBusRow: 'FavoriteBusRow' },
+    '@/bus-favorite-hooks': {},
+    '@/bus-data': {
+      async readBusFeeds() {
+        catalogueReads++;
+        if (pendingCatalogue) await pendingCatalogue;
+        return cachedCatalogue;
+      },
+      isBusFeedFresh: () => true,
+      requestBusJson: () => assert.fail('Unexpected bus network request'),
+      refreshBusFeed: () => assert.fail('Unexpected catalogue refresh'),
+    },
+    '@/nearby-stop-eta-hooks': { useStationEta(routes) {
+      etaRoutes = routes;
+      return { records: {}, rateLimits: {}, now: etaNow, setVisible };
+    } },
   };
   const modules = new Map();
 
@@ -140,7 +178,7 @@ function mount(t, { permission = granted, servicesEnabled = true, appState = 'ac
       const code = filename.endsWith('.js') ? text : ts.transpileModule(text, { compilerOptions: {
         target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,
       } }).outputText;
-      transpiled.set(filename, new Function('module', 'exports', 'require', code));
+      transpiled.set(filename, new Function('module', 'exports', 'require', 'requestAnimationFrame', 'cancelAnimationFrame', code));
     }
     const localRequire = createRequire(filename);
     transpiled.get(filename)(module, module.exports, (id) => {
@@ -149,12 +187,35 @@ function mount(t, { permission = granted, servicesEnabled = true, appState = 'ac
         ...source('nearby-bus-data'), prepareNearbyBusIndex: async () => [], kmbNearbyNeedsRefresh: () => false,
       };
       return id.startsWith('@/') ? source(id.slice(2)) : localRequire(id);
-    });
+    }, (callback) => { frames.set(++frameId, callback); return frameId; }, (id) => frames.delete(id));
     return module.exports;
   }
 
-  const screen = source('app/bus/nearby').default;
-  const labels = source('i18n').messages[locale].nearbyBus;
+  const { parseBusCatalogue } = source('bus-routes');
+  const catalogueRoutes = {
+    kmbLwb: parseBusCatalogue('kmbLwb', { data: [1, 3].map((variant) => ({
+      route: '268X', bound: 'O', service_type: variant, orig_tc: '洪水橋', orig_en: 'Hung Shui Kiu',
+      dest_tc: '高鐵(西九龍站)', dest_en: 'High Speed Rail West Kowloon Station',
+    })) }),
+    citybus: parseBusCatalogue('citybus', { data: [{
+      co: 'CTB', route: '23', orig_tc: '蒲飛路', orig_en: 'Pokfield Road', dest_tc: '北角碼頭', dest_en: 'North Point Ferry Pier',
+    }] }),
+    nlb: parseBusCatalogue('nlb', { routes: [
+      { routeId: 37, routeNo: 'B2', routeName_c: '元朗港鐵站>深圳灣口岸', routeName_e: 'Yuen Long MTR Station>Shenzhen Bay Port' },
+      { routeId: 33, routeNo: 'B2P', routeName_c: '天水圍 (天慈邨)>深圳灣口岸', routeName_e: 'Tin Shui Wai (Tin Tsz Estate)>Shenzhen Bay Port' },
+    ] }),
+  };
+  const cachedCatalogue = Object.fromEntries(Object.entries(catalogueRoutes).map(([source, routes]) => [
+    source, { routes, fetchedAt: Date.now(), persisted: true },
+  ]));
+  const pendingCatalogue = delayCatalogue && new Promise((resolve) => { finishCatalogue = resolve; });
+
+  const busScreen = source('app/bus/nearby').default;
+  const transportEntry = transport && source('app/transport').default();
+  if (transportEntry) assert.equal(transportEntry.type, busScreen);
+  const screen = transportEntry ? () => transportEntry.type(transportEntry.props) : busScreen;
+  const copy = source('i18n').messages[locale];
+  const labels = copy.nearbyBus;
   const landmarks = source('nearby-bus-landmarks').nearbyBusLandmarks;
 
   async function settle() {
@@ -163,7 +224,15 @@ function mount(t, { permission = granted, servicesEnabled = true, appState = 'ac
         dirty = false;
         cursor = 0;
         effects = [];
-        tree = screen();
+        screenTree = screen();
+        tree = elements(screenTree, false).find(({ type }) => type === 'FlatList');
+        if (transport) {
+          const controls = elements(screenTree, false);
+          const picker = controls.find(({ type }) => type.name === 'TransportModePicker');
+          modePickerTree = picker.type(picker.props);
+          const search = controls.find(({ type }) => type.name === 'TransportBusSearch');
+          searchTree = search && search.type(search.props);
+        }
         effects.forEach((run) => run());
       }
       await new Promise(setImmediate);
@@ -172,19 +241,31 @@ function mount(t, { permission = granted, servicesEnabled = true, appState = 'ac
     assert.fail('Nearby bus screen did not settle');
   }
 
-  function elements(node) {
-    if (Array.isArray(node)) return node.flatMap(elements);
-    return node?.props ? [node, ...elements(node.props.children)] : [];
+  function elements(node, expand = true) {
+    if (Array.isArray(node)) return node.flatMap((child) => elements(child, expand));
+    if (!node?.props) return [];
+    let children = node.props.children;
+    if (expand && (node.type?.name === 'Loading' || node.type?.name?.startsWith('Transport'))) {
+      children = node.type.name === 'TransportModePicker' ? modePickerTree
+        : node.type.name === 'TransportBusSearch' ? searchTree : node.type(node.props);
+    }
+    return [node, ...elements(children, expand)];
   }
-  function press(label) {
-    const action = elements(tree.props.ListHeaderComponent).find(({ type, props }) => type === 'Pressable'
+  function findAction(label) {
+    const action = elements([screenTree, tree.props.ListHeaderComponent, !tree.props.data.length && tree.props.ListEmptyComponent])
+      .find(({ type, props }) => type === 'Pressable'
       && (props.accessibilityLabel === label || elements(props.children).some((child) => child.props.children === label)));
     assert.ok(action, `Missing action: ${label}`);
+    return action;
+  }
+  function press(label) {
+    const action = findAction(label);
     assert.equal(Boolean(action.props.disabled), false, `Disabled action: ${label}`);
     action.props.onPress();
   }
   function shows(label) {
-    return elements([tree.props.ListHeaderComponent, tree.props.ListEmptyComponent]).some(({ props }) => props.children === label);
+    return elements([screenTree, tree.props.ListHeaderComponent, !tree.props.data.length && tree.props.ListEmptyComponent])
+      .some(({ props }) => props.children === label || props.title === label);
   }
 
   function unmount() {
@@ -193,10 +274,51 @@ function mount(t, { permission = granted, servicesEnabled = true, appState = 'ac
     mounted = false;
   }
 
+  function attachList({ failIndex = false } = {}) {
+    const scrolls = [];
+    tree.props.ref.current = {
+      scrollToIndex(params) {
+        scrolls.push({ method: 'index', ...params });
+        if (failIndex) tree.props.onScrollToIndexFailed({ index: params.index, averageItemLength: 100 });
+      },
+      scrollToOffset(params) { scrolls.push({ method: 'offset', ...params }); },
+    };
+    return scrolls;
+  }
+
+  function showRows(indexes, offset) {
+    tree.props.onScroll({ nativeEvent: { contentOffset: { y: offset } } });
+    tree.props.onViewableItemsChanged({ viewableItems: indexes.map((index) => {
+      const item = tree.props.data[index];
+      assert.ok(item, `Missing visible row at ${index}`);
+      return { item, index, key: tree.props.keyExtractor(item), isViewable: true };
+    }) });
+  }
+
+  function paint() {
+    for (const [id, run] of frames) {
+      frames.delete(id);
+      run();
+    }
+  }
+
   t.after(unmount);
   return {
-    calls, labels, landmarks, requests, queries, routes, settle, press, shows, unmount,
+    calls, labels, landmarks, requests, queries, routes, settings, alerts, settle, press, shows, unmount, findAction,
+    transportCopy: copy.transport, busCopy: copy.bus, catalogueRoutes, theme: source('theme'),
+    finishCatalogue: () => finishCatalogue(),
+    catalogueReads: () => catalogueReads,
+    dismissals: () => dismissals,
+    controls: () => screenTree.props.children[0].props.children.filter(Boolean),
+    searchInput: () => elements(searchTree).find(({ type }) => type === 'TextInput')?.props,
+    list: () => tree,
+    modeScroller: () => elements(modePickerTree).find(({ type }) => type === 'ScrollView').props,
+    unavailableTitle: () => elements(tree.props.ListEmptyComponent).find(({ type }) => type === 'EmptyState')?.props.title,
+    etaRoutes: () => etaRoutes,
+    attachList, showRows, paint,
+    tickEta() { etaNow += 1000; dirty = true; },
     rows: () => tree.props.data,
+    renderRow: (index) => tree.props.renderItem({ item: tree.props.data[index] }),
     renderFirstRow: () => tree.props.renderItem({ item: tree.props.data[0] }),
     locateButton: () => elements(tree.props.ListHeaderComponent).find(({ props }) => props.accessibilityLabel === labels.useLocation),
     appState(state) { AppState.currentState = state; events.emit('change', state); },
@@ -427,5 +549,526 @@ test('a hung native fix times out and its late result cannot replace a retry', a
   page.unmount();
   page.fix(2, page.landmarks.central);
   await page.settle();
+  assert.equal(page.queries.length, 1);
+});
+
+for (const locale of ['zh-HK', 'en']) {
+  test(`transport filters use real bus results and keep the same position and mode (${locale})`, async (t) => {
+    const page = mount(t, { transport: true, locale });
+    const { labels, landmarks, transportCopy: copy } = page;
+    const expected = locale === 'en'
+      ? ['All', 'Bus', 'MTR', 'Light Rail', 'Ferry', 'Tram', 'Green Minibus']
+      : ['全部', '巴士', '港鐵', '輕鐵', '渡輪', '電車', '專線小巴'];
+    assert.deepEqual(Object.values(copy.modes), expected);
+    await page.settle();
+    assert.ok(!page.shows(locale === 'en' ? 'Find transport services near you' : '查看附近可用的交通服務'));
+    assert.equal(copy.searchAll, locale === 'en' ? 'Search transport routes' : '搜尋交通路線');
+    assert.equal(copy.searchBuses, locale === 'en' ? 'Search bus routes' : '搜尋巴士路線');
+    assert.equal(page.searchInput().placeholder, copy.searchAll);
+    page.searchInput().onFocus();
+    await page.settle();
+    assert.deepEqual(page.routes, []);
+    for (const label of expected) {
+      const { props } = page.findAction(label);
+      assert.equal(props.accessibilityRole, 'tab');
+      assert.equal(props.accessibilityState.selected, label === copy.modes.all);
+      assert.equal(props.style({ pressed: false })[0].minHeight, 44);
+      assert.equal(props.style({ pressed: false })[1].maxWidth, 212);
+    }
+    page.fix(0, landmarks.central);
+    await page.settle();
+    const allRoutes = page.rows();
+    assert.ok(allRoutes.length > 1);
+    assert.equal(page.etaRoutes().length, allRoutes.length);
+    page.searchInput().onChangeText('B2');
+    await page.settle();
+    assert.deepEqual(page.rows().map((route) => route.number), ['B2', 'B2P']);
+    assert.equal(page.requests.length, 1);
+    assert.equal(page.queries.length, 1);
+    page.press(page.busCopy.clearInput);
+    await page.settle();
+    assert.deepEqual(page.rows(), allRoutes);
+    for (const mode of ['mtr', 'lightRail', 'ferry', 'tram', 'minibus']) {
+      page.press(copy.modes[mode]);
+      await page.settle();
+      assert.ok(page.findAction(copy.modes[mode]).props.accessibilityState.selected);
+      assert.equal(page.unavailableTitle(), copy.unavailable(copy.modes[mode]));
+      assert.equal(page.searchInput(), undefined);
+      assert.ok(!page.shows(copy.locating) && !page.shows(labels.noReference));
+      assert.throws(() => page.findAction(copy.changeReference), /Missing action/);
+      assert.deepEqual(page.routes, []);
+      assert.deepEqual(page.rows(), []);
+      assert.equal(page.etaRoutes().length, 0);
+    }
+    page.press(copy.modes.bus);
+    await page.settle();
+    assert.deepEqual(page.rows(), allRoutes);
+    assert.equal(page.searchInput().placeholder, copy.searchBuses);
+    page.press(labels.byStop);
+    await page.settle();
+    const { floatingTab, colors } = page.theme;
+    const stopTab = page.findAction(labels.byStop).props;
+    const routeTab = page.findAction(labels.byRoute).props;
+    assert.equal(stopTab.accessibilityState.selected, true);
+    assert.equal(stopTab.style({ pressed: false })[1].backgroundColor, floatingTab.selected);
+    assert.equal(stopTab.children[0].props.color, colors.primary);
+    assert.equal(stopTab.children[1].props.tone, 'primary');
+    assert.equal(routeTab.children[0].props.color, colors.muted);
+    assert.equal(routeTab.children[1].props.tone, 'muted');
+    const allStops = page.rows();
+    assert.ok(allStops.length > 1 && allStops.every((row) => 'stops' in row));
+    page.press(copy.modes.ferry);
+    await page.settle();
+    page.press(copy.modes.all);
+    await page.settle();
+    assert.deepEqual(page.rows(), allStops);
+    assert.equal(page.searchInput().placeholder, copy.searchAll);
+    assert.ok(!page.shows(labels.distanceNote));
+    assert.ok(!page.shows(labels.currentLocation));
+    assert.ok(!page.locateButton());
+    assert.equal(page.requests.length, 1);
+    assert.equal(page.queries.length, 1);
+  });
+
+  test(`transport puts search first and discloses distance and location controls on demand (${locale})`, async (t) => {
+    const page = mount(t, { transport: true, locale });
+    const { labels, landmarks, transportCopy: copy } = page;
+    await page.settle();
+
+    const list = page.list();
+    assert.equal(list.type, 'FlatList');
+    assert.equal(list.props.contentInsetAdjustmentBehavior, 'never');
+    assert.ok(list.props.contentContainerStyle.at(-1).paddingBottom > 0);
+    assert.equal(list.props.automaticallyAdjustKeyboardInsets, true);
+    assert.equal(list.props.keyboardShouldPersistTaps, 'handled');
+    const [search, picker] = page.controls();
+    const [listMode] = list.props.ListHeaderComponent.props.children.filter(Boolean);
+    assert.equal(search.props.label, copy.searchAll);
+    assert.equal(picker.type.name, 'TransportModePicker');
+    assert.equal(listMode.props.accessibilityRole, 'tablist');
+    assert.equal(listMode.props.style[1].backgroundColor, page.theme.floatingTab.background);
+    assert.ok(!page.shows(labels.reference) && !page.shows(labels.currentLocation));
+    assert.ok(page.shows(locale === 'en' ? 'Finding nearby transport…' : '正在尋找附近交通…'));
+    assert.ok(!page.shows(labels.noRoutes(labels.metres(500))) && !page.locateButton());
+    const landmark = page.findAction(copy.chooseLandmark);
+    assert.equal(landmark.props.style({ pressed: false })[0][0].minHeight, 44);
+
+    assert.ok(!page.shows(labels.distanceNote) && !page.shows(labels.routeCoverage));
+    page.fix(0, landmarks.central);
+    await page.settle();
+    assert.ok(!page.shows(copy.locating) && !page.locateButton());
+    assert.ok(page.rows().length > 0);
+    assert.throws(() => page.findAction(copy.chooseLandmark), /Missing action/);
+    const changeReference = page.findAction(copy.changeReference);
+    assert.equal(changeReference.props.accessibilityState.expanded, false);
+    assert.equal(changeReference.props.style({ pressed: false })[0].minHeight, 44);
+    page.press(copy.changeReference);
+    await page.settle();
+    assert.equal(page.findAction(copy.changeReference).props.accessibilityState.expanded, true);
+    assert.ok(page.findAction(labels.landmarks.central));
+    assert.ok(page.locateButton());
+    page.press(copy.changeReference);
+    await page.settle();
+    assert.ok(!page.locateButton());
+    const info = page.findAction(copy.distanceInfo);
+    assert.equal(info.props.accessibilityState.expanded, false);
+    assert.equal(info.props.style({ pressed: false })[0].minHeight, 44);
+    assert.equal(info.props.style({ pressed: false })[0].minWidth, 44);
+    page.press(copy.distanceInfo);
+    await page.settle();
+    assert.equal(page.findAction(copy.distanceInfo).props.accessibilityState.expanded, true);
+    assert.ok(page.shows(labels.distanceNote) && page.shows(labels.routeCoverage));
+
+    const range500 = locale === 'en' ? 'Straight-line 500 m' : '直線 500 米';
+    const range1000 = locale === 'en' ? 'Straight-line 1 km' : '直線 1 公里';
+    page.press(range500);
+    await page.settle();
+    page.press(labels.kilometres(1));
+    await page.settle();
+    assert.ok(page.findAction(range1000));
+    assert.ok(!page.shows(range500));
+    assert.equal(page.queries.length, 2);
+    assert.equal(page.requests.length, 1);
+    page.press(labels.byStop);
+    await page.settle();
+    assert.ok(page.shows(labels.distanceNote) && page.shows(labels.partialCoverage));
+    assert.ok(!page.shows(labels.routeCoverage));
+    page.press(copy.distanceInfo);
+    await page.settle();
+    assert.ok(!page.shows(labels.distanceNote) && !page.shows(labels.partialCoverage));
+    page.press(copy.distanceInfo);
+    await page.settle();
+    page.press(copy.modes.mtr);
+    await page.settle();
+    assert.ok(!page.shows(range1000) && !page.shows(labels.distanceNote) && !page.shows(labels.partialCoverage));
+    assert.throws(() => page.findAction(copy.distanceInfo), /Missing action/);
+    page.press(copy.modes.all);
+    await page.settle();
+    page.press(copy.changeReference);
+    await page.settle();
+    page.press(labels.landmarks.shaTin);
+    await page.settle();
+    assert.ok(page.shows(labels.landmarkReference(labels.landmarks.shaTin)));
+    assert.equal(page.findAction(copy.changeReference).props.accessibilityState.expanded, false);
+    assert.equal(page.requests.length, 1);
+  });
+}
+
+for (const locale of ['zh-HK', 'en']) {
+  test(`home intent opens Bus and offers inline search and boarding-stop guidance (${locale})`, async (t) => {
+    const page = mount(t, { transport: true, locale, intent: 'add-frequent-route', permission: promptable });
+    const { transportCopy: copy } = page;
+    await page.settle();
+    assert.equal(page.searchInput().placeholder, copy.searchBuses);
+    assert.equal(page.searchInput().autoFocus, true);
+    assert.ok(page.findAction(copy.modes.bus).props.accessibilityState.selected);
+    assert.ok(page.shows(locale === 'en' ? 'Search for a route and choose a boarding stop to save it.' : '搜尋路線並選擇上車站，即可加入常用。'));
+    assert.equal(page.catalogueReads(), 0);
+    assert.equal(page.calls.prompt, 0);
+    assert.deepEqual(page.routes, []);
+  });
+}
+
+test('inline search reuses catalogue identities, ranks results, and restores the nearby state after clear or cancel', async (t) => {
+  const page = mount(t, { transport: true, delayCatalogue: true });
+  const { labels, transportCopy: copy, busCopy: bus, catalogueRoutes } = page;
+  await page.settle();
+  assert.ok(!page.shows(copy.addFrequentHint));
+  assert.equal(page.searchInput().autoFocus, false);
+  page.press(copy.chooseLandmark);
+  await page.settle();
+  page.press(labels.landmarks.central);
+  await page.settle();
+  page.press(labels.byStop);
+  await page.settle();
+  page.press(copy.straightLineRadius(labels.metres(500)));
+  await page.settle();
+  page.press(labels.kilometres(1));
+  await page.settle();
+  const nearby = page.rows();
+  assert.ok(nearby.length > 1 && nearby.every((row) => 'stops' in row));
+  assert.equal(page.catalogueReads(), 0);
+  const gpsRequests = page.requests.length;
+
+  page.searchInput().onChangeText('B2');
+  await page.settle();
+  assert.ok(page.shows(bus.loading));
+  assert.deepEqual(page.rows(), []);
+  page.searchInput().onChangeText('2');
+  page.searchInput().onChangeText('268X');
+  await page.settle();
+  assert.equal(page.catalogueReads(), 1);
+  page.press(copy.modes.mtr);
+  await page.settle();
+  page.finishCatalogue();
+  await page.settle();
+  assert.equal(page.searchInput(), undefined);
+  assert.deepEqual(page.rows(), []);
+  assert.equal(page.unavailableTitle(), copy.unavailable(copy.modes.mtr));
+  page.press(copy.modes.bus);
+  await page.settle();
+  assert.equal(page.searchInput().value, '268X');
+  assert.equal(page.searchInput().placeholder, copy.searchBuses);
+  assert.deepEqual(page.rows(), catalogueRoutes.kmbLwb);
+  assert.deepEqual(page.rows().map((route) => route.serviceType), ['1', '3']);
+  assert.ok(page.shows(copy.busResults));
+  assert.deepEqual(page.etaRoutes(), []);
+
+  page.press(copy.modes.all);
+  await page.settle();
+  page.searchInput().onChangeText(' ｂ２ ');
+  await page.settle();
+  assert.deepEqual(page.rows().map((route) => route.number), ['B2', 'B2P']);
+  const row = page.renderFirstRow();
+  assert.equal(row.type.name, 'BusRouteRow');
+  const searchList = page.list().key;
+  const searchScrolls = page.attachList();
+  page.showRows([1], 120);
+  row.props.onPress();
+  assert.deepEqual(page.routes, [{ pathname: '/bus/route', params: { routeId: catalogueRoutes.nlb[0].id } }]);
+  assert.ok(page.dismissals() > 0);
+  page.focus(false);
+  page.focus(true);
+  await page.settle();
+  assert.equal(page.searchInput().value, ' ｂ２ ');
+  assert.deepEqual(page.rows().map((route) => route.number), ['B2', 'B2P']);
+  assert.equal(page.list().key, searchList);
+  page.paint();
+  assert.deepEqual(searchScrolls, []);
+
+  for (const query of ['north point ferry pier', '北角碼頭']) {
+    page.searchInput().onChangeText(query);
+    await page.settle();
+    assert.deepEqual(page.rows(), catalogueRoutes.citybus);
+  }
+  page.searchInput().onChangeText('invalid route query');
+  await page.settle();
+  assert.ok(page.shows(bus.noResults));
+  assert.deepEqual(page.rows(), []);
+  assert.ok(searchScrolls.some(({ method, offset }) => method === 'offset' && offset === 0));
+  page.press(bus.clearInput);
+  await page.settle();
+  assert.equal(page.searchInput().value, '');
+  assert.notEqual(page.list().key, searchList);
+  assert.deepEqual(page.rows(), nearby);
+  assert.ok(page.findAction(labels.byStop).props.accessibilityState.selected);
+  assert.ok(page.findAction(copy.straightLineRadius(labels.kilometres(1))));
+  page.searchInput().onChangeText('26');
+  await page.settle();
+  const beforeCancel = page.dismissals();
+  page.press(bus.cancel);
+  await page.settle();
+  assert.equal(page.dismissals(), beforeCancel + 1);
+  assert.equal(page.searchInput().value, '');
+  assert.deepEqual(page.rows(), nearby);
+  assert.equal(page.catalogueReads(), 1);
+  assert.equal(page.requests.length, gpsRequests);
+  assert.equal(page.calls.prompt, 0);
+});
+
+test('transport keeps search available before permission and offers Settings when permission is blocked', async (t) => {
+  const page = mount(t, { transport: true, permission: promptable, locale: 'en' });
+  const { labels, transportCopy: copy } = page;
+  await page.settle();
+  assert.equal(page.calls.prompt, 0);
+  assert.equal(page.requests.length, 0);
+  assert.ok(page.shows(labels.issues.denied));
+  page.searchInput().onFocus();
+  await page.settle();
+  assert.deepEqual(page.routes, []);
+  page.answerPrompt(blocked);
+  page.press(labels.useLocation);
+  await page.settle();
+  assert.equal(page.calls.prompt, 1);
+  assert.ok(page.shows(labels.issues.denied));
+  page.focus(false);
+  page.focus(true);
+  await page.settle();
+  assert.equal(page.requests.length, 0);
+  assert.ok(!page.locateButton());
+  assert.ok(page.shows(labels.issues.blocked));
+  page.press(copy.openSettings);
+  assert.equal(page.settings.length, 1);
+  page.settings[0].reject(new Error('Settings unavailable'));
+  await page.settle();
+  assert.deepEqual(page.alerts, [copy.settingsUnavailable]);
+  page.press(copy.chooseLandmark);
+  await page.settle();
+  page.press(labels.landmarks.central);
+  await page.settle();
+  assert.ok(page.shows(labels.landmarkReference(labels.landmarks.central)));
+  assert.ok(page.rows().length > 0);
+  assert.equal(page.calls.prompt, 1);
+});
+
+test('transport recovers from disabled services and failed GPS without showing stale nearby results', async (t) => {
+  const page = mount(t, { transport: true, servicesEnabled: false });
+  const { labels, landmarks, transportCopy: copy } = page;
+  await page.settle();
+  assert.ok(page.shows(labels.issues.unavailable));
+  assert.ok(page.findAction(copy.chooseLandmark));
+  assert.equal(page.calls.prompt, 0);
+  page.changeServices(true);
+  page.press(labels.useLocation);
+  await page.settle();
+  assert.ok(page.shows(copy.locating));
+  page.fix(0, landmarks.central);
+  await page.settle();
+  assert.ok(page.rows().length > 0);
+  assert.ok(!page.locateButton());
+
+  page.focus(false);
+  page.focus(true);
+  await page.settle();
+  assert.equal(page.requests.length, 2);
+  assert.ok(!page.shows(copy.locating));
+  assert.ok(page.rows().length > 0, 'The previous nearby data stays visible during passive GPS refresh');
+  assert.ok(!page.shows(labels.noRoutes(labels.metres(500))));
+  page.requests[1].reject(new Error('Native location failed'));
+  await page.settle();
+  assert.ok(page.shows(labels.issues.unavailable));
+  assert.ok(!page.shows(copy.locating));
+  assert.equal(page.rows().length, 0);
+  assert.ok(page.locateButton());
+
+  page.appState('background');
+  page.appState('active');
+  await page.settle();
+  assert.equal(page.requests.length, 3);
+  page.fix(2, landmarks.shaTin);
+  await page.settle();
+  assert.ok(page.rows().length > 0);
+  assert.ok(!page.shows(labels.issues.unavailable) && !page.locateButton());
+});
+
+for (const mode of ['routes', 'stops']) {
+  test(`transport ${mode} detail preserves the mounted list across refocus, GPS and ETA updates`, async (t) => {
+    const page = mount(t, { transport: true, locale: mode === 'routes' ? 'zh-HK' : 'en' });
+    const { landmarks, transportCopy: copy, labels } = page;
+    await page.settle();
+    page.fix(0, landmarks.central);
+    await page.settle();
+    page.press(copy.modes.bus);
+    await page.settle();
+    if (mode === 'stops') {
+      page.press(labels.byStop);
+      await page.settle();
+    }
+    page.press(copy.straightLineRadius(labels.metres(500)));
+    await page.settle();
+    page.press(labels.kilometres(1));
+    await page.settle();
+
+    const rows = page.rows();
+    const listKey = page.list().key;
+    const scrolls = page.attachList();
+    page.showRows([13, 14, 15], 1500);
+    const card = page.renderRow(14);
+    if (mode === 'routes') {
+      card.props.onPress();
+      assert.equal(page.routes.at(-1).pathname, '/bus/route');
+      assert.equal(page.routes.at(-1).params.stopId, rows[14].route.target.stopId);
+    } else {
+      card.props.onOpen(rows[14].stops[0]);
+      assert.equal(page.routes.at(-1).pathname, '/bus/nearby/stop');
+      assert.equal(page.routes.at(-1).params.stopId, rows[14].stops[0].stop_id);
+    }
+    page.focus(false);
+    page.focus(true);
+    await page.settle();
+    assert.equal(page.requests.length, 2);
+    assert.equal(page.list().key, listKey);
+    assert.equal(page.rows(), rows);
+    assert.ok(!page.shows(copy.locating));
+    page.tickEta();
+    await page.settle();
+    assert.equal(page.list().key, listKey);
+    assert.equal(page.rows(), rows);
+    page.fix(1, landmarks.central);
+    await page.settle();
+    page.paint();
+    assert.equal(page.list().key, listKey);
+    assert.deepEqual(page.rows(), rows);
+    assert.deepEqual(scrolls, []);
+    assert.ok(page.findAction(copy.modes.bus).props.accessibilityState.selected);
+    assert.ok(page.findAction(mode === 'routes' ? labels.byRoute : labels.byStop).props.accessibilityState.selected);
+    assert.ok(page.findAction(copy.straightLineRadius(labels.kilometres(1))));
+    page.press(mode === 'routes' ? labels.byStop : labels.byRoute);
+    await page.settle();
+    assert.notEqual(page.list().key, listKey, 'An explicit display-mode change uses a new list scope');
+  });
+}
+
+test('a changed GPS ranking keeps a visible station nearby with one layout fallback', async (t) => {
+  const page = mount(t, { transport: true });
+  const { landmarks, labels, transportCopy: copy } = page;
+  await page.settle();
+  page.fix(0, landmarks.central);
+  await page.settle();
+  page.press(labels.byStop);
+  await page.settle();
+  page.press(copy.straightLineRadius(labels.metres(500)));
+  await page.settle();
+  page.press(labels.kilometres(1));
+  await page.settle();
+  const listKey = page.list().key;
+  const scrolls = page.attachList({ failIndex: true });
+  const originalVisible = page.rows().slice(12, 15);
+  page.showRows([12, 13, 14], 1400);
+  page.focus(false);
+  page.focus(true);
+  await page.settle();
+  page.fix(1, { latitude: landmarks.central.latitude + 0.00035, longitude: landmarks.central.longitude + 0.00055 });
+  await page.settle();
+  const ids = page.rows().map(({ id }) => id);
+  const surviving = originalVisible.find(({ id }) => ids.includes(id));
+  assert.ok(surviving, 'A station in the original viewport still exists at the nearby position');
+  const index = ids.indexOf(surviving.id);
+  assert.notEqual(index, 12);
+  assert.equal(page.list().key, listKey);
+  assert.deepEqual(scrolls, []);
+  page.paint();
+  page.paint();
+  assert.deepEqual(scrolls, [
+    { method: 'index', index, animated: false },
+    { method: 'offset', offset: Math.max(0, 1400 + (index - 12) * 100), animated: false },
+  ]);
+});
+
+test('a vanished station falls back within the new list, and a fresh drag cancels the next correction', async (t) => {
+  const page = mount(t, { transport: true });
+  const { landmarks, labels } = page;
+  await page.settle();
+  page.fix(0, landmarks.central);
+  await page.settle();
+  page.press(labels.byStop);
+  await page.settle();
+  const scrolls = page.attachList();
+  const oldId = page.rows()[12].id;
+  page.showRows([12], 1400);
+  page.focus(false);
+  page.focus(true);
+  await page.settle();
+  page.fix(1, landmarks.shaTin);
+  await page.settle();
+  assert.ok(!page.rows().some(({ id }) => id === oldId));
+  const index = Math.min(12, page.rows().length - 1);
+  page.paint();
+  assert.deepEqual(scrolls, [{ method: 'index', index, animated: false }]);
+
+  page.showRows([index], 1400);
+  page.appState('background');
+  page.appState('active');
+  await page.settle();
+  page.fix(2, landmarks.central);
+  await page.settle();
+  page.list().props.onScrollBeginDrag();
+  page.showRows([4], 450);
+  page.list().props.onScrollEndDrag();
+  page.paint();
+  assert.equal(scrolls.length, 1, 'The queued correction does not override a new drag');
+});
+
+test('horizontal transport overflow has a usable next-page and return-to-start control', async (t) => {
+  const page = mount(t, { transport: true, locale: 'en' });
+  await page.settle();
+  const scroll = page.modeScroller();
+  assert.equal(scroll.horizontal, true);
+  const calls = [];
+  scroll.ref.current = { scrollTo: (options) => calls.push(options) };
+  scroll.onLayout({ nativeEvent: { layout: { width: 280 } } });
+  scroll.onContentSizeChange(650);
+  await page.settle();
+  const more = page.findAction(page.transportCopy.moreModes);
+  assert.equal(more.props.style({ pressed: false })[0].minHeight, 44);
+  assert.equal(more.props.style({ pressed: false })[0].minWidth, 44);
+  scroll.onLayout({ nativeEvent: { layout: { width: 232 } } });
+  page.press(page.transportCopy.moreModes);
+  assert.deepEqual(calls, [{ x: 212, animated: true }]);
+  scroll.onScroll({ nativeEvent: { contentOffset: { x: 418 } } });
+  await page.settle();
+  page.press(page.transportCopy.firstModes);
+  assert.deepEqual(calls.at(-1), { x: 0, animated: true });
+  assert.equal(page.requests.length, 1);
+  assert.deepEqual(page.routes, []);
+});
+
+test('a transport filter change does not let a pending GPS fix replace a selected landmark', async (t) => {
+  const page = mount(t, { transport: true });
+  const { labels, landmarks, transportCopy: copy } = page;
+  await page.settle();
+  page.press(copy.modes.bus);
+  await page.settle();
+  page.press(copy.chooseLandmark);
+  await page.settle();
+  page.press(labels.landmarks.central);
+  await page.settle();
+  page.press(copy.modes.mtr);
+  await page.settle();
+  page.fix(0, landmarks.shaTin);
+  page.press(copy.modes.all);
+  await page.settle();
+  assert.ok(page.shows(labels.landmarkReference(labels.landmarks.central)));
+  assert.equal(page.requests.length, 1);
   assert.equal(page.queries.length, 1);
 });

@@ -60,6 +60,7 @@ Object.assign(native, { Keyboard: { dismiss() {} }, StyleSheet: { create: (style
 native.AppState = { currentState: 'active', addEventListener: () => ({ remove() {} }) };
 const stubs = {
   react, 'react-native': native, 'expo-sqlite': {}, 'expo-location': {},
+  'expo-linear-gradient': { LinearGradient: 'LinearGradient' },
   'react-native-maps': { __esModule: true, default: 'MapView', Marker: 'Marker', Polyline: 'Polyline' },
   'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ bottom: 0 }) },
   'expo-router': {
@@ -221,6 +222,40 @@ const config = JSON.parse(JSON.stringify(getReactNavigationConfig(getRoutes(cont
 const stack = StackRouter({ initialRouteName: 'bus' });
 const stackOptions = { routeNames: Object.keys(config.screens), routeParamList: {}, routeGetIdList: {} };
 const stateFor = (href) => getStateFromPath(resolveHref(href), config);
+const homeState = stack.getRehydratedState(stateFor('/'), stackOptions);
+const transportName = stateFor('/transport').routes.at(-1).name;
+assert.equal(transportName, 'transport');
+const transportStack = stack.getStateForAction(homeState, { type: 'PUSH', payload: { name: transportName } }, stackOptions);
+assert.equal(transportStack.routes.at(-1).name, 'transport');
+assert.equal(stack.getStateForAction(transportStack, { type: 'GO_BACK' }, stackOptions).routes.at(-1), homeState.routes.at(-1));
+const addFrequent = stateFor('/transport?intent=add-frequent-route').routes.at(-1);
+assert.equal(addFrequent.name, 'transport');
+assert.deepEqual(addFrequent.params, { intent: 'add-frequent-route' });
+const findFrequent = { type: 'NAVIGATE', payload: { name: addFrequent.name, params: addFrequent.params } };
+const frequentStack = stack.getStateForAction(homeState, findFrequent, stackOptions);
+assert.equal(stack.getStateForAction(frequentStack, findFrequent, stackOptions).routes.length, frequentStack.routes.length);
+const matchedRoute = stack.getStateForAction(frequentStack, { type: 'PUSH', payload: {
+  name: 'bus/route', params: { routeId: route.id },
+} }, stackOptions);
+assert.equal(matchedRoute.routes.at(-1).params.routeId, route.id);
+assert.equal(stack.getStateForAction(matchedRoute, { type: 'GO_BACK' }, stackOptions).routes.at(-1), frequentStack.routes.at(-1));
+assert.equal(stack.getStateForAction(frequentStack, { type: 'GO_BACK' }, stackOptions).routes.at(-1), homeState.routes.at(-1));
+for (const [name, params] of [
+  ['bus/route', { routeId: route.id, stopId: visits[2].id, stopSeq: String(visits[2].seq) }],
+  ['bus/nearby/stop', { source: 'nlb', stopId: visits[2].id, distance: '120' }],
+]) {
+  const detail = stack.getStateForAction(transportStack, { type: 'PUSH', payload: { name, params } }, stackOptions);
+  assert.deepEqual(detail.routes.at(-1).params, params);
+  for (const action of [{ type: 'GO_BACK' }, { type: 'POP', payload: { count: 1 } }]) {
+    assert.equal(stack.getStateForAction(detail, action, stackOptions).routes.at(-1), transportStack.routes.at(-1));
+  }
+}
+const homeBusSearch = stack.getStateForAction(homeState, { type: 'PUSH', payload: { name: 'bus' } }, stackOptions);
+assert.equal(homeBusSearch.routes.at(-1).name, 'bus');
+assert.equal(stack.getStateForAction(homeBusSearch, { type: 'GO_BACK' }, stackOptions).routes.at(-1), homeState.routes.at(-1));
+for (const name of ['bus', 'bus/nearby', 'bus/nearby/stop', 'bus/route', 'bus/route-map', 'bus/eta']) {
+  assert.equal(stateFor(`/${name}`).routes.at(-1).name, name);
+}
 const routeHref = { pathname: '/bus/route', params: { routeId: route.id } };
 const href = busRouteMapHref(route.id, choice.identity, visits[2]);
 const mapParams = stateFor(href).routes.at(-1).params;

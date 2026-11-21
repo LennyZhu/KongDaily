@@ -163,14 +163,18 @@ export function HomeSection({ title, icon, action, children }: SectionProps) {
 
 export function QuickLinkCard({ href, icon, label, backgroundColor, iconColor }: {
   href: Href;
-  icon: IconName;
+  icon: IconName | readonly IconName[];
   label: string;
   backgroundColor: string;
   iconColor?: string;
 }) {
   return (
     <HomeLink href={href} label={label} style={[styles.quickLink, { backgroundColor }]}>
-      <Icon name={icon} size={26} color={iconColor} />
+      {typeof icon === 'string' ? <Icon name={icon} size={26} color={iconColor} /> : (
+        <View style={styles.quickIconGroup}>
+          {icon.map((name) => <Icon key={name} name={name} size={21} color={iconColor} />)}
+        </View>
+      )}
       <AppText variant="detail" numberOfLines={2} maxFontSizeMultiplier={1.35} style={styles.quickLabel}>
         {label}
       </AppText>
@@ -275,6 +279,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.xs,
     borderRadius: radius.card,
   },
+  quickIconGroup: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   quickLabel: { alignSelf: 'stretch', fontWeight: '600', textAlign: 'center' },
   featured: {
     flex: 1,

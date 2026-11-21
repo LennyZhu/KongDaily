@@ -51,6 +51,11 @@ function RootStack() {
         headerShadowVisible: false,
       }} />
       <Stack.Screen name="bus" options={{ headerShown: false }} />
+      <Stack.Screen name="transport" options={{
+        title: copy.transport.title,
+        headerStyle: { backgroundColor: colors.tintedBackground },
+        headerShadowVisible: false,
+      }} />
       <Stack.Screen name="bus/nearby" options={{
         title: copy.bus.shortcuts.nearby,
         headerStyle: { backgroundColor: colors.tintedBackground },

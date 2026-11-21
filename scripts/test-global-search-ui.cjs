@@ -84,7 +84,7 @@ Object.assign(native, {
   Alert: { alert: (title) => alerts.push(title) },
   useWindowDimensions: () => ({ width: 375, height: 812, fontScale: 1 }),
 });
-const basicUi = Object.fromEntries(['AppText', 'EmptyState', 'Icon'].map((name) => [name, name]));
+const basicUi = Object.fromEntries(['AppText', 'EmptyState', 'Icon', 'Screen'].map((name) => [name, name]));
 const stubs = {
   react, 'react-native': native,
   'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
@@ -115,6 +115,7 @@ function load(name) {
   });
   new Function('module', 'exports', 'require', 'setTimeout', 'clearTimeout', 'requestAnimationFrame', 'cancelAnimationFrame', outputText)(module, module.exports, (id) => {
     if (Object.hasOwn(stubs, id)) return stubs[id];
+    if (id.endsWith('.jpg')) return id;
     if (id.startsWith('@/')) return load(id.slice(2));
     if (id.startsWith('.')) return require(resolve(dirname(file), id));
     return require(id);
@@ -241,7 +242,60 @@ async function complete() {
 }
 
 async function verify() {
-  const { HomeHero, HomeLink } = load('components/home-ui');
+  const { HomeHero, HomeLink, HomeSection, QuickLinkCard } = load('components/home-ui');
+  const pinnedB2 = { id: 'pinned-b2', pinOrder: 1, target: { source: 'nlb', number: 'B2', routeId: '37', stopId: '200', stopSeq: 13 } };
+  let favoriteItems = [pinnedB2];
+  stubs['@/bus-favorite-hooks'] = {
+    useBusFavorites: () => ({ items: favoriteItems, status: 'ready' }),
+    useUnavailableFavorites: () => new Set(),
+  };
+  stubs['@/components/saved-bus-ui'] = { HomeFavoriteBus: 'HomeFavoriteBus' };
+  stubs['@/components/weather-warning-ui'] = { WeatherWarningLink: 'WeatherWarningLink' };
+  const HomeScreen = load('app/(tabs)/index').default;
+  const addFrequentHref = { pathname: '/transport', params: { intent: 'add-frequent-route' } };
+  for (locale of ['zh-HK', 'en']) {
+    const [emptyTitle, emptyDetail, addLabel] = locale === 'en'
+      ? ['No frequent routes yet', 'Save your frequent bus routes or stops for quick arrival updates.', 'Add frequent route']
+      : ['尚未加入常用路線', '目前支援收藏巴士路線及車站，方便快速查看到站時間。', '新增常用路線'];
+    favoriteItems = [pinnedB2];
+    hookIndex = 0;
+    const page = nodes(HomeScreen());
+    assert(page.some(({ type }) => type === HomeHero));
+    assert(page.some(({ type }) => type === 'WeatherWarningLink'));
+    const pinned = page.find(({ type }) => type === 'HomeFavoriteBus');
+    assert.equal(pinned.props.favorite, pinnedB2);
+    const frequent = page.find(({ type, props }) => type === HomeSection && props.title === labels().home.buses);
+    assert.equal(frequent.props.title, locale === 'en' ? 'Frequent transport' : '常用公共交通');
+    assert.equal(frequent.props.action.href, '/saved?category=buses');
+    const add = page.find(({ type }) => type.name === 'HomeAddBus');
+    const addLink = add.type(add.props);
+    assert.equal(addLink.props.label, addLabel);
+    assert.deepEqual(addLink.props.href, addFrequentHref);
+    const shortcuts = page.filter(({ type }) => type === QuickLinkCard);
+    assert.deepEqual(shortcuts.map(({ props }) => props.href), [
+      '/transport', '/nearby?category=toilets', '/nearby?category=pets', '/nearby?category=parks',
+      '/explore?category=hiking', '/explore?category=waterfront',
+    ]);
+    const [transport] = shortcuts;
+    assert.equal(transport.props.label, locale === 'en' ? 'Transport Search' : '交通查詢');
+    const transportLink = QuickLinkCard(transport.props);
+    assert.deepEqual(nodes(transportLink).filter(({ type }) => type === 'Icon').map(({ props }) => props.name), ['bus', 'tram.fill.tunnel']);
+    find(HomeLink(transportLink.props), 'Pressable').props.onPress();
+    assert.equal(pushed.pop(), '/transport');
+
+    favoriteItems = [];
+    hookIndex = 0;
+    const emptyFrequent = nodes(HomeScreen()).find(({ type, props }) => type === HomeSection && props.title === labels().home.buses);
+    assert(hasCopy(emptyFrequent, emptyTitle));
+    assert(hasCopy(emptyFrequent, emptyDetail));
+    tapText(emptyFrequent, addLabel);
+    assert.deepEqual(pushed.pop(), addFrequentHref);
+    tapText(emptyFrequent, labels().home.viewAll);
+    assert.equal(pushed.pop(), '/saved?category=buses');
+  }
+  locale = 'zh-HK';
+  slots = [];
+  hookIndex = 0;
   const home = HomeHero(labels().home);
   const entry = nodes(home).find(({ type, props }) => type === HomeLink && props.href === '/search');
   assert(entry);

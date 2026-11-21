@@ -1,11 +1,15 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, FlatList, Pressable, StyleSheet, View, type ViewToken } from 'react-native';
+import { ActivityIndicator, Alert, AppState, FlatList, Keyboard, Linking, Pressable, StyleSheet, View, type ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { describeEta, etaEntryNotes, etaIsStale } from '@/bus-eta';
 import { limitedServiceTimetable } from '@/bus-limited-service';
-import { routePlaceName } from '@/bus-routes';
+import { useBusCatalogue } from '@/bus-hooks';
+import { busSources, matchBusRoutes, normalizeBusQuery, routePlaceName, type BusRoute } from '@/bus-routes';
+import { routeStopKey } from '@/bus-stops';
+import { BusRouteRow } from '@/components/bus-ui';
+import { TransportBusSearch, TransportModePicker, TransportUnavailable, type TransportMode } from '@/components/transport-ui';
 import { AppText, EmptyState, Icon } from '@/components/ui';
 import { useLanguage } from '@/language';
 import {
@@ -18,28 +22,45 @@ import { locateNearbyBusStops, type NearbyLocationIssue } from '@/nearby-bus-loc
 import { useStationEta } from '@/nearby-stop-eta-hooks';
 import { groupNearbyStops, type NearbyStopGroup } from '@/nearby-stop-groups';
 import { nearbyRouteHref, readNearbyRoutes, readStationRoutes, type NearbyRoute, type StationEtaRecord, type StationRoute } from '@/nearby-stop-routes';
-import { colors, homeLayout, radius, space, touchTarget } from '@/theme';
+import { colors, floatingTab, homeLayout, radius, space, touchTarget } from '@/theme';
+import { useTransportListPosition } from '@/transport-list-position';
 
 type Reference = { kind: 'current'; point: Coordinates } | { kind: 'landmark'; landmark: NearbyLandmark; point: Coordinates };
 type Results = { reference: Reference; radius: BusSearchRadius; stops?: NearbyBusStop[]; routes?: NearbyRoute[] | 'error' };
 type Mode = 'routes' | 'stops';
 type NearbyItem = NearbyRoute | NearbyStopGroup;
+type ListItem = NearbyItem | BusRoute;
 const emptyRoutes: NearbyRoute[] = [];
 const emptyStops: NearbyBusStop[] = [];
+const emptySearchResults: BusRoute[] = [];
 const viewability = { itemVisiblePercentThreshold: 35, minimumViewTime: 250 };
 const radii = [500, 1000, 2000] as const;
 
-export default function NearbyBusScreen() {
+function browseKey(item: ListItem) {
+  // A location refresh can change the recommended stop while the service stays the same.
+  return 'route' in item ? routeStopKey(item.route.target) : item.id;
+}
+
+export default function NearbyBusScreen({ transport = false, addFrequentRoute = false }: {
+  transport?: boolean; addFrequentRoute?: boolean;
+} = {}) {
   const { copy, locale } = useLanguage();
   const router = useRouter();
   const labels = copy.nearbyBus;
   const { bottom } = useSafeAreaInsets();
   const [reference, setReference] = useState<Reference>();
   const [referenceRevision, setReferenceRevision] = useState(0);
+  const [transportMode, setTransportMode] = useState<TransportMode>(addFrequentRoute ? 'bus' : 'all');
+  const [focusSearchOnMount, setFocusSearchOnMount] = useState(addFrequentRoute);
+  const [query, setQuery] = useState('');
+  const [catalogueRequested, setCatalogueRequested] = useState(false);
+  const listRef = useRef<FlatList<ListItem>>(null);
+  const catalogue = useBusCatalogue(transport && catalogueRequested);
   const [mode, setMode] = useState<Mode>('routes');
   const [expandedStopGroups, setExpandedStopGroups] = useState<Set<string>>(() => new Set());
   const [radiusMeters, setRadiusMeters] = useState<BusSearchRadius>(500);
   const [pickingRadius, setPickingRadius] = useState(false);
+  const [showDistanceInfo, setShowDistanceInfo] = useState(false);
   const [picking, setPicking] = useState(false);
   const [locating, setLocating] = useState(false);
   const [locationIssue, setLocationIssue] = useState<NearbyLocationIssue>();
@@ -82,24 +103,45 @@ export default function NearbyBusScreen() {
     return () => { active = false; };
   }, [index, radiusMeters, reference]);
 
-  const resultForRadius = result && result.reference === reference && result.radius === radiusMeters ? result : undefined;
+  const refreshingCurrent = transport && reference?.kind === 'current' && result?.reference.kind === 'current'
+    && !!result.stops && (mode === 'stops' || Array.isArray(result.routes));
+  const resultForRadius = result && result.radius === radiusMeters && (result.reference === reference || refreshingCurrent)
+    ? result : undefined;
   const stops = resultForRadius?.stops ?? emptyStops;
-  const stopGroups = useMemo(() => mode === 'stops' ? groupNearbyStops(stops) : [], [mode, stops]);
+  const showBuses = transportMode === 'all' || transportMode === 'bus';
+  const normalizedQuery = normalizeBusQuery(query);
+  const searching = transport && showBuses && normalizedQuery.length > 0;
+  const searchRoutes = useMemo(() => busSources.flatMap((source) => catalogue.feeds[source]?.routes ?? []), [catalogue.feeds]);
+  const searchResults = useMemo(() => searching ? matchBusRoutes(searchRoutes, normalizedQuery) : emptySearchResults,
+    [normalizedQuery, searchRoutes, searching]);
+  const searchFailed = busSources.some((source) => catalogue.failed[source]);
+  const stopGroups = useMemo(() => showBuses && mode === 'stops' ? groupNearbyStops(stops) : [], [mode, showBuses, stops]);
   const routeResult = resultForRadius?.routes;
-  const routeRows = mode === 'routes' && Array.isArray(routeResult) ? routeResult : emptyRoutes;
+  const routeRows = showBuses && !searching && mode === 'routes' && Array.isArray(routeResult) ? routeResult : emptyRoutes;
+  const rows = searching ? searchResults : mode === 'routes' ? routeRows : stopGroups;
+  const nearbyScope = `${mode}:${referenceRevision}:${radiusMeters}`;
+  const listScope = transport ? `${transportMode}:${searching ? 'bus-search' : nearbyScope}` : nearbyScope;
+  const browseScope = searching ? `${listScope}:${normalizedQuery}` : listScope;
+  const { recordVisible, scrollProps } = useTransportListPosition<ListItem>(transport, browseScope, rows, listRef, browseKey);
   const etaRoutes = useMemo(() => routeRows.map(({ route }) => route), [routeRows]);
   const { records, now, rateLimits, setVisible } = useStationEta(etaRoutes, locale);
-  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken<NearbyItem>[] }) => {
+  const onViewableItemsChanged = useCallback(({ viewableItems }: { viewableItems: ViewToken<ListItem>[] }) => {
+    if (transport) recordVisible(viewableItems);
     setVisible(viewableItems.flatMap(({ item }) => 'route' in item ? [item.route.id] : []));
-  }, [setVisible]);
+  }, [recordVisible, setVisible, transport]);
 
   const updateReference = useCallback((value: Reference, resetRadius: boolean) => {
-    setVisible([]);
-    if (resetRadius) setRadiusMeters(500);
-    setPickingRadius(false);
+    if (!transport || resetRadius) {
+      setVisible([]);
+      setPickingRadius(false);
+      setReferenceRevision((revision) => revision + 1);
+    }
+    if (resetRadius) {
+      setRadiusMeters(500);
+      if (transport) setResult(undefined);
+    }
     setReference(value);
-    setReferenceRevision((revision) => revision + 1);
-  }, [setVisible]);
+  }, [setVisible, transport]);
 
   const cancelLocation = useCallback(() => {
     locationRequest.current?.abort();
@@ -114,8 +156,10 @@ export default function NearbyBusScreen() {
     setLocating(true);
     setLocationIssue(undefined);
     if (allowPermissionPrompt) setPicking(false);
-    setPickingRadius(false);
-    setReference((previous) => previous?.kind === 'current' ? undefined : previous);
+    if (!transport || allowPermissionPrompt) {
+      setPickingRadius(false);
+      setReference((previous) => previous?.kind === 'current' ? undefined : previous);
+    }
 
     const location = await locateNearbyBusStops(controller.signal, allowPermissionPrompt);
     if (locationRequest.current !== controller) return;
@@ -126,9 +170,12 @@ export default function NearbyBusScreen() {
       landmarkSelected.current = false;
       updateReference({ kind: 'current', point: location.point }, allowPermissionPrompt);
     } else if (location.kind !== 'cancelled') {
+      if (transport && !allowPermissionPrompt) {
+        setReference((previous) => previous?.kind === 'current' ? undefined : previous);
+      }
       setLocationIssue(location.kind);
     }
-  }, [updateReference]);
+  }, [transport, updateReference]);
 
   useFocusEffect(useCallback(() => {
     function resumeLocation() {
@@ -194,18 +241,114 @@ export default function NearbyBusScreen() {
   const expandedRadius = radiusMeters === 500 ? 1000 : radiusMeters === 1000 ? 2000 : undefined;
   const referenceName = reference?.kind === 'landmark' ? labels.landmarkReference(labels.landmarks[reference.landmark])
     : reference ? labels.currentLocation : labels.noReference;
+  const range = formatDistance(radiusMeters);
+  const locateAction = (
+    <Pressable accessibilityRole="button" accessibilityLabel={labels.useLocation}
+      accessibilityState={{ disabled: locating, busy: locating }} disabled={locating}
+      onPress={() => void requestLocation(true)}
+      style={({ pressed }) => [styles.locationButton, transport && styles.compactLocationAction, pressed && styles.pressed]}>
+      {locating ? <ActivityIndicator size="small" color={colors.primary} /> : <Icon name="location" size={14} />}
+      <AppText variant="caption" tone="primary" style={styles.shrink}>{labels.useLocation}</AppText>
+    </Pressable>
+  );
+  const landmarkAction = (
+    <Pressable accessibilityRole="button" accessibilityState={{ expanded: picking }}
+      onPress={() => setPicking((open) => !open)}
+      style={({ pressed }) => [
+        transport ? [styles.locationButton, styles.compactLocationAction] : styles.action, pressed && styles.pressed,
+      ]}>
+      <Icon name="mappin" size={15} />
+      <AppText variant={transport ? 'caption' : 'detail'} tone="primary" style={transport ? styles.shrink : styles.copy}>
+        {transport ? copy.transport.chooseLandmark : labels.chooseLandmark}
+      </AppText>
+      <Icon name={picking ? 'chevron.up' : 'chevron.down'} size={12} />
+    </Pressable>
+  );
+  const landmarkPicker = picking && (
+    <View style={styles.panel}>
+      {Object.keys(nearbyBusLandmarks).map((key) => {
+        const landmark = key as NearbyLandmark;
+        const selected = reference?.kind === 'landmark' && reference.landmark === landmark;
+        return (
+          <Pressable key={landmark} accessibilityRole="button" accessibilityState={{ selected }}
+            onPress={() => chooseLandmark(landmark)}
+            style={({ pressed }) => [styles.landmark, selected && styles.selected, pressed && styles.pressed]}>
+            <AppText variant="detail" style={styles.copy}>{labels.landmarks[landmark]}</AppText>
+            <Icon name={selected ? 'checkmark' : 'chevron.right'} size={13} />
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+  const locationIssueNote = locationIssue && (
+    <View style={styles.note}>
+      <Icon name="exclamationmark.circle" size={16} />
+      <AppText variant="detail" tone="muted" accessibilityRole="alert" style={styles.copy}>{labels.issues[locationIssue]}</AppText>
+    </View>
+  );
+  const showLocationAction = !locating && (!reference || picking || !!locationIssue);
+  const distanceNote = (
+    <View style={styles.note}>
+      <Icon name="info.circle" color={colors.muted} size={14} />
+      <View style={styles.copy}>
+        <AppText variant="brandSubtitle" tone="muted">{labels.distanceNote}</AppText>
+        <AppText variant="brandSubtitle" tone="muted">
+          {mode === 'routes' ? labels.routeCoverage : labels.partialCoverage}
+        </AppText>
+      </View>
+    </View>
+  );
+  const radiusControl = reference && (
+    <Pressable accessibilityRole="button" accessibilityState={{ expanded: pickingRadius }}
+      onPress={() => setPickingRadius((open) => !open)}
+      style={[styles.radiusControl, transport && styles.transportRadiusControl]}>
+      <AppText variant="caption" tone="primary" style={styles.shrink}>
+        {transport ? copy.transport.straightLineRadius(range) : labels.radius(range)}
+      </AppText>
+      <Icon name={pickingRadius ? 'chevron.up' : 'chevron.down'} size={11} />
+    </Pressable>
+  );
 
-  return (
-    <FlatList<NearbyItem>
-      key={`${mode}:${referenceRevision}:${radiusMeters}`}
-      style={styles.screen}
-      contentContainerStyle={[styles.content, { paddingBottom: bottom + space.section }]}
+  function editQuery(value: string) {
+    const next = normalizeBusQuery(value);
+    if (next) {
+      setCatalogueRequested(true);
+      if (searching && next !== normalizedQuery) listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    }
+    setQuery(value);
+  }
+
+  function selectTransport(next: TransportMode) {
+    setTransportMode(next);
+    if (next !== 'all' && next !== 'bus') {
+      setFocusSearchOnMount(false);
+      Keyboard.dismiss();
+    }
+  }
+
+  const list = (
+    <FlatList<ListItem>
+      ref={listRef}
+      key={listScope}
+      {...scrollProps}
+      style={transport ? [styles.screen, styles.transportScreen] : styles.screen}
+      contentContainerStyle={[styles.content, transport && styles.transportContent, searching && styles.searchContent,
+        { paddingBottom: bottom + space.section }]}
       contentInsetAdjustmentBehavior="never"
-      data={mode === 'routes' ? routeRows : stopGroups}
+      automaticallyAdjustKeyboardInsets={transport}
+      keyboardShouldPersistTaps={transport ? 'handled' : undefined}
+      keyboardDismissMode={transport ? 'on-drag' : undefined}
+      data={rows}
       keyExtractor={(item) => 'route' in item ? item.route.id : item.id}
       viewabilityConfig={viewability}
       onViewableItemsChanged={onViewableItemsChanged}
       renderItem={({ item }) => {
+        if ('number' in item) {
+          return <BusRouteRow copy={copy.bus} locale={locale} route={item} onPress={() => {
+            Keyboard.dismiss();
+            router.push({ pathname: '/bus/route', params: { routeId: item.id } });
+          }} />;
+        }
         if ('route' in item) {
           return <RouteCard recommendation={item} distance={formatDistance(item.stop.distance)}
             record={records[item.route.id]} fallbackError={rateLimits[item.route.target.source]} now={now}
@@ -214,9 +357,28 @@ export default function NearbyBusScreen() {
         return <StopGroupCard group={item} expanded={expandedStopGroups.has(item.id)}
           formatDistance={formatDistance} onOpen={openStop} onToggle={() => toggleStopGroup(item.id)} />;
       }}
-      ListHeaderComponent={(
-        <View style={styles.header}>
-          <View style={[styles.panel, styles.reference]}>
+      ListHeaderComponent={searching ? (
+        <View style={[styles.transportHeader, styles.searchFeedback]}>
+          <AppText variant="homeHeading" accessibilityRole="header">{copy.transport.busResults}</AppText>
+          {searchRoutes.length > 0 && (!catalogue.loading || searchResults.length > 0) && (
+            <AppText variant="detail" tone="muted">{copy.bus.resultCount(searchResults.length)}</AppText>
+          )}
+          {catalogue.loading && searchResults.length === 0 && <Loading label={copy.bus.loading} />}
+          {searchFailed && (
+            <>
+              <AppText variant="detail" tone="muted" accessibilityRole="alert">
+                {searchRoutes.length ? copy.bus.updateFailed : copy.bus.loadFailed}
+              </AppText>
+              {!catalogue.loading && <ListAction label={copy.bus.retry} onPress={catalogue.retry} />}
+            </>
+          )}
+        </View>
+      ) : (
+        <View style={[styles.header, transport && styles.transportHeader]}>
+          {addFrequentRoute && transportMode === 'bus' && (
+            <AppText variant="detail" tone="muted">{copy.transport.addFrequentHint}</AppText>
+          )}
+          {!transport && showBuses && <View style={[styles.panel, styles.reference]}>
             <View style={styles.referenceRow}>
               <View style={styles.copy}>
                 <AppText variant="caption" tone="muted">{labels.reference}</AppText>
@@ -224,84 +386,59 @@ export default function NearbyBusScreen() {
                   {locating ? labels.locating : referenceName}
                 </AppText>
               </View>
-              <Pressable accessibilityRole="button" accessibilityLabel={labels.useLocation}
-                accessibilityState={{ disabled: locating, busy: locating }} disabled={locating}
-                onPress={() => void requestLocation(true)}
-                style={({ pressed }) => [styles.locationButton, pressed && styles.pressed]}>
-                {locating ? <ActivityIndicator size="small" color={colors.primary} /> : <Icon name="location" size={14} />}
-                <AppText variant="caption" tone="primary" style={styles.shrink}>{labels.useLocation}</AppText>
-              </Pressable>
+              {locateAction}
             </View>
-            <Pressable accessibilityRole="button" accessibilityState={{ expanded: picking }}
-              onPress={() => setPicking((open) => !open)}
-              style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
-              <Icon name="mappin" size={15} />
-              <AppText variant="detail" tone="primary" style={styles.copy}>{labels.chooseLandmark}</AppText>
-              <Icon name={picking ? 'chevron.up' : 'chevron.down'} size={12} />
-            </Pressable>
-          </View>
-          {picking && (
-            <View style={styles.panel}>
-              {Object.entries(nearbyBusLandmarks).map(([key]) => {
-                const landmark = key as NearbyLandmark;
-                const selected = reference?.kind === 'landmark' && reference.landmark === landmark;
-                return (
-                  <Pressable key={landmark} accessibilityRole="button" accessibilityState={{ selected }}
-                    onPress={() => chooseLandmark(landmark)}
-                    style={({ pressed }) => [styles.landmark, selected && styles.selected, pressed && styles.pressed]}>
-                    <AppText variant="detail" style={styles.copy}>{labels.landmarks[landmark]}</AppText>
-                    <Icon name={selected ? 'checkmark' : 'chevron.right'} size={13} />
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
-          {locationIssue && (
-            <View style={styles.note}>
-              <Icon name="exclamationmark.circle" size={16} />
-              <AppText variant="detail" tone="muted" accessibilityRole="alert" style={styles.copy}>{labels.issues[locationIssue]}</AppText>
-            </View>
-          )}
-          {refreshFailed && <AppText variant="detail" tone="muted" accessibilityRole="alert">{labels.refreshFailed}</AppText>}
-          <View style={styles.note}>
-            <Icon name="info.circle" color={colors.muted} size={14} />
-            <View style={styles.copy}>
-              <AppText variant="brandSubtitle" tone="muted">{labels.distanceNote}</AppText>
-              <AppText variant="brandSubtitle" tone="muted">
-                {mode === 'routes' ? labels.routeCoverage : labels.partialCoverage}
-              </AppText>
-            </View>
-          </View>
-          <View accessibilityRole="tablist" style={styles.segment}>
-            {(['routes', 'stops'] as const).map((option) => (
-              <Pressable key={option} accessibilityRole="tab" accessibilityState={{ selected: mode === option }}
-                onPress={() => {
-                  if (mode === option) return;
-                  setVisible([]);
-                  setMode(option);
-                }}
-                style={({ pressed }) => [styles.segmentOption, mode === option && styles.segmentSelected, pressed && styles.pressed]}>
-                <Icon name={option === 'routes' ? 'bus' : 'mappin'} size={16}
-                  color={mode === option ? colors.onPrimary : colors.primary} />
-                <AppText variant="detail" tone={mode === option ? 'onPrimary' : 'primary'} style={styles.shrink}>
-                  {option === 'routes' ? labels.byRoute : labels.byStop}
-                </AppText>
-              </Pressable>
-            ))}
-          </View>
-          <View style={styles.heading}>
-            <AppText variant="homeHeading" accessibilityRole="header" style={styles.copy}>
+            {landmarkAction}
+          </View>}
+          {showBuses && !transport && landmarkPicker}
+          {showBuses && !transport && locationIssueNote}
+          {showBuses && !transport && refreshFailed && <AppText variant="detail" tone="muted" accessibilityRole="alert">{labels.refreshFailed}</AppText>}
+          {showBuses && !transport && distanceNote}
+          {showBuses && <View accessibilityRole="tablist" style={[styles.segment, transport && styles.transportSegment]}>
+            {(['routes', 'stops'] as const).map((option) => {
+              const selected = mode === option;
+              const tone = selected ? (transport ? 'primary' : 'onPrimary') : (transport ? 'muted' : 'primary');
+              return (
+                <Pressable key={option} accessibilityRole="tab" accessibilityState={{ selected }}
+                  onPress={() => {
+                    if (selected) return;
+                    setVisible([]);
+                    setMode(option);
+                  }}
+                  style={({ pressed }) => [styles.segmentOption, selected && (transport ? styles.transportSegmentSelected : styles.segmentSelected),
+                    pressed && styles.pressed]}>
+                  <Icon name={option === 'routes' ? 'bus' : 'mappin'} size={16} color={colors[tone]} />
+                  <AppText variant="detail" tone={tone} style={styles.shrink}>
+                    {option === 'routes' ? labels.byRoute : labels.byStop}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </View>}
+          {showBuses && <View style={[styles.heading, transport && styles.transportHeading]}>
+            <AppText variant="homeHeading" accessibilityRole="header" style={[styles.copy, transport && styles.transportHeadingTitle]}>
               {mode === 'routes' ? labels.routes : labels.stops}
             </AppText>
-            {!!reference && (
-              <Pressable accessibilityRole="button" accessibilityState={{ expanded: pickingRadius }}
-                onPress={() => setPickingRadius((open) => !open)} style={styles.radiusControl}>
-                <AppText variant="caption" tone="primary" style={styles.shrink}>{labels.radius(formatDistance(radiusMeters))}</AppText>
-                <Icon name={pickingRadius ? 'chevron.up' : 'chevron.down'} size={11} />
-              </Pressable>
-            )}
-          </View>
-          {pickingRadius && (
+            {transport ? (
+              <View style={styles.headingActions}>
+                {radiusControl}
+                <Pressable accessibilityRole="button" accessibilityLabel={copy.transport.distanceInfo}
+                  accessibilityState={{ expanded: showDistanceInfo }} onPress={() => setShowDistanceInfo((open) => !open)}
+                  style={({ pressed }) => [styles.infoButton, pressed && styles.pressed]}>
+                  <Icon name="info.circle" size={18} />
+                </Pressable>
+                {!!reference && (
+                  <Pressable accessibilityRole="button" accessibilityLabel={copy.transport.changeReference}
+                    accessibilityState={{ expanded: picking }} onPress={() => setPicking((open) => !open)}
+                    style={({ pressed }) => [styles.infoButton, pressed && styles.pressed]}>
+                    <Icon name="ellipsis" size={18} />
+                  </Pressable>
+                )}
+              </View>
+            ) : radiusControl}
+          </View>}
+          {showBuses && transport && showDistanceInfo && distanceNote}
+          {showBuses && pickingRadius && (
             <View style={styles.segment}>
               {radii.map((value) => (
                 <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: value === radiusMeters }}
@@ -312,9 +449,37 @@ export default function NearbyBusScreen() {
               ))}
             </View>
           )}
+          {showBuses && transport && (
+            <>
+              {reference?.kind === 'landmark' && <AppText variant="caption" tone="muted">{referenceName}</AppText>}
+              {locating && reference?.kind !== 'current' ? <Loading label={copy.transport.locating} /> : locationIssueNote}
+              {!reference && !locating && !locationIssue && <AppText variant="detail" tone="muted">{labels.noReference}</AppText>}
+              {(!reference || showLocationAction) && (
+                <View style={styles.positionActions}>
+                  {showLocationAction && (locationIssue === 'blocked' ? (
+                    <Pressable accessibilityRole="button" onPress={() => {
+                      void Linking.openSettings().catch(() => Alert.alert(copy.transport.settingsUnavailable));
+                    }} style={({ pressed }) => [styles.locationButton, styles.compactLocationAction, pressed && styles.pressed]}>
+                      <Icon name="gearshape" size={14} />
+                      <AppText variant="caption" tone="primary" style={styles.shrink}>{copy.transport.openSettings}</AppText>
+                    </Pressable>
+                  ) : locateAction)}
+                  {!reference && landmarkAction}
+                </View>
+              )}
+              {landmarkPicker}
+              {refreshFailed && <AppText variant="detail" tone="muted" accessibilityRole="alert">{labels.refreshFailed}</AppText>}
+            </>
+          )}
         </View>
       )}
-      ListEmptyComponent={(
+      ListEmptyComponent={searching ? (
+        !catalogue.loading && searchRoutes.length > 0 ? (
+          <View style={styles.searchFeedback}>
+            <EmptyState icon="magnifyingglass" title={copy.bus.noResults} detail={copy.bus.searchHint} />
+          </View>
+        ) : null
+      ) : !showBuses ? <TransportUnavailable copy={copy.transport} mode={transportMode} /> : transport && !reference ? null : (
         <View style={styles.header}>
           {index === 'loading' ? <Loading label={labels.preparing} />
             : index === 'error' || (resultForRadius && !resultForRadius.stops) || (mode === 'routes' && routeResult === 'error') ? (
@@ -343,6 +508,20 @@ export default function NearbyBusScreen() {
         </View>
       )}
     />
+  );
+  if (!transport) return list;
+  return (
+    <View style={styles.transportPage}>
+      <View style={styles.transportControls}>
+        {showBuses && (
+          <TransportBusSearch label={transportMode === 'all' ? copy.transport.searchAll : copy.transport.searchBuses}
+            clearLabel={copy.bus.clearInput} cancelLabel={copy.bus.cancel} query={query} onChange={editQuery}
+            autoFocus={focusSearchOnMount} />
+        )}
+        <TransportModePicker copy={copy.transport} selected={transportMode} onSelect={selectTransport} />
+      </View>
+      {list}
+    </View>
   );
 }
 
@@ -530,11 +709,20 @@ function ListAction({ label, onPress }: { label: string; onPress: () => void }) 
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  transportScreen: { backgroundColor: colors.tintedBackground },
+  transportPage: { flex: 1, backgroundColor: colors.tintedBackground },
+  transportControls: { paddingHorizontal: homeLayout.gutter, paddingTop: space.xs, gap: space.sm },
   content: { paddingHorizontal: homeLayout.gutter, paddingTop: space.lg, gap: space.sm },
+  transportContent: { paddingTop: space.sm },
+  searchContent: { paddingHorizontal: 0, gap: 0 },
+  searchFeedback: { paddingHorizontal: homeLayout.gutter, paddingBottom: space.sm },
   header: { gap: space.md },
+  transportHeader: { gap: space.sm },
   panel: { backgroundColor: colors.surface, borderRadius: radius.media, borderColor: colors.border, borderWidth: StyleSheet.hairlineWidth },
   reference: { paddingHorizontal: space.md, paddingTop: space.md },
   referenceRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingBottom: space.sm },
+  positionActions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  compactLocationAction: { minWidth: touchTarget, maxWidth: '100%' },
   copy: { flex: 1, minWidth: 0, gap: space.xs },
   shrink: { flexShrink: 1 },
   locationButton: {
@@ -547,13 +735,20 @@ const styles = StyleSheet.create({
   selected: { backgroundColor: colors.tint, borderRadius: radius.media },
   note: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },
   heading: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingTop: space.xs },
+  transportHeading: { flexWrap: 'wrap', columnGap: space.sm, rowGap: space.xs },
+  transportHeadingTitle: { flexBasis: 112 },
+  headingActions: { marginLeft: 'auto', maxWidth: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm },
+  infoButton: { minHeight: touchTarget, minWidth: touchTarget, alignItems: 'center', justifyContent: 'center' },
   segment: { flexDirection: 'row', gap: space.xs, borderRadius: radius.pill, padding: space.xs, backgroundColor: colors.tint },
   segmentOption: {
     flex: 1, minHeight: touchTarget, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: space.xs, paddingHorizontal: space.sm, paddingVertical: space.xs, borderRadius: radius.pill,
   },
   segmentSelected: { backgroundColor: colors.primary },
+  transportSegment: { backgroundColor: floatingTab.background },
+  transportSegmentSelected: { backgroundColor: floatingTab.selected },
   radiusControl: { minHeight: touchTarget, maxWidth: '45%', flexDirection: 'row', alignItems: 'center', gap: space.xs },
+  transportRadiusControl: { maxWidth: '100%' },
   routeCard: { padding: space.md, gap: space.sm },
   routeMain: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   routeBadge: {

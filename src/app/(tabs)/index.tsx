@@ -15,12 +15,12 @@ import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
 import { colors, homeColors, homeLayout, radius, space, touchTarget } from '@/theme';
 
-const busSearch = '/bus' satisfies Href;
+const addFrequentRoute = { pathname: '/transport', params: { intent: 'add-frequent-route' } } satisfies Href;
 const facilityMap = { pathname: '/nearby', params: { category: 'all', view: 'map' } } satisfies Href;
 
 type QuickLink = {
   key: keyof Messages['home']['quickLinks'];
-  icon: IconName;
+  icon: IconName | readonly IconName[];
   href: Href;
   backgroundColor: string;
   iconColor?: string;
@@ -28,7 +28,7 @@ type QuickLink = {
 
 const quickLinkRows = [
   [
-    { key: 'bus', icon: 'bus', href: busSearch, backgroundColor: colors.tintedBackground },
+    { key: 'bus', icon: ['bus', 'tram.fill.tunnel'], href: '/transport', backgroundColor: colors.tintedBackground },
     { key: 'toilets', icon: 'figure.dress.line.vertical.figure', href: '/nearby?category=toilets', backgroundColor: homeColors.cream },
     { key: 'pets', icon: 'pawprint', href: '/nearby?category=pets', backgroundColor: homeColors.peach, iconColor: homeColors.rustInk },
   ],
@@ -69,7 +69,7 @@ export default function HomeScreen() {
           ) : pins.length > 0 ? (
             <>
               {pins.map((favorite) => <HomeFavoriteBus key={favorite.id} favorite={favorite} unavailable={unavailable.has(favorite.id)} />)}
-              <HomeAddBus label={home.addBus} />
+              <HomeAddBus label={home.addFrequentRoute} />
             </>
           ) : items.length > 0 ? (
             <EmptyState icon="pin" title={copy.busFavorites.noPins} detail={copy.busFavorites.noPinsDetail} />
@@ -82,7 +82,7 @@ export default function HomeScreen() {
                   <AppText variant="detail" tone="muted">{home.busDetail}</AppText>
                 </View>
               </View>
-              <HomeAddBus label={home.addBus} />
+              <HomeAddBus label={home.addFrequentRoute} />
             </View>
           )}
         </HomeSection>
@@ -133,7 +133,7 @@ export default function HomeScreen() {
 
 function HomeAddBus({ label }: { label: string }) {
   return (
-    <HomeLink href={busSearch} label={label} style={styles.addBus}>
+    <HomeLink href={addFrequentRoute} label={label} style={styles.addBus}>
       <Icon name="plus" size={16} />
       <AppText variant="detail" numberOfLines={1} maxFontSizeMultiplier={1.4} tone="primary" style={styles.buttonLabel}>
         {label}
