@@ -4,6 +4,7 @@ import { ActivityIndicator, AppState, FlatList, Pressable, StyleSheet, View, typ
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { describeEta, etaEntryNotes, etaIsStale } from '@/bus-eta';
+import { limitedServiceTimetable } from '@/bus-limited-service';
 import { routePlaceName } from '@/bus-routes';
 import { AppText, EmptyState, Icon } from '@/components/ui';
 import { useLanguage } from '@/language';
@@ -450,9 +451,10 @@ function RouteCard({ recommendation, distance, record, fallbackError, now, onPre
     ? copy.busDetail.routeOptions : copy.bus.directions[target.direction];
   const name = routePlaceName({ zh: stop.name_zh, en: stop.name_en }, locale);
   const shared = snapshot && !etaIsStale(snapshot, now) && (record?.sharedThrough ?? 0) >= now;
-  const status = shared ? copy.busStation.sharedForecast
-    : view.status === eta.loading ? copy.nearbyBus.loadingForecast
-      : view.status === eta.unmatched || view.status === eta.empty ? eta.previewEmpty : view.status;
+  const status = view.status === eta.stale ? eta.stale
+    : error ? eta.failed
+      : shared ? copy.busStation.sharedForecast
+        : view.status === eta.loading ? copy.nearbyBus.loadingForecast : copy.nearbyBus.noArrivalEstimate;
   const countdown = (minutes: number) => minutes === 0 ? eta.due : `${eta.minutes.prefix}${minutes}${eta.minutes.suffix}`;
   const notes = [...new Set([next && etaEntryNotes(next, locale), ...view.notices].filter(Boolean))];
 
@@ -480,6 +482,9 @@ function RouteCard({ recommendation, distance, record, fallbackError, now, onPre
           ) : <AppText variant="caption" tone="muted" style={styles.arrivalText}>{status}</AppText>}
         </View>
       </View>
+      {limitedServiceTimetable(target) && (
+        <AppText variant="brandSubtitle" tone="muted">{copy.busDetail.limitedService}</AppText>
+      )}
       {notes.map((note) => <AppText key={note} variant="brandSubtitle" tone="muted">{note}</AppText>)}
       {!!view.errorText && <AppText variant="brandSubtitle" tone="error">{view.errorText}</AppText>}
       {(!next || !!error) && !!view.updateText && <AppText variant="brandSubtitle" tone="muted">{view.updateText}</AppText>}

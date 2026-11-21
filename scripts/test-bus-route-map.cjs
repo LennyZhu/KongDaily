@@ -59,7 +59,7 @@ const native = Object.fromEntries(['ActivityIndicator', 'FlatList', 'Pressable',
 Object.assign(native, { Keyboard: { dismiss() {} }, StyleSheet: { create: (styles) => styles, absoluteFill: {} } });
 native.AppState = { currentState: 'active', addEventListener: () => ({ remove() {} }) };
 const stubs = {
-  react, 'react-native': native, 'expo-sqlite': {},
+  react, 'react-native': native, 'expo-sqlite': {}, 'expo-location': {},
   'react-native-maps': { __esModule: true, default: 'MapView', Marker: 'Marker', Polyline: 'Polyline' },
   'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ bottom: 0 }) },
   'expo-router': {
@@ -89,7 +89,7 @@ function load(name) {
   const filename = existsSync(tsPath) ? tsPath : tsPath + 'x';
   const module = { exports: {} };
   modules.set(name, module);
-  const testExports = { 'app/bus/route-map': 'RouteMap', 'app/bus/route': 'RouteDetails' }[name];
+  const testExports = { 'app/bus/route-map': 'RouteMap', 'app/bus/route': 'RouteDetails', 'app/bus/nearby': 'RouteCard' }[name];
   const source = readFileSync(filename, 'utf8') + (testExports ? '\nexport { ' + testExports + ' };' : '');
   const { outputText } = ts.transpileModule(source, { compilerOptions: {
     target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS,
@@ -667,7 +667,107 @@ async function checkMapEtaPreview() {
   }
 }
 
-checkGeometryScreen().then(checkMapEtaPreview).then(
+async function checkLimitedServiceAndEtaStatus() {
+  const { RouteCard } = load('app/bus/nearby');
+  const { limitedServiceTimetable } = load('bus-limited-service');
+  const { describeEta, etaIsStale, etaMaxAge, parseEta } = load('bus-eta');
+  const { BusFeedError } = load('bus-data');
+  const service = [fixture('kmbLwb', '258P', 'O', '1'), fixture('kmbLwb', '258P', 'I', '1'), fixture('kmbLwb', '261P', 'O', '1')];
+  const [lamTin, hungFuk, tinPing] = service;
+  const ordinary = fixture('kmbLwb', '261', 'O', '1');
+  const evidence = [
+    'https://search.kmb.hk/TD_SS/258d.pdf',
+    'https://search.kmb.hk/TD_SS/258d.pdf',
+    'https://search.kmb.hk/TD_SS/261.pdf',
+  ];
+  assert.deepEqual(service.map(({ choice }) => limitedServiceTimetable(choice.identity)), evidence);
+  const discontinued = { ...tinPing.choice.identity, direction: 'inbound' };
+  for (const other of [discontinued, { ...lamTin.choice.identity, serviceType: '2' }, ordinary.choice.identity,
+    fixture('kmbLwb', '258D', 'O', '1').choice.identity, fixture('kmbLwb', '268X', 'I', '1').choice.identity,
+    { source: 'citybus', number: '258P', direction: 'outbound' }, { source: 'nlb', number: '261P', routeId: '1' }]) {
+    assert.equal(limitedServiceTimetable(other), undefined);
+  }
+
+  const now = Date.parse('2026-11-21T13:38:01+08:00');
+  const iso = (offset) => new Date(now + offset).toISOString();
+  const old = iso(-etaMaxAge);
+  const target = { ...lamTin.choice.identity, stopId: lamTin.stops[0].id, stopSeq: 1 };
+  const baseRow = { co: 'KMB', route: target.number, service_type: 1, dir: 'O', stop: target.stopId, seq: 1 };
+  const parse = (rows, generated_timestamp = iso(0)) => parseEta(target, { generated_timestamp, data: rows }, now);
+  const oldNullRow = { ...baseRow, eta: null, data_timestamp: old, rmk_tc: '舊備註', rmk_en: 'Old notice' };
+  const freshNullRow = { ...oldNullRow, data_timestamp: iso(-3_000), rmk_tc: '現有備註', rmk_en: 'Current notice' };
+  const oldArrival = { ...baseRow, eta: iso(240_000), data_timestamp: old };
+  const freshArrival = { ...baseRow, eta: iso(150_000), data_timestamp: iso(-3_000) };
+  const oldNull = parse([oldNullRow]);
+  const oldTimed = parse([oldArrival, freshNullRow]);
+  const fresh = parse([freshArrival, { ...oldArrival, eta: iso(100_000) }]);
+  const past = parse([{ ...freshArrival, eta: iso(-1_000) }]);
+  const empty = parse([]);
+  const otherDirection = parse([{ ...freshArrival, dir: 'I' }]);
+  const failure = new BusFeedError('network');
+  assert.equal(oldNull.generatedAt, now, 'A fresh null ETA uses the response timestamp');
+  assert.equal(etaIsStale(oldTimed, now), true, 'A fresh notice cannot make an old ETA current');
+  assert.equal(etaIsStale(parse([], old), now), true, 'An old cached response is stale even when it contains no ETA');
+  assert.equal(etaIsStale(parse([], iso(30_000)), now + etaMaxAge), true, 'A future provider clock cannot extend the receipt lifetime');
+  assert.throws(() => parse([{ ...oldNullRow, data_timestamp: 'bad date' }]), (error) => error.kind === 'invalid');
+
+  const opens = [];
+  const alerts = [];
+  native.Linking = { async openURL(url) { opens.push(url); throw new Error('System link unavailable'); } };
+  native.Alert = { alert: (message) => alerts.push(message) };
+  for (const language of ['zh-HK', 'en']) {
+    locale = language;
+    const copy = messages[locale];
+    const label = copy.busDetail.limitedService;
+    const noEstimate = locale === 'en' ? 'No arrival estimate available' : '暫無到站預報';
+    assert.equal(label, locale === 'en' ? 'Operates on selected days or at specific times' : '只在指定日期或時段服務');
+    const view = (snapshot, time = now) => describeEta(snapshot, undefined, time, false, locale, copy.busEta);
+    assert.equal(view(fresh).upcoming[0].minutes, 3);
+    assert.equal(view(fresh).upcoming.length, 1, 'Only the current arrival enters the countdown');
+    assert.equal(view(past).upcoming.length, 0);
+    assert.equal(view(otherDirection).status, copy.busEta.unmatched);
+    assert.equal(view(oldNull).status, copy.busEta.empty);
+    assert.deepEqual(view(oldNull).notices, []);
+    assert.deepEqual(view(parse([freshNullRow])).notices, [locale === 'en' ? 'Current notice' : '現有備註']);
+
+    function card(line, snapshot, error) {
+      const sample = { ...line.choice.identity, stopId: line.stops[0].id, stopSeq: 1 };
+      return elements(RouteCard({
+        recommendation: { route: { target: sample, destination: line.route.destination }, stop: { name_zh: '分站', name_en: 'Bus stop' } },
+        distance: '50 m', record: { snapshot, error }, now, onPress() {},
+      })).filter(({ type }) => type === 'AppText').map(({ props }) => props.children);
+    }
+    for (const snapshot of [oldNull, empty, past, otherDirection]) {
+      const text = card(lamTin, snapshot);
+      assert(text.includes(label) && text.includes(noEstimate) && !text.includes(copy.busEta.stale));
+    }
+    assert(card(hungFuk).includes(label));
+    assert(card(tinPing).includes(label));
+    assert(!card(ordinary).includes(label));
+    assert(card(lamTin, fresh).includes(`${copy.busEta.minutes.prefix}3${copy.busEta.minutes.suffix}`));
+    assert(card(lamTin, oldTimed).includes(copy.busEta.stale));
+    assert(card(lamTin, oldTimed, failure).includes(copy.busEta.errors.network));
+    assert(card(lamTin, empty, failure).includes(copy.busEta.failed));
+    assert(card(lamTin, undefined, failure).includes(copy.busEta.failed));
+
+    for (const [index, line] of [...service, ordinary].entries()) {
+      state = {};
+      sequence = { [routeStopKey(line.choice.identity)]: { snapshot: { stops: line.stops, fetchedAt: now }, loading: false } };
+      const details = render(RouteDetails, { family: { selected: line.route, routes: [line.route] }, boarding: {} });
+      const link = action(details, copy.busDetail.officialTimetable);
+      if (line === ordinary) { assert.equal(link, undefined); continue; }
+      assert.equal(link.props.accessibilityRole, 'link');
+      assert.equal(link.props.style({ pressed: false })[0].minHeight, 44);
+      link.props.onPress();
+      await new Promise(setImmediate);
+      assert.equal(opens.at(-1), evidence[index]);
+      assert.equal(alerts.at(-1), copy.busDetail.timetableLinkFailed);
+    }
+  }
+  console.log('PASS: verified limited services, wrong directions and variants, official timetable links, and bilingual ETA freshness states');
+}
+
+checkGeometryScreen().then(checkMapEtaPreview).then(checkLimitedServiceAndEtaStatus).then(
   () => console.log('PASS: official geometry, selected-stop ETA requests, race isolation, retry, stale and unavailable states, and bilingual routing'),
   (error) => { console.error(error); process.exitCode = 1; },
 );

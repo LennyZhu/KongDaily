@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useNavigation, useRoute, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState, type Ref, type RefObject } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { findBusRouteFamily } from '@/bus-data';
@@ -8,6 +8,7 @@ import { useBusEta } from '@/bus-eta-hooks';
 import { describeEta, etaIsStale, readEtaTarget } from '@/bus-eta';
 import { useBusStopFavorite } from '@/bus-favorite-hooks';
 import { busStopEtaHref, describeBusVisit, type BusVisitSummary } from '@/bus-favorites';
+import { limitedServiceTimetable } from '@/bus-limited-service';
 import { busRouteMapHref } from '@/bus-route-map';
 import { routePlaceName } from '@/bus-routes';
 import { useRouteSequences, useRouteStopNames, type SequenceState } from '@/bus-stop-hooks';
@@ -205,6 +206,7 @@ function RouteDetails({ family, boarding, fromSearch }: { family: RouteFamily; b
   const hasStops = (sequence?.stops.length ?? 0) > 0;
   const picked = current && sequence?.stops.find((stop) => stopVisitKey(current.identity, stop) === selectedVisit);
   const mapRouteId = current?.catalogueRoute?.id ?? (current?.identity.source === 'citybus' ? base.id : undefined);
+  const timetable = current && limitedServiceTimetable(current.identity);
 
   function scrollToRecommendation() {
     const row = recommendedRow.current;
@@ -262,6 +264,14 @@ function RouteDetails({ family, boarding, fromSearch }: { family: RouteFamily; b
             {nlbRoute?.special && <AppText variant="caption" tone="muted">{bus.specialRoute}</AppText>}
             {nlbRoute?.overnight && <AppText variant="caption" tone="muted">{bus.overnightRoute}</AppText>}
           </View>
+          {timetable && (
+            <Pressable accessibilityRole="link"
+              onPress={() => { void Linking.openURL(timetable).catch(() => Alert.alert(detail.timetableLinkFailed)); }}
+              style={({ pressed }) => [styles.timetable, pressed && styles.pressed]}>
+              <AppText variant="detail" tone="primary" style={styles.headingText}>{detail.officialTimetable}</AppText>
+              <Icon name="arrow.up.right" size={14} />
+            </Pressable>
+          )}
         </View>
 
         {options.length > 1 && (
@@ -588,6 +598,10 @@ const styles = StyleSheet.create({
     columnGap: space.sm, rowGap: space.xs,
   },
   headingText: { flexShrink: 1 },
+  timetable: {
+    alignSelf: 'flex-start', maxWidth: '100%', minHeight: touchTarget,
+    flexDirection: 'row', alignItems: 'center', gap: space.xs,
+  },
   routeMapAction: {
     marginStart: 'auto', minWidth: touchTarget, minHeight: touchTarget, maxWidth: '100%',
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.xs,

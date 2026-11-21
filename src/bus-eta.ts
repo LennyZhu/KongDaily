@@ -172,9 +172,11 @@ export function parseEta(target: EtaTarget, value: unknown, receivedAt = Date.no
   }
   if (!Array.isArray(payload.data)) throw new BusFeedError('invalid');
   const entries = parseDirectionalEta(target, payload.data);
+  // KMB null ETA rows can carry an older timestamp even when the response was just generated.
+  const predictions = target.source === 'kmbLwb' ? entries.filter((entry) => entry.arrivalAt !== undefined) : entries;
   return {
     target, entries, receivedAt,
-    generatedAt: latestTimestamp(entries) ?? timestamp(payload.generated_timestamp),
+    generatedAt: latestTimestamp(predictions) ?? timestamp(payload.generated_timestamp),
     match: entries.length ? 'matched' : payload.data.length ? 'unmatched' : 'empty',
   };
 }
@@ -238,7 +240,9 @@ export function describeEta(snapshot: EtaSnapshot | undefined, error: BusFeedErr
   const upcoming = snapshot ? validEtaPredictions(snapshot, now) : [];
   const notices = snapshot && !stale ? [...new Set([
     snapshot.message,
-    ...snapshot.entries.filter((entry) => entry.arrivalAt === undefined).map((entry) => etaEntryNotes(entry, locale)),
+    ...snapshot.entries.filter((entry) => entry.arrivalAt === undefined
+      && (snapshot.target.source !== 'kmbLwb' || !etaIsStale(snapshot, now, entry.generatedAt)))
+      .map((entry) => etaEntryNotes(entry, locale)),
   ].filter((message): message is string => Boolean(message)))] : [];
   const status = stale ? copy.stale
     : !snapshot ? error && !loading ? copy.failed : copy.loading
