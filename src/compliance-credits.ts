@@ -40,11 +40,14 @@ const sourceGroups = [
     paragraphs: [
       text('路線、站點及到站資料來自九巴／龍運、城巴及新大嶼山巴士的官方資料服務。離線站點與站序索引由相關官方資料整理。資料權利屬香港特別行政區政府及相關營辦商。',
         'Route, stop and arrival information comes from the official KMB and Long Win, Citybus, and New Lantao Bus feeds. The offline stop and route–stop indexes are derived from these sources. Rights belong to the Hong Kong SAR Government and the relevant operators.'),
+      text('成人標準車費源自香港特別行政區政府運輸署經 DATA.GOV.HK 發布的公共交通路線及收費資料。資料知識產權屬政府及相關機構。實際收費以營辦商最新公布為準。',
+        'Standard adult fares come from the Transport Department, Hong Kong SAR Government, via DATA.GOV.HK. The Government and relevant organisations own the intellectual property rights. Check the operator for current fares.'),
     ],
     links: [
       source('https://data.gov.hk/en-data/dataset/hk-td-tis_21-etakmb', '九巴及龍運 · DATA.GOV.HK', 'KMB and Long Win · DATA.GOV.HK'),
       source('https://data.gov.hk/en-data/dataset/ctb-eta-transport-realtime-eta', '城巴 · DATA.GOV.HK', 'Citybus · DATA.GOV.HK'),
       source('https://data.gov.hk/en-data/dataset/nlb-bus-nlb-bus-service-v2', '新大嶼山巴士 · DATA.GOV.HK', 'New Lantao Bus · DATA.GOV.HK'),
+      source('https://data.gov.hk/en-data/dataset/hk-td-tis_14-routes-fares-xml', '運輸署車費資料 · DATA.GOV.HK', 'Transport Department fares · DATA.GOV.HK'),
     ],
   },
   {

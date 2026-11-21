@@ -767,7 +767,92 @@ async function checkLimitedServiceAndEtaStatus() {
   console.log('PASS: verified limited services, wrong directions and variants, official timetable links, and bilingual ETA freshness states');
 }
 
-checkGeometryScreen().then(checkMapEtaPreview).then(checkLimitedServiceAndEtaStatus).then(
+function checkAdultFares() {
+  const { RouteCard } = load('app/bus/nearby');
+  const { formatAdultBusFare, readAdultBusFare } = load('nearby-bus-fares');
+  const pack = require('../assets/data/nearby-bus-fares.json');
+  const now = Date.parse('2026-11-21T13:38:01+08:00');
+  const expires = Date.parse('2026-12-02T00:00:00+08:00');
+  const eligible = [
+    ['nlb', 'B2', '', '37', 13, 'full', 1580],
+    ['nlb', 'B2', '', '38', 7, 'full', 1580],
+    ['citybus', 'B15', 'O', '', 2, 'boarding', 1020],
+    ['citybus', 'B15', 'I', '', 12, 'boarding', 1390],
+    ['kmbLwb', '68A', 'O', '1', 1, 'full', 1260],
+    ['kmbLwb', '68A', 'I', '1', 1, 'full', 1260],
+    ['kmbLwb', '68X', 'I', '1', 1, 'full', 1620],
+    ['kmbLwb', '258P', 'O', '1', 1, 'full', 1880],
+    ['kmbLwb', '258P', 'I', '1', 16, 'boarding', 570],
+    ['kmbLwb', '261P', 'O', '1', 10, 'boarding', 430],
+    ['kmbLwb', '268X', 'O', '1', 10, 'full', 1620],
+    ['kmbLwb', '268X', 'I', '1', 10, 'full', 1620],
+    ['kmbLwb', '268X', 'O', '3', 10, 'boarding', 580],
+  ];
+  assert.equal(pack.datasetDate, '2026-11-18');
+  assert.equal(Object.keys(pack.records).length, eligible.length);
+  assert.equal(Object.values(pack.records).reduce((count, entry) => count + Object.keys(entry.boarding).length, 0), 85);
+  assert.equal(pack.sources['fare.xml'], 'https://static.data.gov.hk/td/routes-fares-xml/FARE_BUS.xml');
+  assert(Object.values(pack.sha256).every((sha) => /^[a-f0-9]{64}$/.test(sha)));
+  assert.equal(formatAdultBusFare(430), 'HK$4.30');
+  assert.equal(formatAdultBusFare(437), 'HK$4.37');
+
+  function targetFor(line, seq) {
+    return { ...line.choice.identity, stopId: line.stops.find((stop) => stop.seq === seq).id, stopSeq: seq };
+  }
+
+  for (const [source, number, bound, variant, seq, scope, cents] of eligible) {
+    const line = fixture(source, number, bound, variant);
+    const target = targetFor(line, seq);
+    assert.deepEqual(readAdultBusFare(target, now), { scope, cents });
+    const record = pack.records[routeStopKey(target)];
+    for (const [position, boarding] of Object.entries(record.boarding)) {
+      assert.deepEqual(readAdultBusFare(targetFor(line, Number(position)), now), { scope: 'boarding', cents: boarding.cents });
+    }
+    assert.deepEqual(readAdultBusFare(target, expires - 1), { scope, cents });
+    assert.equal(readAdultBusFare(target, expires), undefined);
+  }
+  for (const service of ['1', '3', '4']) {
+    assert.equal(readAdultBusFare(targetFor(fixture('kmbLwb', '68X', 'O', service), 1), now), undefined);
+  }
+  const special = fixture('kmbLwb', '268X', 'O', '3');
+  const section = targetFor(special, 10);
+  assert.deepEqual(readAdultBusFare(targetFor(special, 1), now), { scope: 'full', cents: 1620 }, 'Price differs by alighting stop');
+  for (const change of [{ stopSeq: 9 }, { stopId: 'WRONG' }, { repeatedStop: true }]) {
+    assert.deepEqual(readAdultBusFare({ ...section, ...change }, now), { scope: 'full', cents: 1620 });
+  }
+  for (const change of [{ serviceType: '2' }, { direction: 'inbound' }, { source: 'citybus' }, { number: '268' }]) {
+    assert.equal(readAdultBusFare({ ...section, ...change }, now), undefined);
+  }
+  assert.equal(readAdultBusFare({ ...targetFor(fixture('nlb', 'B2', '', '37'), 1), number: 'B2P' }, now), undefined);
+  assert.equal(readAdultBusFare(section, now, { ...pack, datasetDate: '2026-11-31' }), undefined);
+  assert.equal(readAdultBusFare(section, now, { ...pack, reviewedDate: '2026-11-22' }), undefined);
+
+  for (const language of ['zh-HK', 'en']) {
+    locale = language;
+    const copy = messages[locale];
+    const line = fixture('kmbLwb', '258P', 'I', '1');
+    const target = targetFor(line, 16);
+    const stopRow = stops.kmbLwb.find(([id]) => id === target.stopId);
+    const snapshot = { target, match: 'matched', entries: [{ arrivalAt: now + 120_000 }], receivedAt: now };
+    const props = { recommendation: { route: { target, destination: line.route.destination }, stop: {
+      name_zh: stopRow[1], name_en: stopRow[2], source: target.source, stop_id: target.stopId,
+    } }, distance: '50 m', record: { snapshot }, now, onPress() {} };
+    const children = (card) => elements(card).filter(({ type }) => type === 'AppText').map(({ props }) => props.children);
+    const card = children(RouteCard(props));
+    assert(card.includes(locale === 'en' ? 'Adult fare from this stop HK$5.70' : '此站成人車費 HK$5.70'));
+    assert(card.includes(`${copy.busEta.minutes.prefix}2${copy.busEta.minutes.suffix}`));
+    assert(card.includes(copy.busDetail.limitedService));
+    assert(card.includes(copy.nearbyBus.viewRoute));
+    assert(children(RouteCard({ ...props, now: expires })).every((text) => !String(text).includes('HK$')));
+    const full = children(RouteCard({ ...props, recommendation: { ...props.recommendation,
+      route: { ...props.recommendation.route, target: { ...target, stopSeq: 1 } },
+    } }));
+    assert(full.includes(locale === 'en' ? 'Full-route adult fare HK$18.80' : '全程成人車費 HK$18.80'));
+  }
+  console.log('PASS: official full and boarding fares, exact route and visit identity, HKD cents, expiration, and bilingual cards');
+}
+
+checkGeometryScreen().then(checkMapEtaPreview).then(checkLimitedServiceAndEtaStatus).then(checkAdultFares).then(
   () => console.log('PASS: official geometry, selected-stop ETA requests, race isolation, retry, stale and unavailable states, and bilingual routing'),
   (error) => { console.error(error); process.exitCode = 1; },
 );

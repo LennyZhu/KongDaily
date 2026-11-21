@@ -12,6 +12,7 @@ import {
   kmbNearbyNeedsRefresh, prepareNearbyBusIndex, readNearbyBusStops, refreshKmbNearbyStops,
   type BusSearchRadius, type Coordinates, type NearbyBusStop,
 } from '@/nearby-bus-data';
+import { formatAdultBusFare, readAdultBusFare } from '@/nearby-bus-fares';
 import { nearbyBusLandmarks, type NearbyLandmark } from '@/nearby-bus-landmarks';
 import { locateNearbyBusStops, type NearbyLocationIssue } from '@/nearby-bus-location';
 import { useStationEta } from '@/nearby-stop-eta-hooks';
@@ -457,6 +458,7 @@ function RouteCard({ recommendation, distance, record, fallbackError, now, onPre
         : view.status === eta.loading ? copy.nearbyBus.loadingForecast : copy.nearbyBus.noArrivalEstimate;
   const countdown = (minutes: number) => minutes === 0 ? eta.due : `${eta.minutes.prefix}${minutes}${eta.minutes.suffix}`;
   const notes = [...new Set([next && etaEntryNotes(next, locale), ...view.notices].filter(Boolean))];
+  const fare = readAdultBusFare(target, now);
 
   return (
     <Pressable accessibilityRole="button" onPress={onPress}
@@ -482,6 +484,11 @@ function RouteCard({ recommendation, distance, record, fallbackError, now, onPre
           ) : <AppText variant="caption" tone="muted" style={styles.arrivalText}>{status}</AppText>}
         </View>
       </View>
+      {fare && (
+        <AppText variant="brandSubtitle" tone="muted">
+          {copy.nearbyBus.adultFare[fare.scope](formatAdultBusFare(fare.cents))}
+        </AppText>
+      )}
       {limitedServiceTimetable(target) && (
         <AppText variant="brandSubtitle" tone="muted">{copy.busDetail.limitedService}</AppText>
       )}

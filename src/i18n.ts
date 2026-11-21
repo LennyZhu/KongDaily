@@ -316,6 +316,10 @@ const zhHK = {
     boardingStop: (name: string, distance: string) => `建議上車站：${name} · 直線約 ${distance}`,
     loadingForecast: '正在取得預報',
     noArrivalEstimate: '暫無到站預報',
+    adultFare: {
+      boarding: (amount: string) => `此站成人車費 ${amount}`,
+      full: (amount: string) => `全程成人車費 ${amount}`,
+    },
     viewRoute: '查看路線',
     stops: '附近候車站',
     sameNameStops: (count: number) => `${count} 個同名站點`,
@@ -897,6 +901,10 @@ const en: typeof zhHK = {
     boardingStop: (name: string, distance: string) => `Suggested stop: ${name} · about ${distance} straight-line`,
     loadingForecast: 'Getting predictions',
     noArrivalEstimate: 'No arrival estimate available',
+    adultFare: {
+      boarding: (amount: string) => `Adult fare from this stop ${amount}`,
+      full: (amount: string) => `Full-route adult fare ${amount}`,
+    },
     viewRoute: 'View route',
     stops: 'Nearby boarding stops',
     sameNameStops: (count: number) => `${count} stops with this name`,
