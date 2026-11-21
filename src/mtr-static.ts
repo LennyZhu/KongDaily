@@ -1,7 +1,7 @@
 import snapshot from '../assets/data/mtr-static.json';
 
 type Names = { zh: string; en: string };
-type MtrLineCode = keyof typeof snapshot.lines;
+export type MtrLineCode = keyof typeof snapshot.lines;
 type Membership = { lineCode: MtrLineCode; stationId: number | null };
 type StationRecord = Names & {
   lineIds: Partial<Record<MtrLineCode, number | null>>;

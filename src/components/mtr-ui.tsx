@@ -3,10 +3,10 @@ import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Icon } from '@/components/ui';
 import { useLanguage } from '@/language';
-import { findMtrLine, mtrName, type MtrEntry } from '@/mtr-static';
+import { findMtrLine, mtrName, type MtrEntry, type MtrLineCode } from '@/mtr-static';
 import { colors, radius, space, touchTarget } from '@/theme';
 
-export function MtrEntryRow({ entry, sequence }: { entry: MtrEntry; sequence?: number }) {
+export function MtrEntryRow({ entry, sequence, lineCode }: { entry: MtrEntry; sequence?: number; lineCode?: MtrLineCode }) {
   const { copy, locale } = useLanguage();
   const router = useRouter();
   const isLine = entry.kind === 'mtr-line';
@@ -20,7 +20,10 @@ export function MtrEntryRow({ entry, sequence }: { entry: MtrEntry; sequence?: n
   return (
     <Pressable accessibilityRole="button" onPress={() => {
       Keyboard.dismiss();
-      router.push({ pathname: '/mtr/[kind]', params: { kind: isLine ? 'line' : 'station', code: entry.id } });
+      router.push({
+        pathname: '/mtr/[kind]',
+        params: { kind: isLine ? 'line' : 'station', code: entry.id, ...(!isLine && lineCode ? { line: lineCode } : {}) },
+      });
     }} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
       {sequence === undefined
         ? <Icon name={isLine ? 'tram.fill.tunnel' : 'mappin'} size={18} />

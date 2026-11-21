@@ -329,6 +329,7 @@ function mount(t, {
     calls, labels, landmarks, requests, queries, routes, settings, alerts, openedLinks, settle, press, shows, unmount, findAction,
     transportCopy: copy.transport, busCopy: copy.bus, mtrCopy: copy.mtr, catalogueRoutes, theme: source('theme'),
     mtr: () => source('mtr-static'),
+    mtrForecastProps: () => visibleElements().find(({ type }) => type.name === 'MtrNextTrains')?.props,
     detailRows: () => visibleElements().filter(({ type }) => type.name === 'MtrEntryRow').map(({ props }) => props),
     directionFilters: () => visibleElements().find(({ type }) => type === 'Filters')?.props,
     openResult: (index) => elements(tree.props.renderItem({ item: tree.props.data[index] }))
@@ -1229,6 +1230,7 @@ test('MTR detail shows separate official branch orders and a supplemental Raceco
   const page = mount(t, { mtrDetail: { kind: 'line', code: 'EAL' } });
   await page.settle();
   assert.ok(page.shows('東鐵綫'));
+  assert.equal(page.mtrForecastProps(), undefined);
   assert.equal(page.directionFilters().options.length, 4);
   const orderedStops = () => page.detailRows().filter(({ sequence }) => sequence !== undefined);
   assert.deepEqual(orderedStops().map(({ sequence }) => sequence), Array.from({ length: 14 }, (_, i) => i + 1));
@@ -1241,11 +1243,13 @@ test('MTR detail shows separate official branch orders and a supplemental Raceco
   assert.ok(page.shows(page.mtrCopy.racecourse));
   assert.equal(page.detailRows().find(({ entry }) => entry.id === 'RAC').sequence, undefined);
   page.press('馬場');
-  assert.deepEqual(page.routes, [{ pathname: '/mtr/[kind]', params: { kind: 'station', code: 'RAC' } }]);
+  assert.deepEqual(page.routes, [{ pathname: '/mtr/[kind]', params: { kind: 'station', code: 'RAC', line: 'EAL' } }]);
 
   const station = mount(t, { locale: 'en', mtrDetail: { kind: 'station', code: 'HOK' } });
   await station.settle();
   assert.ok(station.shows('Hong Kong') && station.shows('香港'));
+  assert.equal(station.mtrForecastProps().station.id, 'HOK');
+  assert.equal(station.mtrForecastProps().initialLine, undefined);
   assert.ok(station.shows(station.mtrCopy.attribution) && station.shows(station.mtrCopy.disclaimer));
   assert.deepEqual(station.openedLinks, []);
   station.press(station.mtrCopy.dataset);
