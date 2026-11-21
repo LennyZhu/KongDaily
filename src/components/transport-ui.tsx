@@ -81,7 +81,7 @@ export function TransportUnavailable({ copy, mode }: { copy: TransportCopy; mode
   );
 }
 
-export function TransportBusSearch({ label, clearLabel, cancelLabel, query, onChange, autoFocus }: {
+export function TransportSearch({ label, clearLabel, cancelLabel, query, onChange, autoFocus }: {
   label: string; clearLabel: string; cancelLabel: string; query: string;
   onChange: (query: string) => void; autoFocus: boolean;
 }) {

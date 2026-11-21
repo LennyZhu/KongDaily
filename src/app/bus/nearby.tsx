@@ -9,9 +9,11 @@ import { useBusCatalogue } from '@/bus-hooks';
 import { busSources, matchBusRoutes, normalizeBusQuery, routePlaceName, type BusRoute } from '@/bus-routes';
 import { routeStopKey } from '@/bus-stops';
 import { BusRouteRow } from '@/components/bus-ui';
-import { TransportBusSearch, TransportModePicker, TransportUnavailable, type TransportMode } from '@/components/transport-ui';
+import { MtrEntryRow } from '@/components/mtr-ui';
+import { TransportSearch, TransportModePicker, TransportUnavailable, type TransportMode } from '@/components/transport-ui';
 import { AppText, EmptyState, Icon } from '@/components/ui';
 import { useLanguage } from '@/language';
+import { mtrLines, mtrStations, searchMtr, type MtrEntry } from '@/mtr-static';
 import {
   kmbNearbyNeedsRefresh, prepareNearbyBusIndex, readNearbyBusStops, refreshKmbNearbyStops,
   type BusSearchRadius, type Coordinates, type NearbyBusStop,
@@ -29,7 +31,7 @@ type Reference = { kind: 'current'; point: Coordinates } | { kind: 'landmark'; l
 type Results = { reference: Reference; radius: BusSearchRadius; stops?: NearbyBusStop[]; routes?: NearbyRoute[] | 'error' };
 type Mode = 'routes' | 'stops';
 type NearbyItem = NearbyRoute | NearbyStopGroup;
-type ListItem = NearbyItem | BusRoute;
+type ListItem = NearbyItem | BusRoute | MtrEntry;
 const emptyRoutes: NearbyRoute[] = [];
 const emptyStops: NearbyBusStop[] = [];
 const emptySearchResults: BusRoute[] = [];
@@ -37,6 +39,7 @@ const viewability = { itemVisiblePercentThreshold: 35, minimumViewTime: 250 };
 const radii = [500, 1000, 2000] as const;
 
 function browseKey(item: ListItem) {
+  if ('kind' in item) return `${item.kind}:${item.id}`;
   // A location refresh can change the recommended stop while the service stays the same.
   return 'route' in item ? routeStopKey(item.route.target) : item.id;
 }
@@ -57,6 +60,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   const listRef = useRef<FlatList<ListItem>>(null);
   const catalogue = useBusCatalogue(transport && catalogueRequested);
   const [mode, setMode] = useState<Mode>('routes');
+  const [mtrView, setMtrView] = useState<Mode>('routes');
   const [expandedStopGroups, setExpandedStopGroups] = useState<Set<string>>(() => new Set());
   const [radiusMeters, setRadiusMeters] = useState<BusSearchRadius>(500);
   const [pickingRadius, setPickingRadius] = useState(false);
@@ -109,18 +113,32 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
     ? result : undefined;
   const stops = resultForRadius?.stops ?? emptyStops;
   const showBuses = transportMode === 'all' || transportMode === 'bus';
+  const mtrMode = transport && transportMode === 'mtr';
   const normalizedQuery = normalizeBusQuery(query);
-  const searching = transport && showBuses && normalizedQuery.length > 0;
+  const searching = transport && (showBuses || mtrMode) && normalizedQuery.length > 0;
+  const searchingBuses = searching && showBuses;
+  const mixedSearch = searching && transportMode === 'all';
   const searchRoutes = useMemo(() => busSources.flatMap((source) => catalogue.feeds[source]?.routes ?? []), [catalogue.feeds]);
-  const searchResults = useMemo(() => searching ? matchBusRoutes(searchRoutes, normalizedQuery) : emptySearchResults,
-    [normalizedQuery, searchRoutes, searching]);
+  const busResults = useMemo(() => searchingBuses ? matchBusRoutes(searchRoutes, normalizedQuery) : emptySearchResults,
+    [normalizedQuery, searchRoutes, searchingBuses]);
+  const searchResults = useMemo(() => {
+    if (mtrMode && searching) return searchMtr(normalizedQuery);
+    if (mixedSearch) return [...busResults, ...searchMtr(normalizedQuery)];
+    return busResults;
+  }, [busResults, mixedSearch, mtrMode, normalizedQuery, searching]);
   const searchFailed = busSources.some((source) => catalogue.failed[source]);
+  const showSearchCount = mtrMode || (mixedSearch
+    ? searchResults.length > 0 || (!catalogue.loading && !searchFailed)
+    : searchRoutes.length > 0 && (!catalogue.loading || busResults.length > 0));
   const stopGroups = useMemo(() => showBuses && mode === 'stops' ? groupNearbyStops(stops) : [], [mode, showBuses, stops]);
   const routeResult = resultForRadius?.routes;
   const routeRows = showBuses && !searching && mode === 'routes' && Array.isArray(routeResult) ? routeResult : emptyRoutes;
-  const rows = searching ? searchResults : mode === 'routes' ? routeRows : stopGroups;
+  const view = mtrMode ? mtrView : mode;
+  const directory = mtrView === 'routes' ? mtrLines : mtrStations;
+  const rows = searching ? searchResults : mtrMode ? directory : mode === 'routes' ? routeRows : stopGroups;
   const nearbyScope = `${mode}:${referenceRevision}:${radiusMeters}`;
-  const listScope = transport ? `${transportMode}:${searching ? 'bus-search' : nearbyScope}` : nearbyScope;
+  const contentScope = searching ? 'search' : mtrMode ? `directory:${mtrView}` : nearbyScope;
+  const listScope = transport ? `${transportMode}:${contentScope}` : nearbyScope;
   const browseScope = searching ? `${listScope}:${normalizedQuery}` : listScope;
   const { recordVisible, scrollProps } = useTransportListPosition<ListItem>(transport, browseScope, rows, listRef, browseKey);
   const etaRoutes = useMemo(() => routeRows.map(({ route }) => route), [routeRows]);
@@ -312,7 +330,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   function editQuery(value: string) {
     const next = normalizeBusQuery(value);
     if (next) {
-      setCatalogueRequested(true);
+      if (showBuses) setCatalogueRequested(true);
       if (searching && next !== normalizedQuery) listRef.current?.scrollToOffset({ offset: 0, animated: false });
     }
     setQuery(value);
@@ -322,7 +340,9 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
     setTransportMode(next);
     if (next !== 'all' && next !== 'bus') {
       setFocusSearchOnMount(false);
-      Keyboard.dismiss();
+      if (next !== 'mtr') Keyboard.dismiss();
+    } else if (normalizedQuery) {
+      setCatalogueRequested(true);
     }
   }
 
@@ -332,19 +352,23 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
       key={listScope}
       {...scrollProps}
       style={transport ? [styles.screen, styles.transportScreen] : styles.screen}
-      contentContainerStyle={[styles.content, transport && styles.transportContent, searching && styles.searchContent,
+      contentContainerStyle={[styles.content, transport && styles.transportContent, searchingBuses && styles.searchContent,
         { paddingBottom: bottom + space.section }]}
       contentInsetAdjustmentBehavior="never"
       automaticallyAdjustKeyboardInsets={transport}
       keyboardShouldPersistTaps={transport ? 'handled' : undefined}
       keyboardDismissMode={transport ? 'on-drag' : undefined}
       data={rows}
-      keyExtractor={(item) => 'route' in item ? item.route.id : item.id}
+      keyExtractor={(item) => 'route' in item ? item.route.id : browseKey(item)}
       viewabilityConfig={viewability}
       onViewableItemsChanged={onViewableItemsChanged}
       renderItem={({ item }) => {
+        if ('kind' in item) {
+          const row = <MtrEntryRow entry={item} />;
+          return mixedSearch ? <View style={styles.mixedMtrRow}>{row}</View> : row;
+        }
         if ('number' in item) {
-          return <BusRouteRow copy={copy.bus} locale={locale} route={item} onPress={() => {
+          return <BusRouteRow copy={copy.bus} locale={locale} route={item} modeLabel={mixedSearch ? copy.transport.modes.bus : undefined} onPress={() => {
             Keyboard.dismiss();
             router.push({ pathname: '/bus/route', params: { routeId: item.id } });
           }} />;
@@ -358,13 +382,15 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
           formatDistance={formatDistance} onOpen={openStop} onToggle={() => toggleStopGroup(item.id)} />;
       }}
       ListHeaderComponent={searching ? (
-        <View style={[styles.transportHeader, styles.searchFeedback]}>
-          <AppText variant="homeHeading" accessibilityRole="header">{copy.transport.busResults}</AppText>
-          {searchRoutes.length > 0 && (!catalogue.loading || searchResults.length > 0) && (
+        <View style={[styles.transportHeader, searchingBuses && styles.searchFeedback]}>
+          <AppText variant="homeHeading" accessibilityRole="header">
+            {mtrMode ? copy.mtr.results : mixedSearch ? copy.transport.searchResults : copy.transport.busResults}
+          </AppText>
+          {showSearchCount && (
             <AppText variant="detail" tone="muted">{copy.bus.resultCount(searchResults.length)}</AppText>
           )}
-          {catalogue.loading && searchResults.length === 0 && <Loading label={copy.bus.loading} />}
-          {searchFailed && (
+          {searchingBuses && catalogue.loading && busResults.length === 0 && <Loading label={copy.bus.loading} />}
+          {searchingBuses && searchFailed && (
             <>
               <AppText variant="detail" tone="muted" accessibilityRole="alert">
                 {searchRoutes.length ? copy.bus.updateFailed : copy.bus.loadFailed}
@@ -394,20 +420,24 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
           {showBuses && !transport && locationIssueNote}
           {showBuses && !transport && refreshFailed && <AppText variant="detail" tone="muted" accessibilityRole="alert">{labels.refreshFailed}</AppText>}
           {showBuses && !transport && distanceNote}
-          {showBuses && <View accessibilityRole="tablist" style={[styles.segment, transport && styles.transportSegment]}>
+          {(showBuses || mtrMode) && <View accessibilityRole="tablist" style={[styles.segment, transport && styles.transportSegment]}>
             {(['routes', 'stops'] as const).map((option) => {
-              const selected = mode === option;
+              const selected = view === option;
               const tone = selected ? (transport ? 'primary' : 'onPrimary') : (transport ? 'muted' : 'primary');
               return (
                 <Pressable key={option} accessibilityRole="tab" accessibilityState={{ selected }}
                   onPress={() => {
                     if (selected) return;
+                    if (mtrMode) {
+                      setMtrView(option);
+                      return;
+                    }
                     setVisible([]);
                     setMode(option);
                   }}
                   style={({ pressed }) => [styles.segmentOption, selected && (transport ? styles.transportSegmentSelected : styles.segmentSelected),
                     pressed && styles.pressed]}>
-                  <Icon name={option === 'routes' ? 'bus' : 'mappin'} size={16} color={colors[tone]} />
+                  <Icon name={option === 'routes' ? (mtrMode ? 'tram.fill.tunnel' : 'bus') : 'mappin'} size={16} color={colors[tone]} />
                   <AppText variant="detail" tone={tone} style={styles.shrink}>
                     {option === 'routes' ? labels.byRoute : labels.byStop}
                   </AppText>
@@ -415,6 +445,9 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
               );
             })}
           </View>}
+          {mtrMode && <AppText variant="homeHeading" accessibilityRole="header">
+            {mtrView === 'routes' ? copy.mtr.lines : copy.mtr.stations}
+          </AppText>}
           {showBuses && <View style={[styles.heading, transport && styles.transportHeading]}>
             <AppText variant="homeHeading" accessibilityRole="header" style={[styles.copy, transport && styles.transportHeadingTitle]}>
               {mode === 'routes' ? labels.routes : labels.stops}
@@ -474,12 +507,15 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
         </View>
       )}
       ListEmptyComponent={searching ? (
-        !catalogue.loading && searchRoutes.length > 0 ? (
-          <View style={styles.searchFeedback}>
-            <EmptyState icon="magnifyingglass" title={copy.bus.noResults} detail={copy.bus.searchHint} />
+        mtrMode || (!catalogue.loading && (mixedSearch || searchRoutes.length > 0)) ? (
+          <View style={searchingBuses && styles.searchFeedback}>
+            <EmptyState icon="magnifyingglass"
+              title={mtrMode || (mixedSearch && searchFailed) ? copy.mtr.noMatches : mixedSearch ? copy.transport.noMatches : copy.bus.noResults}
+              detail={transportMode === 'bus' ? copy.bus.searchHint : undefined} />
           </View>
         ) : null
-      ) : !showBuses ? <TransportUnavailable copy={copy.transport} mode={transportMode} /> : transport && !reference ? null : (
+      ) : mtrMode ? <EmptyState icon="tram.fill.tunnel" title={copy.mtr.noDirectory} />
+        : !showBuses ? <TransportUnavailable copy={copy.transport} mode={transportMode} /> : transport && !reference ? null : (
         <View style={styles.header}>
           {index === 'loading' ? <Loading label={labels.preparing} />
             : index === 'error' || (resultForRadius && !resultForRadius.stops) || (mode === 'routes' && routeResult === 'error') ? (
@@ -513,8 +549,8 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   return (
     <View style={styles.transportPage}>
       <View style={styles.transportControls}>
-        {showBuses && (
-          <TransportBusSearch label={transportMode === 'all' ? copy.transport.searchAll : copy.transport.searchBuses}
+        {(showBuses || mtrMode) && (
+          <TransportSearch label={mtrMode ? copy.mtr.search : transportMode === 'all' ? copy.transport.searchAll : copy.transport.searchBuses}
             clearLabel={copy.bus.clearInput} cancelLabel={copy.bus.cancel} query={query} onChange={editQuery}
             autoFocus={focusSearchOnMount} />
         )}
@@ -716,6 +752,7 @@ const styles = StyleSheet.create({
   transportContent: { paddingTop: space.sm },
   searchContent: { paddingHorizontal: 0, gap: 0 },
   searchFeedback: { paddingHorizontal: homeLayout.gutter, paddingBottom: space.sm },
+  mixedMtrRow: { paddingHorizontal: homeLayout.gutter, paddingBottom: space.sm },
   header: { gap: space.md },
   transportHeader: { gap: space.sm },
   panel: { backgroundColor: colors.surface, borderRadius: radius.media, borderColor: colors.border, borderWidth: StyleSheet.hairlineWidth },

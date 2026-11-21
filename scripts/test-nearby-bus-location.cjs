@@ -28,7 +28,7 @@ const blocked = { granted: false, canAskAgain: false };
 
 function mount(t, {
   permission = granted, servicesEnabled = true, appState = 'active', locale = 'zh-HK', transport = false,
-  intent, delayCatalogue = false,
+  intent, delayCatalogue = false, offlineCatalogue = false, mtrDetail,
 } = {}) {
   const events = new EventEmitter();
   const requests = [];
@@ -36,6 +36,7 @@ function mount(t, {
   const routes = [];
   const settings = [];
   const alerts = [];
+  const openedLinks = [];
   const calls = { services: 0, permission: 0, prompt: 0 };
   let permissionOnRequest = granted;
   let focused = true;
@@ -47,6 +48,7 @@ function mount(t, {
   let tree;
   let modePickerTree;
   let searchTree;
+  let lineStationsTree;
   let etaRoutes;
   let etaNow = 0;
   let dismissals = 0;
@@ -115,7 +117,10 @@ function mount(t, {
     'react-native': {
       ...native, AppState, StyleSheet: { create: (styles) => styles }, useWindowDimensions: () => ({ width: 320 }),
       Keyboard: { dismiss: () => { dismissals++; } },
-      Linking: { openSettings: () => new Promise((resolve, reject) => settings.push({ resolve, reject })) },
+      Linking: {
+        openSettings: () => new Promise((resolve, reject) => settings.push({ resolve, reject })),
+        async openURL(url) { openedLinks.push(url); },
+      },
       Alert: { alert: (message) => alerts.push(message) },
     },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ bottom: 0 }) },
@@ -131,13 +136,16 @@ function mount(t, {
     },
     'expo-router': {
       useRouter: () => ({ push: (href) => routes.push(href) }),
-      useLocalSearchParams: () => ({ intent }),
+      useLocalSearchParams: () => mtrDetail ?? { intent },
       useFocusEffect: (effect) => load(require.resolve('expo-router/build/useFocusEffect')).useFocusEffect(effect),
     },
     './link/useLoadedNavigation': { useOptionalNavigation: () => navigation },
     './useNavigation': { useNavigation: () => navigation },
     '@/language': { useLanguage: () => ({ locale, copy: source('i18n').messages[locale] }) },
-    '@/components/ui': { AppText: 'AppText', EmptyState: 'EmptyState', Icon: 'Icon' },
+    '@/components/ui': {
+      AppText: 'AppText', EmptyState: 'EmptyState', Icon: 'Icon', Filters: 'Filters',
+      PageHeading: 'PageHeading', Screen: 'Screen',
+    },
     '@/database': { getDatabase: async () => ({
       async getAllAsync(sql, ...params) {
         queries.push(params);
@@ -151,11 +159,15 @@ function mount(t, {
       async readBusFeeds() {
         catalogueReads++;
         if (pendingCatalogue) await pendingCatalogue;
-        return cachedCatalogue;
+        return offlineCatalogue ? {} : cachedCatalogue;
       },
+      BusFeedError: class BusFeedError extends Error {},
       isBusFeedFresh: () => true,
       requestBusJson: () => assert.fail('Unexpected bus network request'),
-      refreshBusFeed: () => assert.fail('Unexpected catalogue refresh'),
+      async refreshBusFeed() {
+        if (offlineCatalogue) throw new Error('Offline');
+        assert.fail('Unexpected catalogue refresh');
+      },
     },
     '@/nearby-stop-eta-hooks': { useStationEta(routes) {
       etaRoutes = routes;
@@ -213,7 +225,8 @@ function mount(t, {
   const busScreen = source('app/bus/nearby').default;
   const transportEntry = transport && source('app/transport').default();
   if (transportEntry) assert.equal(transportEntry.type, busScreen);
-  const screen = transportEntry ? () => transportEntry.type(transportEntry.props) : busScreen;
+  const screen = mtrDetail ? source('app/mtr/[kind]').default
+    : transportEntry ? () => transportEntry.type(transportEntry.props) : busScreen;
   const copy = source('i18n').messages[locale];
   const labels = copy.nearbyBus;
   const landmarks = source('nearby-bus-landmarks').nearbyBusLandmarks;
@@ -230,8 +243,12 @@ function mount(t, {
           const controls = elements(screenTree, false);
           const picker = controls.find(({ type }) => type.name === 'TransportModePicker');
           modePickerTree = picker.type(picker.props);
-          const search = controls.find(({ type }) => type.name === 'TransportBusSearch');
+          const search = controls.find(({ type }) => type.name === 'TransportSearch');
           searchTree = search && search.type(search.props);
+        }
+        if (mtrDetail) {
+          const stationList = elements(screenTree, false).find(({ type }) => type.name === 'MtrLineStations');
+          lineStationsTree = stationList && stationList.type(stationList.props);
         }
         effects.forEach((run) => run());
       }
@@ -245,14 +262,20 @@ function mount(t, {
     if (Array.isArray(node)) return node.flatMap((child) => elements(child, expand));
     if (!node?.props) return [];
     let children = node.props.children;
-    if (expand && (node.type?.name === 'Loading' || node.type?.name?.startsWith('Transport'))) {
-      children = node.type.name === 'TransportModePicker' ? modePickerTree
-        : node.type.name === 'TransportBusSearch' ? searchTree : node.type(node.props);
+    if (expand) {
+      const name = node.type?.name;
+      if (name === 'TransportModePicker') children = modePickerTree;
+      else if (name === 'TransportSearch') children = searchTree;
+      else if (name === 'MtrLineStations') children = lineStationsTree;
+      else if (name?.startsWith('Transport') || ['Loading', 'MtrEntryRow', 'MtrSources'].includes(name)) children = node.type(node.props);
     }
     return [node, ...elements(children, expand)];
   }
+  function visibleElements() {
+    return elements([screenTree, tree?.props.ListHeaderComponent, tree?.props.data.length === 0 && tree.props.ListEmptyComponent]);
+  }
   function findAction(label) {
-    const action = elements([screenTree, tree.props.ListHeaderComponent, !tree.props.data.length && tree.props.ListEmptyComponent])
+    const action = visibleElements()
       .find(({ type, props }) => type === 'Pressable'
       && (props.accessibilityLabel === label || elements(props.children).some((child) => child.props.children === label)));
     assert.ok(action, `Missing action: ${label}`);
@@ -264,8 +287,7 @@ function mount(t, {
     action.props.onPress();
   }
   function shows(label) {
-    return elements([screenTree, tree.props.ListHeaderComponent, !tree.props.data.length && tree.props.ListEmptyComponent])
-      .some(({ props }) => props.children === label || props.title === label);
+    return visibleElements().some(({ props }) => props.children === label || props.title === label || props.description === label);
   }
 
   function unmount() {
@@ -304,8 +326,13 @@ function mount(t, {
 
   t.after(unmount);
   return {
-    calls, labels, landmarks, requests, queries, routes, settings, alerts, settle, press, shows, unmount, findAction,
-    transportCopy: copy.transport, busCopy: copy.bus, catalogueRoutes, theme: source('theme'),
+    calls, labels, landmarks, requests, queries, routes, settings, alerts, openedLinks, settle, press, shows, unmount, findAction,
+    transportCopy: copy.transport, busCopy: copy.bus, mtrCopy: copy.mtr, catalogueRoutes, theme: source('theme'),
+    mtr: () => source('mtr-static'),
+    detailRows: () => visibleElements().filter(({ type }) => type.name === 'MtrEntryRow').map(({ props }) => props),
+    directionFilters: () => visibleElements().find(({ type }) => type === 'Filters')?.props,
+    openResult: (index) => elements(tree.props.renderItem({ item: tree.props.data[index] }))
+      .find(({ type, props }) => type === 'Pressable' || (type.name === 'BusRouteRow' && props.onPress)).props.onPress(),
     finishCatalogue: () => finishCatalogue(),
     catalogueReads: () => catalogueReads,
     dismissals: () => dismissals,
@@ -588,7 +615,7 @@ for (const locale of ['zh-HK', 'en']) {
     page.press(page.busCopy.clearInput);
     await page.settle();
     assert.deepEqual(page.rows(), allRoutes);
-    for (const mode of ['mtr', 'lightRail', 'ferry', 'tram', 'minibus']) {
+    for (const mode of ['lightRail', 'ferry', 'tram', 'minibus']) {
       page.press(copy.modes[mode]);
       await page.settle();
       assert.ok(page.findAction(copy.modes[mode]).props.accessibilityState.selected);
@@ -762,9 +789,10 @@ test('inline search reuses catalogue identities, ranks results, and restores the
   await page.settle();
   page.finishCatalogue();
   await page.settle();
-  assert.equal(page.searchInput(), undefined);
+  assert.equal(page.searchInput().placeholder, page.mtrCopy.search);
+  assert.equal(page.searchInput().value, '268X');
   assert.deepEqual(page.rows(), []);
-  assert.equal(page.unavailableTitle(), copy.unavailable(copy.modes.mtr));
+  assert.equal(page.unavailableTitle(), page.mtrCopy.noMatches);
   page.press(copy.modes.bus);
   await page.settle();
   assert.equal(page.searchInput().value, '268X');
@@ -803,7 +831,12 @@ test('inline search reuses catalogue identities, ranks results, and restores the
   }
   page.searchInput().onChangeText('invalid route query');
   await page.settle();
+  assert.ok(page.shows(copy.noMatches));
+  page.press(copy.modes.bus);
+  await page.settle();
   assert.ok(page.shows(bus.noResults));
+  page.press(copy.modes.all);
+  await page.settle();
   assert.deepEqual(page.rows(), []);
   assert.ok(searchScrolls.some(({ method, offset }) => method === 'offset' && offset === 0));
   page.press(bus.clearInput);
@@ -1071,4 +1104,200 @@ test('a transport filter change does not let a pending GPS fix replace a selecte
   assert.ok(page.shows(labels.landmarkReference(labels.landmarks.central)));
   assert.equal(page.requests.length, 1);
   assert.equal(page.queries.length, 1);
+});
+
+test('MTR snapshot preserves each official line/station identity and every ordered visit', (t) => {
+  const page = mount(t);
+  const { mtrLines, mtrStations, findMtrLine, findMtrStation, searchMtr, mtrSource } = page.mtr();
+  assert.equal(mtrSource.csvSha256, 'e0e781152e2e6c5f6d7763262acbae76577b71ca4c66b4b7b72a97252175e0c3');
+  assert.deepEqual(mtrLines.map(({ id }) => id).sort(), ['AEL', 'DRL', 'EAL', 'ISL', 'KTL', 'SIL', 'TCL', 'TKL', 'TML', 'TWL']);
+  assert.equal(mtrStations.length, 98);
+  assert.equal(new Set(mtrStations.map(({ id }) => id)).size, mtrStations.length);
+
+  let patternCount = 0;
+  let visitCount = 0;
+  const memberships = new Set();
+  for (const { id, patterns } of mtrLines) {
+    for (const { stations } of patterns) {
+      assert.equal(new Set(stations).size, stations.length);
+      patternCount++;
+      visitCount += stations.length;
+      for (const code of stations) {
+        const station = findMtrStation(code);
+        assert.ok(station.zh && station.en);
+        assert.ok(station.memberships.some(({ lineCode }) => lineCode === id));
+        memberships.add(`${id}:${code}`);
+      }
+    }
+  }
+  assert.equal(patternCount, 24);
+  assert.equal(visitCount, 270);
+  assert.equal(memberships.size, 120);
+  const officialIds = new Set();
+  for (const station of mtrStations.filter(({ supplemental }) => !supplemental)) {
+    for (const { lineCode, stationId } of station.memberships) {
+      assert.ok(findMtrLine(lineCode) && Number.isInteger(stationId));
+      assert.ok(memberships.has(`${lineCode}:${station.id}`));
+      officialIds.add(stationId);
+    }
+  }
+  assert.equal(officialIds.size, 100);
+
+  for (const [code, ael, tcl] of [['HOK', 44, 39], ['KOW', 45, 40], ['TSY', 46, 42]]) {
+    const matches = searchMtr(code);
+    assert.equal(matches[0], findMtrStation(code));
+    assert.equal(matches.filter(({ id }) => id === code).length, 1);
+    assert.deepEqual(findMtrStation(code).memberships, [{ lineCode: 'AEL', stationId: ael }, { lineCode: 'TCL', stationId: tcl }]);
+  }
+  assert.deepEqual(findMtrStation('ADM').memberships.map(({ lineCode }) => lineCode), ['EAL', 'ISL', 'SIL', 'TWL']);
+  assert.notEqual(findMtrStation('CEN'), findMtrStation('HOK'));
+  assert.notEqual(findMtrStation('TST'), findMtrStation('ETS'));
+
+  const racecourse = findMtrStation('RAC');
+  assert.equal(racecourse.supplemental, true);
+  assert.deepEqual(racecourse.memberships, [{ lineCode: 'EAL', stationId: null }]);
+  const eal = findMtrLine('EAL');
+  assert.deepEqual(eal.patterns.map(({ stations }) => [stations[0], stations.at(-1)]),
+    [['ADM', 'LOW'], ['LOW', 'ADM'], ['ADM', 'LMC'], ['LMC', 'ADM']]);
+  assert.ok(eal.patterns.every(({ stations }) => !stations.includes('RAC')));
+  assert.deepEqual(findMtrLine('TKL').patterns.find(({ direction }) => direction === 'TKS-UT').stations,
+    ['TIK', 'TKO', 'LHP']);
+  assert.equal(searchMtr('  tUnG  cHuNg LiNe  ')[0].id, 'TCL');
+  assert.equal(searchMtr('東涌線')[0].id, 'TCL');
+  assert.equal(searchMtr('ＡＤＭ')[0].id, 'ADM');
+  assert.equal(searchMtr('金鐘')[0].id, 'ADM');
+  assert.equal(searchMtr('racecourt').length, 0);
+  assert.equal(searchMtr('Racecourse')[0], racecourse);
+});
+
+for (const locale of ['zh-HK', 'en']) {
+  test(`MTR directory and bilingual search work offline and stay mounted on return (${locale})`, async (t) => {
+    const page = mount(t, { transport: true, permission: blocked, locale });
+    const { transportCopy: copy, mtrCopy, labels } = page;
+    await page.settle();
+    page.press(copy.modes.mtr);
+    await page.settle();
+    assert.ok(page.shows(mtrCopy.lines));
+    assert.equal(page.searchInput().placeholder, mtrCopy.search);
+    assert.equal(page.rows().length, 10);
+    assert.ok(page.rows().every(({ kind }) => kind === 'mtr-line'));
+    assert.throws(() => page.findAction(copy.distanceInfo), /Missing action/);
+
+    page.press(labels.byStop);
+    await page.settle();
+    assert.ok(page.shows(mtrCopy.stations));
+    assert.equal(page.rows().length, 98);
+    assert.ok(page.rows().every(({ kind }) => kind === 'mtr-station'));
+    page.searchInput().onChangeText(locale === 'en' ? 'lInE' : '綫');
+    await page.settle();
+    assert.ok(page.shows(mtrCopy.results));
+    assert.ok(page.rows().length > 2);
+    const before = page.rows();
+    const query = page.searchInput().value;
+    const stableList = page.list().key;
+    const scrolls = page.attachList();
+    page.showRows([2], 140);
+    page.openResult(2);
+    assert.deepEqual(page.routes, [{ pathname: '/mtr/[kind]', params: { kind: 'line', code: before[2].id } }]);
+    page.focus(false);
+    page.focus(true);
+    await page.settle();
+    page.paint();
+    assert.equal(page.rows(), before);
+    assert.equal(page.searchInput().value, query);
+    assert.equal(page.list().key, stableList);
+    assert.deepEqual(scrolls, []);
+
+    page.searchInput().onChangeText(locale === 'en' ? 'aDmIrAlTy' : '金鐘');
+    await page.settle();
+    assert.deepEqual(page.rows().map(({ id, kind }) => [id, kind]), [['ADM', 'mtr-station']]);
+    page.openResult(0);
+    assert.deepEqual(page.routes.at(-1), { pathname: '/mtr/[kind]', params: { kind: 'station', code: 'ADM' } });
+    page.press(page.busCopy.clearInput);
+    await page.settle();
+    assert.ok(page.shows(mtrCopy.stations));
+    assert.equal(page.rows().length, 98);
+    assert.equal(page.catalogueReads(), 0);
+    assert.equal(page.calls.prompt, 0);
+    assert.equal(page.requests.length, 0);
+    assert.equal(page.queries.length, 0);
+    assert.deepEqual(page.etaRoutes(), []);
+  });
+}
+
+test('MTR detail shows separate official branch orders and a supplemental Racecourse station', async (t) => {
+  const page = mount(t, { mtrDetail: { kind: 'line', code: 'EAL' } });
+  await page.settle();
+  assert.ok(page.shows('東鐵綫'));
+  assert.equal(page.directionFilters().options.length, 4);
+  const orderedStops = () => page.detailRows().filter(({ sequence }) => sequence !== undefined);
+  assert.deepEqual(orderedStops().map(({ sequence }) => sequence), Array.from({ length: 14 }, (_, i) => i + 1));
+  assert.equal(orderedStops()[0].entry.id, 'ADM');
+  assert.equal(orderedStops().at(-1).entry.id, 'LOW');
+  page.directionFilters().onSelect('LMC-UT');
+  await page.settle();
+  assert.equal(page.directionFilters().selected, 'LMC-UT');
+  assert.equal(orderedStops().at(-1).entry.id, 'LMC');
+  assert.ok(page.shows(page.mtrCopy.racecourse));
+  assert.equal(page.detailRows().find(({ entry }) => entry.id === 'RAC').sequence, undefined);
+  page.press('馬場');
+  assert.deepEqual(page.routes, [{ pathname: '/mtr/[kind]', params: { kind: 'station', code: 'RAC' } }]);
+
+  const station = mount(t, { locale: 'en', mtrDetail: { kind: 'station', code: 'HOK' } });
+  await station.settle();
+  assert.ok(station.shows('Hong Kong') && station.shows('香港'));
+  assert.ok(station.shows(station.mtrCopy.attribution) && station.shows(station.mtrCopy.disclaimer));
+  assert.deepEqual(station.openedLinks, []);
+  station.press(station.mtrCopy.dataset);
+  assert.deepEqual(station.openedLinks, [page.mtr().mtrSource.resource]);
+  assert.deepEqual(station.detailRows().map(({ entry }) => entry.id), ['AEL', 'TCL']);
+  station.press('Airport Express');
+  assert.deepEqual(station.routes, [{ pathname: '/mtr/[kind]', params: { kind: 'line', code: 'AEL' } }]);
+
+  const invalid = mount(t, { mtrDetail: { kind: 'station', code: ['HOK', 'KOW'] } });
+  await invalid.settle();
+  assert.ok(invalid.shows(invalid.mtrCopy.unavailable));
+  assert.deepEqual(invalid.detailRows(), []);
+});
+
+test('All search shows MTR immediately and keeps bus search and nearby state separate', async (t) => {
+  const page = mount(t, { transport: true, locale: 'en', delayCatalogue: true });
+  await page.settle();
+  page.fix(0, page.landmarks.central);
+  await page.settle();
+  const nearby = page.rows();
+  assert.ok(nearby.length > 0 && nearby.every((row) => 'route' in row));
+  page.searchInput().onChangeText('Yuen Long');
+  await page.settle();
+  assert.ok(page.shows(page.busCopy.loading));
+  assert.deepEqual(page.rows().map(({ id }) => id), ['YUL']);
+  page.finishCatalogue();
+  await page.settle();
+  const busRow = page.rows().findIndex(({ number }) => number === 'B2');
+  const mtrRow = page.rows().findIndex(({ id }) => id === 'YUL');
+  assert.ok(busRow >= 0 && mtrRow > busRow);
+  assert.equal(page.renderRow(busRow).props.modeLabel, page.transportCopy.modes.bus);
+  assert.equal(page.list().props.keyExtractor(page.rows()[mtrRow]), 'mtr-station:YUL');
+  page.openResult(mtrRow);
+  assert.deepEqual(page.routes.at(-1), { pathname: '/mtr/[kind]', params: { kind: 'station', code: 'YUL' } });
+  page.press(page.busCopy.clearInput);
+  await page.settle();
+  assert.deepEqual(page.rows(), nearby);
+  assert.equal(page.requests.length, 1);
+  assert.equal(page.catalogueReads(), 1);
+});
+
+test('All search keeps the offline MTR results if the bus catalogue fails', async (t) => {
+  const page = mount(t, { transport: true, locale: 'en', permission: blocked, offlineCatalogue: true });
+  await page.settle();
+  page.searchInput().onChangeText('Tung Chung Line');
+  await page.settle();
+  assert.ok(page.shows(page.busCopy.loadFailed));
+  assert.deepEqual(page.rows().map(({ kind, id }) => [kind, id]), [['mtr-line', 'TCL']]);
+  page.searchInput().onChangeText('unknown station or route');
+  await page.settle();
+  assert.ok(page.shows(page.busCopy.loadFailed));
+  assert.ok(page.shows(page.mtrCopy.noMatches));
+  assert.ok(!page.shows(page.transportCopy.noMatches));
+  assert.equal(page.catalogueReads(), 1);
 });

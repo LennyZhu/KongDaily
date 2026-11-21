@@ -56,6 +56,7 @@ function RootStack() {
         headerStyle: { backgroundColor: colors.tintedBackground },
         headerShadowVisible: false,
       }} />
+      <Stack.Screen name="mtr/[kind]" options={{ title: copy.transport.modes.mtr }} />
       <Stack.Screen name="bus/nearby" options={{
         title: copy.bus.shortcuts.nearby,
         headerStyle: { backgroundColor: colors.tintedBackground },

@@ -199,11 +199,12 @@ export function BusAction({ label, onPress }: { label: string; onPress: () => vo
   );
 }
 
-export function BusRouteRow({ copy, route, locale, onPress }: {
+export function BusRouteRow({ copy, route, locale, onPress, modeLabel }: {
   copy: BusCopy;
   route: BusRoute;
   locale: BusLocale;
   onPress: () => void;
+  modeLabel?: string;
 }) {
   return (
     <Pressable
@@ -218,6 +219,7 @@ export function BusRouteRow({ copy, route, locale, onPress }: {
       </View>
       <View style={styles.rowCopy}>
         <AppText variant="caption" tone="muted">
+          {modeLabel && `${modeLabel} · `}
           {copy.sources[route.source]}{route.source !== 'nlb' && ` · ${copy.directions[route.direction]}`}
         </AppText>
         <AppText variant="homeCardTitle">
