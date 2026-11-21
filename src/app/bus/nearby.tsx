@@ -42,23 +42,13 @@ export default function NearbyBusScreen() {
   const [locating, setLocating] = useState(false);
   const [locationIssue, setLocationIssue] = useState<NearbyLocationIssue>();
   const locationRequest = useRef<AbortController | null>(null);
+  const locationActive = useRef(false);
+  const landmarkSelected = useRef(false);
 
   const [index, setIndex] = useState<'loading' | 'error' | number>('loading');
   const [reload, setReload] = useState(0);
   const [refreshFailed, setRefreshFailed] = useState(false);
   const [result, setResult] = useState<Results>();
-
-  useFocusEffect(useCallback(() => {
-    setLocating(false);
-    const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'background') locationRequest.current?.abort();
-    });
-    return () => {
-      subscription.remove();
-      locationRequest.current?.abort();
-      locationRequest.current = null;
-    };
-  }, []));
 
   useEffect(() => {
     let active = true;
@@ -101,13 +91,68 @@ export default function NearbyBusScreen() {
     setVisible(viewableItems.flatMap(({ item }) => 'route' in item ? [item.route.id] : []));
   }, [setVisible]);
 
-  function updateReference(value: Reference) {
+  const updateReference = useCallback((value: Reference, resetRadius: boolean) => {
     setVisible([]);
-    setRadiusMeters(500);
+    if (resetRadius) setRadiusMeters(500);
     setPickingRadius(false);
     setReference(value);
     setReferenceRevision((revision) => revision + 1);
-  }
+  }, [setVisible]);
+
+  const cancelLocation = useCallback(() => {
+    locationRequest.current?.abort();
+    locationRequest.current = null;
+  }, []);
+
+  const requestLocation = useCallback(async (allowPermissionPrompt: boolean) => {
+    if (!locationActive.current || locationRequest.current || (!allowPermissionPrompt && landmarkSelected.current)) return;
+
+    const controller = new AbortController();
+    locationRequest.current = controller;
+    setLocating(true);
+    setLocationIssue(undefined);
+    if (allowPermissionPrompt) setPicking(false);
+    setPickingRadius(false);
+    setReference((previous) => previous?.kind === 'current' ? undefined : previous);
+
+    const location = await locateNearbyBusStops(controller.signal, allowPermissionPrompt);
+    if (locationRequest.current !== controller) return;
+    locationRequest.current = null;
+    setLocating(false);
+
+    if (location.kind === 'position') {
+      landmarkSelected.current = false;
+      updateReference({ kind: 'current', point: location.point }, allowPermissionPrompt);
+    } else if (location.kind !== 'cancelled') {
+      setLocationIssue(location.kind);
+    }
+  }, [updateReference]);
+
+  useFocusEffect(useCallback(() => {
+    function resumeLocation() {
+      locationActive.current = true;
+      void requestLocation(false);
+    }
+
+    setLocating(false);
+    const subscription = AppState.addEventListener('change', (state) => {
+      // iOS can become temporarily inactive while the permission prompt is open.
+      if (state === 'background') {
+        locationActive.current = false;
+        cancelLocation();
+        setLocating(false);
+      } else if (state === 'active' && !locationActive.current) {
+        resumeLocation();
+      }
+    });
+    if (AppState.currentState === 'active' || AppState.currentState == null) resumeLocation();
+
+    return () => {
+      subscription.remove();
+      locationActive.current = false;
+      cancelLocation();
+    };
+  }, [cancelLocation, requestLocation]));
 
   function updateRadius(value: BusSearchRadius) {
     setPickingRadius(false);
@@ -117,31 +162,12 @@ export default function NearbyBusScreen() {
   }
 
   function chooseLandmark(landmark: NearbyLandmark) {
-    locationRequest.current?.abort();
-    locationRequest.current = null;
+    landmarkSelected.current = true;
+    cancelLocation();
     setLocating(false);
     setLocationIssue(undefined);
     setPicking(false);
-    updateReference({ kind: 'landmark', landmark, point: nearbyBusLandmarks[landmark] });
-  }
-
-  async function useLocation() {
-    if (locationRequest.current) return;
-    const controller = new AbortController();
-    locationRequest.current = controller;
-    setLocating(true);
-    setLocationIssue(undefined);
-    setPicking(false);
-    const location = await locateNearbyBusStops(controller.signal);
-    if (locationRequest.current !== controller) return;
-    locationRequest.current = null;
-    setLocating(false);
-
-    if (location.kind === 'position' && !controller.signal.aborted) {
-      updateReference({ kind: 'current', point: location.point });
-    } else if (location.kind !== 'position' && location.kind !== 'cancelled' && !controller.signal.aborted) {
-      setLocationIssue(location.kind);
-    }
+    updateReference({ kind: 'landmark', landmark, point: nearbyBusLandmarks[landmark] }, true);
   }
 
   function formatDistance(metres: number) {
@@ -198,7 +224,7 @@ export default function NearbyBusScreen() {
               </View>
               <Pressable accessibilityRole="button" accessibilityLabel={labels.useLocation}
                 accessibilityState={{ disabled: locating, busy: locating }} disabled={locating}
-                onPress={() => void useLocation()}
+                onPress={() => void requestLocation(true)}
                 style={({ pressed }) => [styles.locationButton, pressed && styles.pressed]}>
                 {locating ? <ActivityIndicator size="small" color={colors.primary} /> : <Icon name="location" size={14} />}
                 <AppText variant="caption" tone="primary" style={styles.shrink}>{labels.useLocation}</AppText>
@@ -298,7 +324,9 @@ export default function NearbyBusScreen() {
                   setReload((value) => value + 1);
                 }} />
               </>
-            ) : !reference ? <EmptyState icon="mappin" title={labels.chooseReference} detail={labels.chooseReferenceDetail} />
+            ) : !reference ? (
+              locating ? null : <EmptyState icon="mappin" title={labels.chooseReference} detail={labels.chooseReferenceDetail} />
+            )
               : !resultForRadius || (mode === 'routes' && !routeResult) ? <Loading label={mode === 'routes' ? labels.searchingRoutes : labels.searching} />
                 : (
                   <>
