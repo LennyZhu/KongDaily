@@ -3,6 +3,7 @@ import type { Href } from 'expo-router';
 import { busSources, normalizeBusQuery, type BusRoute } from '@/bus-routes';
 import { getExplorePlace } from '@/explore-places';
 import { resolveStableFacilityIdentity } from '@/facility-identity';
+import { gmbPositiveId, type GmbRouteSeq, type GmbVisitKey } from '@/gmb-data';
 import type { GlobalSearchResult } from '@/global-search';
 import { findLightRailRoute, findLightRailStop } from '@/light-rail-static';
 import { findMtrLine, findMtrStation } from '@/mtr-static';
@@ -25,6 +26,13 @@ function isCatalogueIdentity(route: BusRoute) {
   }
 }
 
+export function gmbRouteHref(routeId: number, routeSeq?: GmbRouteSeq, visit?: Pick<GmbVisitKey, 'stopSeq' | 'stopId'>): Href {
+  return { pathname: '/minibus/[id]', params: {
+    id: String(routeId), ...(routeSeq ? { routeSeq: String(routeSeq) } : {}),
+    ...(visit ? { stopSeq: String(visit.stopSeq), stopId: String(visit.stopId) } : {}),
+  } };
+}
+
 export function searchResultDestination(result: GlobalSearchResult): SearchDestination {
   switch (result.kind) {
     case 'mtr_line':
@@ -45,6 +53,11 @@ export function searchResultDestination(result: GlobalSearchResult): SearchDesti
     case 'light_rail_stop':
       if (result.entry.kind === 'light-rail-stop' && findLightRailStop(result.entry.id)) {
         return { href: { pathname: '/light-rail/[kind]', params: { kind: 'stop', id: result.entry.id } } };
+      }
+      break;
+    case 'gmb_route':
+      if (gmbPositiveId(result.service.routeId)) {
+        return { href: gmbRouteHref(result.service.routeId) };
       }
       break;
     case 'bus_route':

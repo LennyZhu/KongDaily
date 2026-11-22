@@ -8,6 +8,7 @@ const { test } = require('node:test');
 const ts = require('typescript');
 
 const root = join(__dirname, '..');
+const gmbFixture = require('./fixtures/gmb-api.json');
 const { stops } = require('../assets/data/nearby-stops.json');
 const db = new DatabaseSync(':memory:');
 db.exec(`CREATE TABLE nearby_bus_stops (
@@ -28,7 +29,7 @@ const blocked = { granted: false, canAskAgain: false };
 
 function mount(t, {
   permission = granted, servicesEnabled = true, appState = 'active', locale = 'zh-HK', transport = false,
-  intent, delayCatalogue = false, offlineCatalogue = false, mtrDetail, lightRailDetail,
+  intent, delayCatalogue = false, offlineCatalogue = false, mtrDetail, lightRailDetail, gmbDetail,
 } = {}) {
   const events = new EventEmitter();
   const requests = [];
@@ -59,19 +60,22 @@ function mount(t, {
   let stopSearchTask;
   let holdNearby = false;
   const pendingNearby = [];
-  const slots = [];
+  const rootSlots = [];
+  let slots = rootSlots;
+  const gmbComponents = new Map();
   const frames = new Map();
   let frameId = 0;
 
   const react = {
     useState(initial) {
       const index = cursor++;
-      if (!(index in slots)) slots[index] = typeof initial === 'function' ? initial() : initial;
-      return [slots[index], (argument) => {
+      const owner = slots;
+      if (!(index in owner)) owner[index] = typeof initial === 'function' ? initial() : initial;
+      return [owner[index], (argument) => {
         assert.ok(mounted, 'State updated after Nearby Bus unmounted');
-        const next = typeof argument === 'function' ? argument(slots[index]) : argument;
-        if (!Object.is(next, slots[index])) dirty = true;
-        slots[index] = next;
+        const next = typeof argument === 'function' ? argument(owner[index]) : argument;
+        if (!Object.is(next, owner[index])) dirty = true;
+        owner[index] = next;
       }];
     },
     useRef(current) {
@@ -91,9 +95,10 @@ function mount(t, {
       const index = cursor++;
       const previous = slots[index];
       if (previous && dependencies.every((value, i) => Object.is(value, previous.dependencies[i]))) return;
+      const owner = slots;
       effects.push(() => {
         previous?.cleanup?.();
-        slots[index] = { dependencies, cleanup: effect() };
+        owner[index] = { dependencies, cleanup: effect() };
       });
     },
   };
@@ -141,7 +146,7 @@ function mount(t, {
     },
     'expo-router': {
       useRouter: () => ({ push: (href) => routes.push(href) }),
-      useLocalSearchParams: () => mtrDetail ?? lightRailDetail ?? { intent },
+      useLocalSearchParams: () => mtrDetail ?? lightRailDetail ?? gmbDetail ?? { intent },
       useFocusEffect: (effect) => load(require.resolve('expo-router/build/useFocusEffect')).useFocusEffect(effect),
     },
     './link/useLoadedNavigation': { useOptionalNavigation: () => navigation },
@@ -211,6 +216,35 @@ function mount(t, {
     return module.exports;
   }
 
+  const gmbPaths = [];
+  const gmbResponses = { '/route': gmbFixture.directory, '/route/HKI/2': gmbFixture.hki2,
+    '/route/KLN/2': gmbFixture.kln2, '/route/NT/2': gmbFixture.nt2 };
+  if (gmbDetail) {
+    const row = (stopId, tc, en) => ({ stop_seq: 1, stop_id: stopId, name_tc: tc, name_en: en });
+    const stationList = (visit) => ({ ...gmbFixture.circular, data: {
+      ...gmbFixture.circular.data, route_stops: [visit],
+    } });
+    Object.assign(gmbResponses, {
+      '/route/2006474': { ...gmbFixture.hki2, data: [gmbFixture.hki2.data[0]] },
+      '/route/2009246': gmbFixture.kln2,
+      '/route-stop/2006474/1': gmbFixture.circular,
+      '/route-stop/2009246/1': stationList(row(20000418, '黃埔花園公共運輸交匯處', 'Whampoa Garden Public Transport Interchange')),
+      '/route-stop/2009246/2': stationList(row(20013966, '又一城', 'Festival Walk')),
+    });
+  }
+  mocks['@/gmb-client'] = { gmbClient: source('gmb-client').createGmbClient({ request: async (address) => {
+    const { pathname } = new URL(address);
+    gmbPaths.push(pathname);
+    if (pathname === '/eta/route-stop/2009246/1/1') {
+      const now = Date.now();
+      const generated_timestamp = new Date(now).toISOString();
+      const eta = { ...gmbFixture.forecast.data.eta[0], timestamp: new Date(now + 300_000).toISOString(), diff: 5 };
+      return new Response(JSON.stringify({ ...gmbFixture.forecast, generated_timestamp,
+        data: { ...gmbFixture.forecast.data, eta: [eta] } }));
+    }
+    return new Response(JSON.stringify(gmbResponses[pathname]), { status: gmbResponses[pathname] ? 200 : 500 });
+  } }) };
+
   const { parseBusCatalogue } = source('bus-routes');
   const catalogueRoutes = {
     kmbLwb: parseBusCatalogue('kmbLwb', { data: [1, 3].map((variant) => ({
@@ -236,7 +270,7 @@ function mount(t, {
   searchAdapter.loadGlobalBusStops = () => stopSearchTask = loadStops();
   const transportEntry = transport && source('app/transport').default();
   if (transportEntry) assert.equal(transportEntry.type, busScreen);
-  const screen = mtrDetail ? source('app/mtr/[kind]').default
+  const screen = gmbDetail ? source('app/minibus/[id]').default : mtrDetail ? source('app/mtr/[kind]').default
     : lightRailDetail ? source('app/light-rail/[kind]').default
     : transportEntry ? () => transportEntry.type(transportEntry.props) : busScreen;
   const copy = source('i18n').messages[locale];
@@ -250,6 +284,16 @@ function mount(t, {
         cursor = 0;
         effects = [];
         screenTree = screen();
+        if (gmbDetail) {
+          const rendered = new Set();
+          screenTree = renderGmb(screenTree, 'gmb', rendered);
+          for (const [key, owner] of gmbComponents) {
+            if (!rendered.has(key)) {
+              owner.forEach((slot) => slot?.cleanup?.());
+              gmbComponents.delete(key);
+            }
+          }
+        }
         tree = elements(screenTree, false).find(({ type }) => type === 'FlatList');
         if (transport) {
           const controls = elements(screenTree, false);
@@ -275,6 +319,23 @@ function mount(t, {
     assert.fail('Nearby bus screen did not settle');
   }
 
+  function renderGmb(node, key, rendered) {
+    if (Array.isArray(node)) return node.map((child, index) => renderGmb(child, key + '/' + (child?.key ?? index), rendered));
+    if (!node?.props) return node;
+    if (typeof node.type === 'function') {
+      const identity = key + '/' + node.type.name + (node.key ?? '');
+      rendered.add(identity);
+      if (!gmbComponents.has(identity)) gmbComponents.set(identity, []);
+      const parent = [slots, cursor];
+      slots = gmbComponents.get(identity);
+      cursor = 0;
+      const children = node.type(node.props);
+      [slots, cursor] = parent;
+      return renderGmb(children, identity, rendered);
+    }
+    return { ...node, props: { ...node.props, children: renderGmb(node.props.children, key, rendered) } };
+  }
+
   function elements(node, expand = true) {
     if (Array.isArray(node)) return node.flatMap((child) => elements(child, expand));
     if (!node?.props) return [];
@@ -287,7 +348,7 @@ function mount(t, {
       else if (name === 'LightRailStationServices') children = stationServicesTree;
       else if (name === 'MtrNextTrains') children = mtrServicesTree;
       else if (name?.startsWith('Transport')
-        || ['Loading', 'ListAction', 'MtrEntryRow', 'MtrSources', 'LightRailEntryRow', 'LightRailSources', 'GlobalSearchResultRow', 'RailwayStationHeading'].includes(name)) children = node.type(node.props);
+        || ['Loading', 'ListAction', 'MtrEntryRow', 'MtrSources', 'LightRailEntryRow', 'LightRailSources', 'GlobalSearchResultRow', 'GmbSearchNotice', 'GmbFeedback', 'GmbNearbyRouteCard', 'GmbNearbyStopCard', 'RailwayStationHeading'].includes(name)) children = node.type(node.props);
     }
     return [node, ...elements(children, expand)];
   }
@@ -307,12 +368,13 @@ function mount(t, {
     action.props.onPress();
   }
   function shows(label) {
-    return visibleElements().some(({ props }) => props.children === label || props.title === label || props.description === label);
+    return visibleElements().some(({ props }) => props.children === label || props.title === label || props.description === label || props.detail === label);
   }
 
   function unmount() {
     if (!mounted) return;
-    slots.forEach((slot) => slot?.cleanup?.());
+    rootSlots.forEach((slot) => slot?.cleanup?.());
+    gmbComponents.forEach((owner) => owner.forEach((slot) => slot?.cleanup?.()));
     mounted = false;
   }
 
@@ -349,11 +411,12 @@ function mount(t, {
     calls, labels, landmarks, requests, queries, routes, settings, alerts, openedLinks, settle, press, shows, unmount, findAction,
     visibleElements,
     transportCopy: copy.transport, busCopy: copy.bus, mtrCopy: copy.mtr, lightRailCopy: copy.lightRail,
-    catalogueRoutes, theme: source('theme'),
+    gmbPaths, gmbCopy: copy.minibus, catalogueRoutes, theme: source('theme'),
     mtr: () => source('mtr-static'),
     lightRail: () => source('light-rail-static'),
     geo: () => source('railway-station-geo'),
     nearbyRail: () => source('nearby-railway'),
+    nearbyGmb: () => source('nearby-gmb'),
     async waitStopSearch() { await stopSearchTask; await settle(); },
     holdNearby() { holdNearby = true; },
     releaseNearby() { holdNearby = false; pendingNearby.splice(0).forEach((resolve) => resolve()); },
@@ -384,6 +447,7 @@ function mount(t, {
     changePermission(value) { permission = value; },
     changeServices(value) { servicesEnabled = value; },
     answerPrompt(value) { permissionOnRequest = value; },
+    failFix(index) { requests[index].reject(new Error('test location failure')); },
     fix(index, point, accuracy = 20) { requests[index].resolve({ coords: { ...point, accuracy } }); },
   };
 }
@@ -615,7 +679,7 @@ for (const locale of ['zh-HK', 'en']) {
     const page = mount(t, { transport: true, locale });
     const { labels, landmarks, transportCopy: copy } = page;
     const expected = locale === 'en'
-      ? ['All', 'Bus', 'MTR', 'Light Rail', 'Ferry', 'Tram', 'Green Minibus']
+      ? ['All', 'Bus', 'MTR', 'Light Rail', 'Ferry', 'Tram', 'Minibus']
       : ['全部', '巴士', '港鐵', '輕鐵', '渡輪', '電車', '專線小巴'];
     assert.deepEqual(Object.values(copy.modes), expected);
     await page.settle();
@@ -647,7 +711,7 @@ for (const locale of ['zh-HK', 'en']) {
     await page.settle();
     assert.deepEqual(page.rows(), allRoutes);
     assert.equal(page.requests.length, 2);
-    for (const mode of ['ferry', 'tram', 'minibus']) {
+    for (const mode of ['ferry', 'tram']) {
       page.press(copy.modes[mode]);
       await page.settle();
       assert.ok(page.findAction(copy.modes[mode]).props.accessibilityState.selected);
@@ -1846,4 +1910,208 @@ test('transport reuses the existing offline bus-stop search adapter and existing
   assert.equal(page.requests.length, 0);
   page.focus(false); page.focus(true); page.appState('background'); page.appState('active'); await page.settle();
   assert.equal(page.requests.length, 0);
+});
+
+
+for (const locale of ['zh-HK', 'en']) {
+  test(`minibus filter searches all regions and opens a variant without GPS or ETA (${locale})`, async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const page = mount(t, { transport: true, locale, permission: blocked });
+    await page.settle();
+    page.press(page.transportCopy.modes.minibus);
+    await page.settle();
+    assert.equal(page.searchInput().placeholder, page.gmbCopy.nearbySearch);
+    assert.ok(page.findAction(page.transportCopy.openSettings));
+    const originalRequests = page.requests.length;
+    page.searchInput().onChangeText('２');
+    await page.settle();
+    assert.ok(page.shows(page.gmbCopy.loadingSearch));
+    t.mock.timers.tick(250);
+    await page.settle();
+    assert.deepEqual(page.rows().map(({ service }) => service.routeId), [2006474, 2006475, 2009246, 2002342, 2002344, 2002349]);
+    const special = page.rowElements(5).find(({ type }) => type === 'Pressable');
+    assert.match(special.props.accessibilityLabel, locale === 'en' ? /New Territories.*Special Departure/ : /新界.*特別班次/);
+    page.openResult(5);
+    assert.deepEqual(page.routes.at(-1), { pathname: '/minibus/[id]', params: { id: '2002349' } });
+    assert.equal(page.requests.length, originalRequests);
+    assert.deepEqual(page.gmbPaths, ['/route', '/route/HKI/2', '/route/KLN/2', '/route/NT/2']);
+    page.searchInput().onChangeText('99999');
+    await page.settle();
+    t.mock.timers.tick(250);
+    await page.settle();
+    assert.ok(page.shows(page.gmbCopy.noMatches));
+    page.press(page.busCopy.clearInput);
+    await page.settle();
+    assert.ok(page.findAction(page.transportCopy.openSettings));
+  });
+}
+
+test('minibus detail retains repeated visits and withholds ambiguous ETA', async (t) => {
+  const page = mount(t, { gmbDetail: { id: '2006474' } });
+  await page.settle();
+  const name = '香港站小巴總站';
+  const first = page.gmbCopy.stopLabel(1, name);
+  const last = page.gmbCopy.stopLabel(11, name);
+  assert.equal(page.findAction(first).props.accessibilityState.expanded, false);
+  assert.equal(page.findAction(last).props.accessibilityState.expanded, false);
+  page.press(first);
+  await page.settle();
+  assert.ok(page.shows(page.gmbCopy.etaAmbiguous));
+  page.press(last);
+  await page.settle();
+  assert.equal(page.findAction(first).props.accessibilityState.expanded, false);
+  assert.equal(page.findAction(last).props.accessibilityState.expanded, true);
+  assert.ok(page.shows(page.gmbCopy.etaAmbiguous));
+  assert.deepEqual(page.gmbPaths, ['/route/2006474', '/route-stop/2006474/1']);
+});
+
+test('minibus detail requests just the selected visit, labels planned service and clears on direction change', async (t) => {
+  const page = mount(t, { gmbDetail: { id: '2009246' }, locale: 'en' });
+  await page.settle();
+  assert.deepEqual(page.gmbPaths, ['/route/2009246', '/route-stop/2009246/1']);
+  const forward = page.gmbCopy.stopLabel(1, 'Whampoa Garden Public Transport Interchange');
+  page.press(forward);
+  await page.settle();
+  assert.ok(page.shows(page.gmbCopy.scheduled));
+  assert.deepEqual(page.gmbPaths, ['/route/2009246', '/route-stop/2009246/1', '/eta/route-stop/2009246/1/1']);
+  page.directionFilters().onSelect('2');
+  await page.settle();
+  assert.ok(!page.shows(page.gmbCopy.scheduled));
+  const reverse = page.gmbCopy.stopLabel(1, 'Festival Walk');
+  assert.equal(page.findAction(reverse).props.accessibilityState.expanded, false);
+  page.press(reverse);
+  await page.settle();
+  assert.ok(page.shows(page.gmbCopy.etaFailed));
+  assert.deepEqual(page.gmbPaths.slice(-2), ['/route-stop/2009246/2', '/eta/route-stop/2009246/2/1']);
+});
+
+test('official minibus snapshot covers the three regions and retains distinct variant, direction and visit IDs', (t) => {
+  const snapshot = require('../assets/data/gmb-nearby.json');
+  assert.deepEqual(snapshot.counts.codes, { HKI: 107, KLN: 133, NT: 332 });
+  assert.equal(snapshot.stops.length, 4773);
+  assert.equal(snapshot.stops.reduce((sum, row) => sum + row[3].length, 0), 13107);
+  const number2 = snapshot.directions.filter((row) => row[3] === '2');
+  assert.deepEqual(new Set(number2.map((row) => row[2])), new Set(['HKI', 'KLN', 'NT']));
+  assert.deepEqual(number2.filter((row) => row[0] === 2009246).map((row) => row[1]), [1, 2]);
+  assert.ok(number2.some((row) => row[0] === 2002349));
+  const page = mount(t);
+  const { nearbyGmbRows, searchGmbStopNames } = page.nearbyGmb();
+  const station = searchGmbStopNames('Hong Kong Station Minibus Terminus').find(({ id }) => id === '20014492').stop;
+  const circular = station.visits.filter(({ routeId }) => routeId === 2006474);
+  assert.deepEqual(circular.map(({ stopSeq, boarding }) => [stopSeq, boarding]), [[1, true], [11, false]]);
+  assert.ok(station.visits.some(({ routeId }) => routeId === 2006475));
+  assert.ok(searchGmbStopNames('香港站小巴總站').some(({ id }) => id === '20014492'));
+  const stopResults = nearbyGmbRows(station.coordinate, 500, 'stops');
+  assert.equal(stopResults.filter(({ id }) => id === '20014492').length, 1);
+  const routeResults = nearbyGmbRows(station.coordinate, 500, 'routes');
+  assert.equal(routeResults.find(({ id }) => id === '2006474:1').visit.stopSeq, 1);
+  assert.equal(routeResults.find(({ id }) => id === '2006475:1').visit.stopSeq, 1);
+});
+
+test('nearby minibus respects all radius boundaries, distinct collocated stop IDs and boarding eligibility', (t) => {
+  const { nearbyGmbRows } = mount(t).nearbyGmb();
+  const center = { latitude: 22.31, longitude: 114.17 };
+  const location = (meters) => ({ ...center, latitude: center.latitude + (meters / 6_371_008.8) * (180 / Math.PI) });
+  const name = { tc: '測試站', en: 'Test stop', sc: null };
+  const visit = (stopId, stopSeq, boarding, routeId = 10) => ({ stopId, stopSeq, boarding, routeId, routeSeq: 1, name });
+  const stop = (stopId, meters, visits) => ({ stopId, coordinate: location(meters), name, visits });
+  const stops = [
+    stop(1, 3, [visit(1, 1, false), visit(1, 1, true, 20)]),
+    stop(2, 499.9, [visit(2, 4, true), visit(2, 9, true)]),
+    stop(3, 499.9, [visit(3, 5, true, 30)]),
+    stop(4, 500.1, [visit(4, 5, true)]),
+    stop(5, 999.9, [visit(5, 5, true)]),
+    stop(6, 1000.1, [visit(6, 6, true)]),
+    stop(7, 1999.9, [visit(7, 7, true)]),
+    stop(8, 2000.1, [visit(8, 8, true)]),
+  ];
+  assert.deepEqual(nearbyGmbRows(center, 500, 'stops', stops).map(({ id }) => id), ['1', '2', '3']);
+  assert.deepEqual(nearbyGmbRows(center, 1000, 'stops', stops).map(({ id }) => id), ['1', '2', '3', '4', '5']);
+  assert.deepEqual(nearbyGmbRows(center, 2000, 'stops', stops).map(({ id }) => id), ['1', '2', '3', '4', '5', '6', '7']);
+  const routes = nearbyGmbRows(center, 2000, 'routes', stops);
+  assert.deepEqual(routes.map(({ visit }) => [visit.routeId, visit.stopId, visit.stopSeq]), [[20, 1, 1], [10, 2, 4], [30, 3, 5]]);
+});
+
+for (const locale of ['zh-HK', 'en']) {
+  test(`minibus nearby uses shared radius and routes by direction, and stop selection passes the exact visit (${locale})`, async (t) => {
+    const page = mount(t, { transport: true, locale });
+    await page.settle();
+    const point = page.nearbyGmb().searchGmbStopNames('Hong Kong Station Minibus Terminus')
+      .find(({ id }) => id === '20014492').stop.coordinate;
+    page.press(page.transportCopy.modes.minibus);
+    await page.settle();
+    assert.ok(page.shows(page.transportCopy.locating));
+    page.fix(0, point);
+    await page.settle();
+    assert.equal(page.requests.length, 1);
+    assert.deepEqual(page.rows(), page.nearbyGmb().nearbyGmbRows(point, 500, 'routes'));
+    assert.ok(page.rows().length > 0);
+    const visit = page.rows()[0].visit;
+    page.openResult(0);
+    assert.deepEqual(page.routes.at(-1), { pathname: '/minibus/[id]', params: { id: String(visit.routeId), routeSeq: String(visit.routeSeq) } });
+    page.press(page.labels.byStop);
+    await page.settle();
+    assert.ok(page.shows(page.transportCopy.nearbyStops));
+    page.press(page.transportCopy.straightLineRadius(page.labels.metres(500)));
+    await page.settle();
+    page.press(page.labels.kilometres(2));
+    await page.settle();
+    assert.deepEqual(page.rows(), page.nearbyGmb().nearbyGmbRows(point, 2000, 'stops'));
+    const index = page.rows().findIndex(({ id }) => id === '20014492');
+    page.openResult(index);
+    await page.settle();
+    const actions = page.rowElements(index).filter(({ type }) => type === 'Pressable');
+    assert.ok(actions.some(({ props }) => props.accessibilityState?.disabled && props.accessibilityLabel.includes(page.gmbCopy.dropOff)));
+    const first = page.rows()[index].stop.visits.find(({ boarding }) => boarding);
+    actions.find(({ props }) => props.accessibilityState?.disabled === false).props.onPress();
+    assert.deepEqual(page.routes.at(-1), { pathname: '/minibus/[id]', params: {
+      id: String(first.routeId), routeSeq: String(first.routeSeq), stopSeq: String(first.stopSeq), stopId: '20014492',
+    } });
+    page.searchInput().onChangeText(locale === 'en' ? 'Hong Kong Station Minibus Terminus' : '香港站小巴總站');
+    await page.settle();
+    assert.ok(page.rows().some(({ id, distance }) => id === '20014492' && distance === undefined));
+    page.press(page.busCopy.clearInput);
+    await page.settle();
+    assert.deepEqual(page.rows(), page.nearbyGmb().nearbyGmbRows(point, 2000, 'stops'));
+    assert.deepEqual(page.gmbPaths, [], 'Nearby and stop-name search are offline with no ETA fan-out');
+  });
+}
+
+test('minibus distinguishes failed location from empty results and permits a manual landmark', async (t) => {
+  const page = mount(t, { transport: true });
+  await page.settle();
+  page.press(page.transportCopy.modes.minibus);
+  await page.settle();
+  page.failFix(0);
+  await page.settle();
+  assert.ok(page.shows(page.labels.issues.failed));
+  assert.equal(page.unavailableTitle(), undefined);
+  page.press(page.transportCopy.chooseLandmark);
+  await page.settle();
+  page.press(page.labels.landmarks.central);
+  await page.settle();
+  assert.deepEqual(page.rows(), page.nearbyGmb().nearbyGmbRows(page.landmarks.central, 500, 'routes'));
+  assert.ok(page.rows().length > 0);
+  assert.equal(page.calls.prompt, 0);
+});
+
+test('minibus nearby deep link selects official direction and validates stop identity before ETA', async (t) => {
+  const page = mount(t, { gmbDetail: { id: '2009246', routeSeq: '2', stopSeq: '1', stopId: '20000418' }, locale: 'en' });
+  await page.settle();
+  assert.equal(page.directionFilters().selected, '2');
+  assert.ok(page.shows(page.gmbCopy.visitChanged));
+  assert.equal(page.findAction(page.gmbCopy.stopLabel(1, 'Festival Walk')).props.accessibilityState.expanded, false);
+  assert.deepEqual(page.gmbPaths, ['/route/2009246', '/route-stop/2009246/2']);
+});
+
+test('minibus nearby deep link can open a matching stop, while a retired direction is disclosed', async (t) => {
+  const exact = mount(t, { gmbDetail: { id: '2009246', routeSeq: '2', stopSeq: '1', stopId: '20013966' }, locale: 'en' });
+  await exact.settle();
+  assert.equal(exact.directionFilters().selected, '2');
+  assert.equal(exact.findAction(exact.gmbCopy.stopLabel(1, 'Festival Walk')).props.accessibilityState.expanded, true);
+  assert.deepEqual(exact.gmbPaths, ['/route/2009246', '/route-stop/2009246/2', '/eta/route-stop/2009246/2/1']);
+  const retired = mount(t, { gmbDetail: { id: '2006474', routeSeq: '2' }, locale: 'en' });
+  await retired.settle();
+  assert.ok(retired.shows(retired.gmbCopy.directionChanged));
+  assert.deepEqual(retired.gmbPaths, ['/route/2006474', '/route-stop/2006474/1']);
 });

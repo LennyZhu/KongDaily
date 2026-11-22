@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const { existsSync, readFileSync } = require('node:fs');
 const { dirname, join, resolve } = require('node:path');
 const ts = require('typescript');
+const gmbFixture = require('./fixtures/gmb-api.json');
 
 const root = join(__dirname, '..');
 let slots = [];
@@ -131,6 +132,12 @@ function nodes(value, expand = false) {
   return [value, ...nodes(children, expand)];
 }
 
+const gmbResponses = { '/route': gmbFixture.directory, '/route/HKI/2': gmbFixture.hki2,
+  '/route/KLN/2': gmbFixture.kln2, '/route/NT/2': gmbFixture.nt2 };
+stubs['@/gmb-client'] = { gmbClient: load('gmb-client').createGmbClient({ request: async (address) => {
+  const body = gmbResponses[new URL(address).pathname];
+  return new Response(JSON.stringify(body), { status: body ? 200 : 500 });
+} }) };
 const SearchScreen = load('app/search').default;
 function render(runEffects = true) {
   if (!runEffects) {
@@ -538,6 +545,15 @@ async function verify() {
       assert.deepEqual(returnScrolls, [175]);
       assert(hasCopy(screen, labels().search.backToAll));
     }
+    input(screen).onChangeText('2'); screen = await complete();
+    const minibus = list(screen).data.find(({ result }) => result?.key === 'gmb_route:2002349');
+    assert(minibus, 'Special minibus variant in global transport routes');
+    assert.match(pressRow(minibus).props.accessibilityLabel, locale === 'en' ? /Minibus.*Special Departure/ : /專線小巴.*特別班次/);
+    pressRow(minibus).props.onPress();
+    assert.deepEqual(pushed.at(-1), { pathname: '/minibus/[id]', params: { id: '2002349' } });
+    blur(); blur = focusEffect(); advance(16); screen = render();
+    assert.equal(input(screen).value, '2');
+
     tapText(screen, labels().search.clear); screen = render();
     tapText(empty(screen), labels().search.groups.transport_stop); screen = render();
     for (const [query, kind, id, href] of [
@@ -578,7 +594,7 @@ async function verify() {
   assert(displayed(screen, 'mtr_station').some(({ key }) => key === 'mtr_station:ADM'));
   assert(hasCopy(list(screen).ListHeaderComponent, labels().search.stopsFailed));
 
-  console.log('PASS: four interactive bilingual entry cards; three transport sources, scoped categories, detail navigation, debounce/return and offline rail under bus failures; facilities and places unchanged');
+  console.log('PASS: four interactive bilingual entry cards; four transport sources, scoped categories, detail navigation, debounce/return and offline rail under bus failures; facilities and places unchanged');
 }
 
 verify().catch((error) => { console.error(error); process.exitCode = 1; }).finally(reset);

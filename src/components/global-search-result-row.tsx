@@ -4,6 +4,7 @@ import { routePlaceName } from '@/bus-routes';
 import { AppText, Icon, type IconName } from '@/components/ui';
 import { facilityText } from '@/facilities';
 import type { GlobalSearchKind, GlobalSearchResult } from '@/global-search';
+import { gmbText } from '@/gmb-search';
 import { useLanguage } from '@/language';
 import { findMtrLine, mtrName } from '@/mtr-static';
 import { colors, radius, space } from '@/theme';
@@ -37,6 +38,14 @@ function resultCopy(result: GlobalSearchResult, { copy, locale }: ReturnType<typ
           destination && copy.busDetail.towards(destination)],
         note: copy.bus.service(route.serviceType),
       };
+    }
+    case 'gmb_route': {
+      const { service } = result;
+      const direction = service.directions.find(({ routeSeq }) => routeSeq === 1) ?? service.directions[0];
+      const endpoints = direction ? [gmbText(direction.origin, locale), gmbText(direction.destination, locale)] : [];
+      return { title: service.routeCode,
+        detail: [copy.transport.modes.minibus, copy.minibus.regions[service.region], endpoints.filter(Boolean).join(' → ')],
+        note: gmbText(service.description, locale) };
     }
     case 'bus_stop':
       return {
@@ -78,7 +87,7 @@ export function GlobalSearchResultRow({ result, first, last, onPress }: {
     : result.kind === 'explore_place' ? placeIcons[result.place.category]
       : result.kind === 'mtr_line' || result.kind === 'mtr_station' ? 'tram.fill.tunnel'
         : result.kind === 'light_rail_route' || result.kind === 'light_rail_stop' ? 'train.side.front.car'
-          : result.kind === 'bus_route' ? 'bus' : 'mappin';
+          : result.kind === 'gmb_route' ? 'bus.fill' : result.kind === 'bus_route' ? 'bus' : 'mappin';
   const { title, detail, note } = resultCopy(result, language);
   const subtitle = detail.filter(Boolean).join(' · ');
 
@@ -88,7 +97,7 @@ export function GlobalSearchResultRow({ result, first, last, onPress }: {
       style={({ pressed }) => [styles.row, first && styles.first, last && styles.last, pressed && styles.pressed]}>
       <View style={styles.icon}><Icon name={icon} size={21} /></View>
       <View style={styles.text}>
-        <AppText variant={result.kind === 'bus_route' ? 'homeHeading' : 'homeCardTitle'}>{title}</AppText>
+        <AppText variant={result.kind === 'bus_route' || result.kind === 'gmb_route' ? 'homeHeading' : 'homeCardTitle'}>{title}</AppText>
         {!!subtitle && <AppText variant="detail" tone="muted">{subtitle}</AppText>}
         {!!note && <AppText variant="caption" tone="muted">{note}</AppText>}
       </View>
