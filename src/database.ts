@@ -2,7 +2,7 @@ import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
 import { type LanguagePreference } from '@/i18n';
 
-const schemaVersion = 9;
+const schemaVersion = 10;
 let databasePromise: Promise<SQLiteDatabase> | undefined;
 
 async function openAppDatabase() {
@@ -176,6 +176,41 @@ async function openAppDatabase() {
             PRIMARY KEY (mode, line_id, station_id)
           );
           PRAGMA user_version = 9;
+        `);
+      }
+
+      if (version.user_version < 10) {
+        await transaction.execAsync(`
+          CREATE TABLE home_transport_pins (
+            position INTEGER PRIMARY KEY CHECK (position BETWEEN 1 AND 3),
+            mode TEXT NOT NULL CHECK (mode IN ('bus', 'mtr', 'light_rail')),
+            bus_id TEXT UNIQUE,
+            line_id TEXT,
+            station_id TEXT,
+            CHECK (
+              (mode = 'bus' AND bus_id IS NOT NULL AND line_id IS NULL AND station_id IS NULL)
+              OR (mode <> 'bus' AND bus_id IS NULL AND line_id IS NOT NULL AND station_id IS NOT NULL)
+            ),
+            UNIQUE (mode, line_id, station_id)
+          );
+          INSERT INTO home_transport_pins (position, mode, bus_id)
+            SELECT row_number() OVER (ORDER BY pin_order), 'bus', id
+            FROM bus_favorites WHERE pin_order IS NOT NULL;
+          INSERT INTO home_transport_pins (position, mode, line_id, station_id)
+            SELECT position, mode, line_id, station_id FROM (
+              SELECT (SELECT count(*) FROM home_transport_pins)
+                + row_number() OVER (ORDER BY created_at DESC, mode, line_id, station_id) AS position,
+                mode, line_id, station_id
+              FROM railway_favorites
+              ORDER BY created_at DESC, mode, line_id, station_id LIMIT 2
+            ) WHERE position <= 3;
+          CREATE TRIGGER remove_home_bus_pin AFTER DELETE ON bus_favorites BEGIN
+            DELETE FROM home_transport_pins WHERE bus_id = OLD.id;
+          END;
+          CREATE TRIGGER remove_home_railway_pin AFTER DELETE ON railway_favorites BEGIN
+            DELETE FROM home_transport_pins WHERE mode = OLD.mode AND line_id = OLD.line_id AND station_id = OLD.station_id;
+          END;
+          PRAGMA user_version = 10;
         `);
       }
     });

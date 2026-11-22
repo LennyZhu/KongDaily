@@ -10,11 +10,12 @@ import { AppText, Icon, type IconName } from '@/components/ui';
 import { useLanguage } from '@/language';
 import { colors, radius, space, touchTarget } from '@/theme';
 
-export function FavoriteBusRow({ favorite, destination, trailing, children }: {
+export function FavoriteBusRow({ favorite, destination, trailing, children, compact = false }: {
   favorite: BusFavorite;
   destination?: string;
   trailing?: ReactNode;
   children?: ReactNode;
+  compact?: boolean;
 }) {
   const router = useRouter();
   const { copy, locale } = useLanguage();
@@ -29,19 +30,20 @@ export function FavoriteBusRow({ favorite, destination, trailing, children }: {
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
       <View style={styles.line}>
         <View style={styles.badge}><Icon name="bus" color={colors.onPrimary} size={17} /></View>
-        <AppText variant="section" style={styles.route}>{target.number}</AppText>
-        <View style={styles.copy}>
-          <AppText variant="homeCardTitle">{stop}</AppText>
+        {!compact && <AppText variant="section" style={styles.route}>{target.number}</AppText>}
+        <View style={[styles.copy, compact && styles.compactCopy]}>
+          <AppText variant="homeCardTitle">{compact ? `${target.number} · ${stop}` : stop}</AppText>
           <AppText variant="detail">{to ? copy.busDetail.towards(to) : direction}</AppText>
           <AppText variant="brandSubtitle" tone="muted">
             {operator} · {copy.busDetail.stopOrder(target.stopSeq)}
             {target.source === 'kmbLwb' && target.serviceType !== '1' ? ` · ${copy.bus.service(target.serviceType)}` : ''}
           </AppText>
+          {compact && children}
         </View>
         {trailing}
-        <Icon name="chevron.right" color={colors.muted} size={12} />
+        {!compact && <Icon name="chevron.right" color={colors.muted} size={12} />}
       </View>
-      {children}
+      {!compact && children}
     </Pressable>
   );
 }
@@ -119,6 +121,7 @@ const styles = StyleSheet.create({
   },
   route: { flexShrink: 1 },
   copy: { flex: 1, minWidth: 56, gap: space.xs },
+  compactCopy: { minWidth: 0 },
   arrivals: { maxWidth: '33%', alignItems: 'flex-end', gap: space.xs },
   countdown: { textAlign: 'right', fontVariant: ['tabular-nums'] },
   etaStatus: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: space.sm, gap: space.xs },

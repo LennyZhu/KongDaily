@@ -4,7 +4,7 @@ import { AppState } from 'react-native';
 
 import { nextTrainClock, type NextTrainReading } from '@/next-train-time';
 
-export function useNextTrainReading<Payload>(key: string, read: () => Promise<NextTrainReading<Payload>>, clock = nextTrainClock) {
+export function useNextTrainReading<Payload>(key: string, read: () => Promise<NextTrainReading<Payload>>, clock = nextTrainClock, autoRefresh = false) {
   const [sample, setSample] = useState<{ key: string; reading: NextTrainReading<Payload> }>();
   const [now, setNow] = useState(clock);
   const [busy, setBusy] = useState(true);
@@ -14,6 +14,7 @@ export function useNextTrainReading<Payload>(key: string, read: () => Promise<Ne
     let active = false;
     let pending = false;
     let generation = 0;
+    let retryAt = Infinity;
     let ticker: ReturnType<typeof setInterval> | undefined;
 
     function load() {
@@ -24,6 +25,7 @@ export function useNextTrainReading<Payload>(key: string, read: () => Promise<Ne
       void read().then((sample) => {
         if (!active || generation !== attempt) return;
         pending = false;
+        retryAt = sample.retryAt;
         setSample({ key, reading: sample });
         setNow(clock());
         setBusy(false);
@@ -34,7 +36,11 @@ export function useNextTrainReading<Payload>(key: string, read: () => Promise<Ne
       if (active) return;
       active = true;
       setNow(clock());
-      ticker = setInterval(() => setNow(clock()), 1000);
+      ticker = setInterval(() => {
+        const current = clock();
+        setNow(current);
+        if (autoRefresh && current.monotonic >= retryAt) load();
+      }, 1000);
       load();
     }
 
@@ -56,7 +62,7 @@ export function useNextTrainReading<Payload>(key: string, read: () => Promise<Ne
       subscription.remove();
       refresh.current = undefined;
     };
-  }, [clock, key, read]));
+  }, [autoRefresh, clock, key, read]));
 
   return { reading: sample?.key === key ? sample.reading : undefined, now, busy, refresh: () => refresh.current?.() };
 }

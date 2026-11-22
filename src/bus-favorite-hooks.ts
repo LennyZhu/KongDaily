@@ -84,7 +84,7 @@ async function toggleStopFavorite(visit: BusVisitSummary) {
   const saved = state.items.some((item) => item.id === id);
   setStopSaveStatus(id, 'saving');
   const result = await changeBusFavorites(
-    saved ? { type: 'remove', id } : { type: 'save', visit, pinOnSave: false },
+    saved ? { type: 'remove', id } : { type: 'save', visit },
     { readBackOnFailure: true },
   );
   setStopSaveStatus(id, result === 'failed' ? 'failed' : undefined);

@@ -72,32 +72,36 @@ export function EmptyState({ icon, title, detail }: { icon: IconName; title: str
   );
 }
 
-export function Filters<Category extends string>({ options, selected, onSelect }: {
+export function Filters<Category extends string>({ options, selected, onSelect, horizontal = false }: {
   options: ReadonlyArray<readonly [Category, string]>;
   selected: Category;
   onSelect: (category: Category) => void;
+  horizontal?: boolean;
 }) {
-  return (
-    <View style={styles.filters}>
-      {options.map(([key, label]) => {
-        const active = selected === key;
-        return (
-          <Pressable
-            key={key}
-            accessibilityRole="button"
-            accessibilityState={{ selected: active }}
-            onPress={() => onSelect(key)}
-            style={({ pressed }) => [styles.filter, active && styles.activeFilter, pressed && styles.pressedFilter]}
-          >
-            <AppText variant="detail" tone={active ? 'onPrimary' : 'text'}>{label}</AppText>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
+  const buttons = options.map(([key, label]) => {
+    const active = selected === key;
+    return (
+      <Pressable
+        key={key}
+        accessibilityRole="button"
+        accessibilityState={{ selected: active }}
+        onPress={() => onSelect(key)}
+        style={({ pressed }) => [styles.filter, horizontal ? styles.horizontalFilter : styles.boundedFilter,
+          active && styles.activeFilter, pressed && styles.pressedFilter]}
+      >
+        <AppText variant="detail" tone={active ? 'onPrimary' : 'text'} numberOfLines={horizontal ? 1 : undefined}>{label}</AppText>
+      </Pressable>
+    );
+  });
+  return horizontal
+    ? <ScrollView horizontal accessibilityRole="tablist" contentContainerStyle={styles.horizontalFilters}>{buttons}</ScrollView>
+    : <View style={styles.filters}>{buttons}</View>;
 }
 
 const styles = StyleSheet.create({
+  horizontalFilters: { flexDirection: 'row', flexWrap: 'nowrap', gap: space.sm },
+  horizontalFilter: { flexShrink: 0, minWidth: touchTarget },
+  boundedFilter: { maxWidth: '100%' },
   screen: { flex: 1, backgroundColor: colors.background },
   scroll: { backgroundColor: colors.background },
   screenContent: { paddingHorizontal: space.xl, paddingTop: space.lg, paddingBottom: space.section, gap: space.xxl },
@@ -123,7 +127,6 @@ const styles = StyleSheet.create({
   emptyCopy: { flex: 1, gap: space.xs },
   filters: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   filter: {
-    maxWidth: '100%',
     minHeight: touchTarget,
     alignItems: 'center',
     justifyContent: 'center',

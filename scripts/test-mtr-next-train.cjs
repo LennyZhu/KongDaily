@@ -264,7 +264,7 @@ function mountHook() {
   const useNextTrainReading = load('next-train-hooks').useNextTrainReading;
   const simulatedClock = () => now;
   return {
-    render(line, station) { cursor = 0; return useHook(line, station); },
+    render(line, station, autoRefresh = false) { cursor = 0; return useHook(line, station, autoRefresh); },
     renderLightRail(station) {
       cursor = 0;
       const read = react.useCallback(() => new Promise((resolve) => calls.push({ station, resolve })), [station]);
@@ -329,6 +329,47 @@ test('station switches, focus, and AppState ignore old responses and do not poll
   assert.equal(page.calls.length, 4);
   page.focus(true);
   assert.equal(page.calls.length, 5);
+  page.focus(false);
+});
+
+test('Home rail refresh follows the client retry deadline, pauses off-screen, and rejects late responses', async () => {
+  const page = mountHook();
+  page.render('ISL', 'ADM', true);
+  page.calls[0].resolve(reading({ kind: 'failed' }));
+  await nextTick();
+  page.advance(19_999);
+  assert.equal(page.calls.length, 1);
+  page.advance(20_000);
+  assert.equal(page.calls.length, 2);
+  page.advance(40_000);
+  assert.equal(page.calls.length, 2, 'An in-flight request cannot multiply on countdown ticks');
+  const limited = reading({ kind: 'rateLimited' }, { retryAt: start.monotonic + 120_000 });
+  page.calls[1].resolve(limited);
+  await nextTick();
+  page.advance(119_999);
+  assert.equal(page.calls.length, 2, 'HTTP 429 retryAt takes precedence over the normal refresh interval');
+  page.advance(120_000);
+  assert.equal(page.calls.length, 3);
+  page.state('background');
+  assert.equal(page.ticks.size, 0);
+  page.calls[2].resolve(reading({ kind: 'unsupported' }));
+  await nextTick();
+  assert.equal(page.render('ISL', 'ADM', true).reading, limited);
+  page.advance(180_000);
+  assert.equal(page.calls.length, 3);
+  page.state('active');
+  assert.equal(page.calls.length, 4);
+  page.focus(false);
+  page.advance(240_000);
+  assert.equal(page.calls.length, 4);
+  page.focus(true);
+  assert.equal(page.calls.length, 5);
+  page.render('EAL', 'ADM', true);
+  assert.deepEqual([page.calls.at(-1).line, page.calls.at(-1).station], ['EAL', 'ADM']);
+  assert.equal(page.render('EAL', 'ADM', true).reading, undefined);
+  page.calls[4].resolve(reading({ kind: 'special' }));
+  await nextTick();
+  assert.equal(page.render('EAL', 'ADM', true).reading, undefined, 'A previous line cannot overwrite the new Home card');
   page.focus(false);
 });
 
@@ -452,6 +493,202 @@ function railPlatform(platform_id, ...route_list) {
 function railBody(...platform_list) {
   return { status: 1, system_time: timestamp, platform_list };
 }
+
+const { homeMtrPreview, homeLightRailPreview } = source('home-railway-eta');
+const homeFavorite = (mode, lineId, stationId, createdAt = 1) => ({
+  mode, lineId, stationId, createdAt, updatedAt: createdAt,
+  id: `railway_favorite:${JSON.stringify([mode, lineId, stationId])}`,
+  lineSnapshot: { zh: lineId, en: lineId }, stationSnapshot: { zh: stationId, en: stationId },
+});
+
+test('Home MTR previews keep both official directions', () => {
+  const payload = parseMtrForecast(body('EAL-HUH', [train('LOW', '1', { timeType: 'D' }), train('LMC', '2')],
+    [train('ADM', '1', { timeType: 'A', plat: undefined })]), 'EAL', 'HUH');
+  const view = homeMtrPreview(reading(payload), start);
+  assert.equal(view.kind, 'ready');
+  assert.deepEqual(view.groups.map(({ direction, trains }) => [direction, trains.length, trains[0].destination, trains[0].timeType]),
+    [['UP', 1, 'LOW', 'departure'], ['DOWN', 1, 'ADM', 'arrival']]);
+  assert.equal(view.groups[1].trains[0].platform, undefined);
+  assert.equal(homeMtrPreview(reading(payload), clockAfter(60_000)).kind, 'stale');
+  assert.equal(homeMtrPreview(reading(parseMtrForecast(body('ISL-ADM'), 'ISL', 'ADM')), start).kind, 'empty');
+  for (const kind of ['failed', 'rateLimited', 'unsupported', 'special', 'suspended']) {
+    assert.equal(homeMtrPreview(reading({ kind }), start).kind, kind);
+  }
+});
+
+function homeRailPayload() {
+  return parseLightRailForecast(railBody(
+    railPlatform(1, railTrain({ route_no: '614', dest_en: 'Wrong route', dest_ch: '其他路線' }),
+      railTrain({ route_no: '610', stop: 1 }),
+      railTrain({ route_no: '610', dest_en: 'Yuen Long', dest_ch: '元朗' }),
+      railTrain({ route_no: 'SPR', special: 1, additionalInfo1: '610', dest_en: 'Special', dest_ch: '特別班次' })),
+    railPlatform(2, railTrain({ route_no: '610', dest_en: 'Tuen Mun Ferry Pier', dest_ch: '屯門碼頭', arrival_departure: 'D' })),
+    railPlatform(3, railTrain({ route_no: '610', time_en: '9 mins', time_ch: '9 分鐘' })),
+  ), '380');
+}
+
+test('Home Light Rail filters the exact regular route and retains real platforms without fabricated times', () => {
+  const sample = reading(homeRailPayload());
+  const preview = homeLightRailPreview(sample, start, '610');
+  assert.equal(preview.kind, 'ready');
+  assert.deepEqual(preview.platforms.map(({ id, train }) => [id, train.route.code, train.event]), [[1, '610', 'arrival'], [2, '610', 'departure']]);
+  assert.equal(preview.hasMore, true);
+  assert.ok(preview.platforms.every(({ train }) => train.route.kind === 'regular' && !train.serviceIssue));
+  assert.equal(homeLightRailPreview(sample, start, '614').platforms[0].train.destination.en, 'Wrong route');
+  assert.equal(homeLightRailPreview(sample, start, '705').kind, 'empty');
+  const unordered = reading(parseLightRailForecast(railBody(
+    railPlatform(1, railTrain({ route_no: '610', time_en: '9 mins', time_ch: '9 分鐘' }),
+      railTrain({ route_no: '610', time_en: '2 mins', time_ch: '2 分鐘' })),
+    railPlatform(2, railTrain({ route_no: '610', time_en: '5 mins', time_ch: '5 分鐘' })),
+    railPlatform(3, railTrain({ route_no: '610', time_en: '1 min', time_ch: '1 分鐘' })),
+  ), '380'));
+  assert.deepEqual(homeLightRailPreview(unordered, start, '610').platforms.map(({ id, train }) => [id, train.time.minutes]), [[3, 1], [1, 2]]);
+  assert.equal(homeLightRailPreview(sample, clockAfter(60_000), '610').kind, 'stale');
+  for (const [overrides, expected] of [
+    [{ stop: 1 }, 'serviceIssue'], [{ time_en: 'unrecognized', time_ch: '未知' }, 'noTime'],
+    [{ route_no: 'SPR', special: 1, additionalInfo1: '610' }, 'empty'],
+  ]) {
+    const payload = parseLightRailForecast(railBody(railPlatform(1, railTrain({ route_no: '610', ...overrides }))), '380');
+    assert.equal(homeLightRailPreview(reading(payload), start, '610').kind, expected);
+  }
+  for (const kind of ['failed', 'rateLimited', 'unsupported', 'providerUnavailable']) {
+    assert.equal(homeLightRailPreview(reading({ kind }), start, '610').kind, kind);
+  }
+});
+
+function homeRailUi(locale, initialMtr, initialRail, extra = {}) {
+  let mtr = initialMtr;
+  let rail = initialRail;
+  let now = start;
+  const calls = [];
+  const routes = [];
+  const copy = source('i18n').messages[locale];
+  const mocks = {
+    react: { useCallback: (fn) => fn },
+    'expo-router': { useRouter: () => ({ push: (href) => routes.push(href) }) },
+    'react-native': { View: 'View', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', StyleSheet: { create: (styles) => styles, hairlineWidth: 1 } },
+    '@/components/ui': { AppText: 'AppText', Icon: 'Icon' },
+    '@/components/saved-bus-ui': { savedBusStyles: { card: {} } },
+    '@/database': { getDatabase() { throw new Error('Home must not write or migrate favorites'); } },
+    '@/language': { useLanguage: () => ({ locale, copy }) },
+    '@/mtr-next-train-hooks': { useMtrNextTrains(line, station, auto) {
+      calls.push(['mtr', line, station, auto]);
+      return { reading: mtr, now, busy: !mtr, refresh() { calls.push('refresh'); } };
+    } },
+    '@/light-rail-next-train-hooks': { useLightRailNextTrains(station, auto) {
+      calls.push(['light_rail', station, auto]);
+      return { reading: rail, now, busy: !rail, refresh() { calls.push('refresh'); } };
+    } },
+    ...extra,
+  };
+  for (const key of Object.keys(mocks)) if (mocks[key] === undefined) delete mocks[key];
+  const load = sources(mocks);
+  function elements(node) {
+    if (Array.isArray(node)) return node.flatMap(elements);
+    if (!node?.props) return [];
+    return [node, ...elements(typeof node.type === 'function' ? node.type(node.props) : node.props.children)];
+  }
+  return {
+    copy, calls, routes,
+    render(favorite) { return elements(load('components/home-favorite-railway').HomeFavoriteRailway({ favorite })); },
+    update(payload, at = start) { mtr = payload; rail = payload; now = at; },
+  };
+}
+
+for (const locale of ['zh-HK', 'en']) {
+  test(`Home railway cards show accurate compact bilingual predictions and original detail links (${locale})`, () => {
+    const mtr = reading(parseMtrForecast(body('EAL-HUH', [train('LOW', '1', { timeType: 'D' })], [train('ADM', '1', { timeType: 'A' })]), 'EAL', 'HUH'));
+    const page = homeRailUi(locale, mtr, reading(homeRailPayload()));
+    const text = (nodes) => nodes.filter(({ type }) => type === 'AppText').map(({ props }) => props.children).join('\n');
+    const favorite = homeFavorite('mtr', 'EAL', 'HUH');
+    const nodes = page.render(favorite);
+    assert.deepEqual(page.calls, [['mtr', 'EAL', 'HUH', true]]);
+    const content = text(nodes);
+    assert.ok(!content.includes(page.copy.mtr.nextTrains.title), 'Home omits the standalone ETA heading');
+    const header = nodes.find(({ type, props }) => type === 'View' && Array.isArray(props.children)
+      && props.children.length === 2 && props.children.every((child) => child?.type === 'Pressable'));
+    assert.ok(header, 'Navigation and refresh share one header with separate touch targets');
+    const refresh = header.props.children.find(({ props }) => props.accessibilityLabel);
+    const [touchArea] = refresh.props.style({ pressed: false });
+    assert.ok(touchArea.width >= 44 && touchArea.height >= 44);
+    for (const label of [page.copy.homeRailway.direction('UP'), page.copy.homeRailway.direction('DOWN'),
+      page.copy.mtr.nextTrains.arrival, page.copy.mtr.nextTrains.departure,
+      locale === 'en' ? 'Hung Hom' : '紅磡', locale === 'en' ? 'Lo Wu' : '羅湖']) assert.ok(content.includes(label), label);
+    nodes.find(({ type, props }) => type === 'Pressable' && !props.accessibilityLabel).props.onPress();
+    assert.deepEqual(page.routes.at(-1), { pathname: '/mtr/[kind]', params: { kind: 'station', code: 'HUH', line: 'EAL' } });
+    page.render(homeFavorite('mtr', 'ISL', 'ADM'));
+    assert.deepEqual(page.calls.at(-1), ['mtr', 'ISL', 'ADM', true]);
+    page.render(homeFavorite('mtr', 'EAL', 'ADM'));
+    assert.deepEqual(page.calls.at(-1), ['mtr', 'EAL', 'ADM', true]);
+
+    const railNodes = page.render(homeFavorite('light_rail', '610', '380'));
+    const railText = text(railNodes);
+    assert.deepEqual(page.calls.at(-1), ['light_rail', '380', true]);
+    assert.ok(railText.includes(locale === 'en' ? 'Yuen Long' : '元朗'));
+    assert.ok(!railText.includes('Wrong route') && !railText.includes('其他路線') && !railText.includes('Special'));
+    assert.ok(railText.includes(page.copy.lightRail.nextTrains.platform(1)) && railText.includes(page.copy.lightRail.nextTrains.platform(2)));
+    railNodes.find(({ type, props }) => type === 'Pressable' && !props.accessibilityLabel).props.onPress();
+    assert.deepEqual(page.routes.at(-1), { pathname: '/light-rail/[kind]', params: { kind: 'stop', id: '380', route: '610' } });
+    page.update(undefined);
+    const loading = page.render(favorite);
+    assert.ok(text(loading).includes(page.copy.homeRailway.status.loading));
+    assert.equal(loading.find(({ type, props }) => type === 'Pressable' && props.accessibilityLabel).props.disabled, true);
+    page.update(mtr, clockAfter(60_000));
+    const stale = text(page.render(favorite));
+    assert.ok(stale.includes(page.copy.homeRailway.status.stale));
+    assert.ok(!stale.includes(page.copy.mtr.nextTrains.minutes(2)));
+    for (const kind of ['failed', 'rateLimited', 'unsupported']) {
+      page.update(reading({ kind }));
+      const statusNodes = page.render(favorite);
+      const expected = page.copy.homeRailway.status[kind];
+      const notice = statusNodes.find(({ type, props }) => type === 'AppText' && props.children === expected);
+      assert.ok(notice);
+      assert.equal(notice.props.numberOfLines, undefined, 'Status can wrap at large text sizes');
+      assert.ok(!text(statusNodes).includes(page.copy.mtr.nextTrains.empty));
+    }
+    page.update(reading(parseMtrForecast(body('EAL-HUH'), 'EAL', 'HUH')));
+    assert.ok(text(page.render(favorite)).includes(page.copy.mtr.nextTrains.empty));
+    page.update(reading(homeRailPayload()));
+    const unmatched = page.render(homeFavorite('light_rail', '615', '380'));
+    assert.ok(text(unmatched).includes(page.copy.homeRailway.noMatching));
+    const before = page.calls.length;
+    assert.ok(text(page.render(homeFavorite('mtr', 'REMOVED', 'ADM'))).includes(page.copy.railwayFavorites.unavailable));
+    assert.equal(page.calls.length, before, 'An orphaned favorite makes no request');
+  });
+}
+
+test('Home Light Rail same-station favorites share the real client request and cache while filtering separate routes', async () => {
+  let requests = 0;
+  const tasks = [];
+  let current;
+  const read = createLightRailNextTrainClient({ clock: () => start, request: async (url) => {
+    requests++;
+    assert.match(url, /station_id=380&with_special=1$/);
+    return new Response(JSON.stringify(railBody(railPlatform(1,
+      railTrain({ route_no: '610', dest_en: 'Alpha destination' }), railTrain({ route_no: '614', dest_en: 'Beta destination' })))), { status: 200 });
+  } });
+  const page = homeRailUi('en', undefined, undefined, {
+    '@/light-rail-next-train-hooks': undefined,
+    '@/light-rail-next-train-client': { readLightRailNextTrains: read },
+    '@/next-train-hooks': { useNextTrainReading(key, reader, _clock, auto) {
+      assert.equal(key, '380'); assert.equal(auto, true);
+      tasks.push(reader().then((sample) => { current = sample; }));
+      return { reading: current, now: start, busy: !current, refresh() {} };
+    } },
+  });
+  // Both cards use the actual shared hook/client; only the native lifecycle is stubbed here.
+  const first = homeFavorite('light_rail', '610', '380');
+  const second = homeFavorite('light_rail', '614', '380');
+  page.render(first); page.render(second);
+  await Promise.all(tasks);
+  assert.equal(requests, 1);
+  const firstText = page.render(first).filter(({ type }) => type === 'AppText').map(({ props }) => props.children).join('\n');
+  const secondText = page.render(second).filter(({ type }) => type === 'AppText').map(({ props }) => props.children).join('\n');
+  assert.ok(firstText.includes('Alpha destination') && !firstText.includes('Beta destination'));
+  assert.ok(secondText.includes('Beta destination') && !secondText.includes('Alpha destination'));
+  await Promise.all(tasks);
+  assert.equal(requests, 1, 'Fresh cache is shared across separate route cards at one station');
+});
 
 test('Light Rail coverage matches all 68 official directory IDs and uses Hoi Wong Road ID 250', () => {
   assert.equal(lightRailStops.length, 68);

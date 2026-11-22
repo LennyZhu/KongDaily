@@ -496,6 +496,7 @@ async function checkMapEtaPreview() {
   mock.timers.enable({ apis: ['Date', 'setTimeout', 'setInterval'], now: start });
   const requests = [];
   const { BusFeedError } = load('bus-data');
+  const requestBusJson = load('bus-data').requestBusJson;
   load('bus-data').requestBusJson = (source, url, signal) => new Promise((resolve, reject) => {
     requests.push({ source, url, signal, resolve, reject });
   });
@@ -698,6 +699,7 @@ async function checkMapEtaPreview() {
     assert(hasText(ctbPreview.view(), zh.busEta.due));
     ctbPreview.close();
   } finally {
+    load('bus-data').requestBusJson = requestBusJson;
     mock.timers.reset();
   }
 }
@@ -887,7 +889,87 @@ function checkAdultFares() {
   console.log('PASS: official full and boarding fares, exact route and visit identity, HKD cents, expiration, and bilingual cards');
 }
 
-checkGeometryScreen().then(checkMapEtaPreview).then(checkLimitedServiceAndEtaStatus).then(checkAdultFares).then(
+async function checkHomeB2EtaSettlement() {
+  delete stubs['@/components/saved-bus-ui'];
+  const { HomeFavoriteBus } = load('components/saved-bus-ui');
+  const { createMtrNextTrainClient } = load('mtr-next-train-client');
+  const target = { source: 'nlb', number: 'B2', routeId: '37', stopId: '152', stopSeq: 3 };
+  const props = { favorite: { target, station: { zh: '測試站', en: 'Test stop' }, destination: { zh: '總站', en: 'Terminus' } }, unavailable: false };
+  const originalFetch = global.fetch;
+  const originalDev = global.__DEV__;
+  let cleanup;
+  try {
+    global.__DEV__ = false;
+    locale = 'zh-HK';
+    mock.timers.enable({ apis: ['Date', 'setTimeout', 'setInterval'], now: Date.parse('2026-11-22T15:00:00+08:00') });
+    const labels = messages[locale].busEta;
+    const countdown = labels.minutes.prefix + '3' + labels.minutes.suffix;
+    const flush = () => new Promise(setImmediate);
+    const cardText = () => {
+      const row = elements(render(HomeFavoriteBus, props)).find(({ type }) => type.name === 'FavoriteBusRow');
+      return elements([row.props.trailing, row.props.children]).filter(({ type }) => type === 'AppText').map(({ props }) => props.children);
+    };
+    for (const [scenario, expected] of [
+      ['stalled connection', labels.errors.timeout], ['stalled body', labels.errors.timeout],
+      ['HTTP failure', labels.errors.http], ['network failure', labels.errors.network],
+      ['empty ETA', labels.empty], ['valid ETA', countdown],
+    ]) {
+      cleanup?.();
+      state = {};
+      let signal;
+      let finishLateBody;
+      let requests = 0;
+      global.fetch = (url, options) => {
+        assert.match(url, /estimatedArrivals&routeId=37&stopId=152&language=zh$/);
+        requests++;
+        signal = options.signal;
+        // Model a transport that receives the abort signal without settling its Promise.
+        if (scenario === 'stalled connection') return new Promise(() => {});
+        if (scenario === 'stalled body' && requests === 1) return Promise.resolve({
+          ok: true, status: 200, text: () => new Promise((resolve) => { finishLateBody = resolve; }),
+        });
+        if (scenario === 'HTTP failure') return Promise.resolve(new Response('', { status: 503 }));
+        if (scenario === 'network failure') return Promise.reject(new Error('network fixture'));
+        const hasEta = scenario === 'valid ETA' || requests > 1;
+        const arrivals = hasEta ? [{ estimatedArrivalTime: new Date(Date.now() + 180_000).toISOString() }] : [];
+        return Promise.resolve(new Response(JSON.stringify({ estimatedArrivals: arrivals })));
+      };
+      assert(cardText().includes(labels.loading));
+      cleanup = focusedEffect();
+      let finishRail;
+      const rail = createMtrNextTrainClient({ request: () => new Promise((resolve) => { finishRail = resolve; }) })('ISL', 'ADM');
+      await flush();
+      if (scenario.startsWith('stalled')) {
+        mock.timers.tick(20_000);
+        await flush();
+        assert.equal(signal.aborted, true, scenario);
+      }
+      assert(cardText().includes(expected), scenario + ' must show its result or terminal status');
+      assert(!cardText().includes(labels.loading), scenario + ' must leave Loading');
+      assert.equal(requests, 1);
+      if (finishLateBody) {
+        finishLateBody(JSON.stringify({ estimatedArrivals: [{ estimatedArrivalTime: new Date(Date.now() + 180_000).toISOString() }] }));
+        await flush();
+        assert(cardText().includes(expected), 'Late data must not overwrite the timeout');
+        mock.timers.tick(40_000);
+        await flush();
+        assert.equal(requests, 2, 'Normal Home polling can recover after the timeout');
+        assert(cardText().includes(countdown));
+        assert(!cardText().includes(expected));
+      }
+      finishRail(new Response(null, { status: 503 }));
+      await rail;
+    }
+  } finally {
+    cleanup?.();
+    mock.timers.reset();
+    global.fetch = originalFetch;
+    if (originalDev === undefined) delete global.__DEV__; else global.__DEV__ = originalDev;
+  }
+  console.log('PASS: Home B2 settles through real request, hook and card with parallel railway reads');
+}
+
+checkGeometryScreen().then(checkMapEtaPreview).then(checkLimitedServiceAndEtaStatus).then(checkAdultFares).then(checkHomeB2EtaSettlement).then(
   () => console.log('PASS: official geometry, selected-stop ETA requests, race isolation, retry, stale and unavailable states, and bilingual routing'),
   (error) => { console.error(error); process.exitCode = 1; },
 );

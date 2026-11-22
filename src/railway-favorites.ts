@@ -1,4 +1,5 @@
 import { getDatabase } from '@/database';
+import { forgetDeletedHomePin, queueTransportFavoriteWrite, waitForTransportFavoriteWrites } from '@/home-transport-pins';
 import { findLightRailRoute, findLightRailStop } from '@/light-rail-static';
 import { findMtrLine, findMtrStation } from '@/mtr-static';
 
@@ -46,20 +47,14 @@ export function railwayFavoriteHref(identity: RailwayFavoriteIdentity) {
     : { pathname: '/light-rail/[kind]' as const, params: { kind: 'stop', id: identity.stationId, route: identity.lineId } };
 }
 
-let pendingWrites: Promise<unknown> = Promise.resolve();
-function enqueueWrite<T>(write: () => Promise<T>) {
-  const request = pendingWrites.then(write);
-  pendingWrites = request.then(() => undefined, () => undefined);
-  return request;
-}
-
 export function setRailwayFavorite(identity: RailwayFavoriteIdentity, saved: boolean) {
-  return enqueueWrite(async () => {
+  return queueTransportFavoriteWrite(async () => {
     const database = await getDatabase();
     const { mode, lineId, stationId } = identity;
     if (!saved) {
       // Removal still works when a static service has disappeared.
       await database.runAsync('DELETE FROM railway_favorites WHERE mode = ? AND line_id = ? AND station_id = ?', mode, lineId, stationId);
+      forgetDeletedHomePin(identity);
       return;
     }
     const service = resolveRailwayService(identity);
@@ -73,7 +68,7 @@ export function setRailwayFavorite(identity: RailwayFavoriteIdentity, saved: boo
 }
 
 export async function listRailwayFavorites(): Promise<RailwayFavorite[]> {
-  await pendingWrites;
+  await waitForTransportFavoriteWrites();
   const database = await getDatabase();
   const rows = await database.getAllAsync<FavoriteRow>('SELECT * FROM railway_favorites ORDER BY created_at DESC, mode, line_id, station_id');
   return rows.map((row) => {

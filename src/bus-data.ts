@@ -111,22 +111,39 @@ export function refreshBusFeed(source: BusSource) {
 export async function requestBusJson(source: BusSource, url: string, signal?: AbortSignal): Promise<unknown> {
   const startedAt = Date.now();
   const controller = new AbortController();
-  const cancel = () => controller.abort();
-  if (signal?.aborted) cancel();
-  else signal?.addEventListener('abort', cancel);
-  const timeout = setTimeout(() => controller.abort(), requestTimeout);
+  if (signal?.aborted) throw new BusFeedError('network');
   logFeed(source, 'request', { outcome: 'start', url, timeoutMs: requestTimeout });
 
   let body: string;
   let status: number | undefined;
-  try {
+  let cancel: (() => void) | undefined;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  // Native fetch or body reads may stay pending after abort. Settle the caller independently.
+  const interrupted = new Promise<never>((_, reject) => {
+    cancel = () => {
+      reject(new BusFeedError('network'));
+      controller.abort();
+    };
+    signal?.addEventListener('abort', cancel);
+    timeout = setTimeout(() => {
+      reject(new BusFeedError('timeout'));
+      controller.abort();
+    }, requestTimeout);
+  });
+
+  async function readBody() {
     const response = await fetch(url, { signal: controller.signal });
+    if (controller.signal.aborted) throw new BusFeedError('network');
     status = response.status;
     logFeed(source, 'http', { outcome: response.ok ? 'ok' : 'error', status, elapsedMs: Date.now() - startedAt });
     if (!response.ok) throw new BusFeedError('http', status);
-    body = await response.text();
+    return response.text();
+  }
+
+  try {
+    body = await Promise.race([interrupted, readBody()]);
   } catch (error) {
-    if (signal?.aborted || error instanceof BusFeedError) throw error;
+    if (signal?.aborted || (error instanceof BusFeedError && error.kind !== 'timeout')) throw error;
     const stage = status === undefined ? 'request' : 'body';
     const message = error instanceof Error ? error.message : '';
     const tlsFailure = /\b(?:tls|ssl|certificate|secure connection)\b/i.test(message);
@@ -140,7 +157,7 @@ export async function requestBusJson(source: BusSource, url: string, signal?: Ab
     throw new BusFeedError(kind);
   } finally {
     clearTimeout(timeout);
-    signal?.removeEventListener('abort', cancel);
+    if (cancel) signal?.removeEventListener('abort', cancel);
   }
 
   try {

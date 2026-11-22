@@ -1,16 +1,16 @@
 import { Link, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActionSheetIOS, ActivityIndicator, Alert, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 import { changeBusFavorites, loadBusFavorites, useBusFavorites, useUnavailableFavorites } from '@/bus-favorite-hooks';
-import { homeBusLimit, pinnedBuses, type FavoriteChange } from '@/bus-favorites';
 import { BusAction } from '@/components/bus-ui';
 import { facilityVisuals } from '@/components/nearby-facilities-map';
-import { FavoriteAction, FavoriteBusRow, savedBusStyles } from '@/components/saved-bus-ui';
+import { FavoriteBusRow, savedBusStyles } from '@/components/saved-bus-ui';
 import { AppText, EmptyState, Filters, Icon, PageHeading, Screen } from '@/components/ui';
 import { loadFacilityFavorites, removeSavedFacility, useFacilityFavorites } from '@/facility-favorite-hooks';
 import { resolveFacilityFavorite } from '@/facility-favorites';
 import { facilityText, facilityType } from '@/facilities';
+import { changeHomePin, homePinKey, homeTransportLimit, loadHomePins, useHomePins, type HomePin } from '@/home-transport-pins';
 import { useLanguage } from '@/language';
 import { loadRailwayFavorites, removeSavedRailway, useRailwayFavorites } from '@/railway-favorite-hooks';
 import { railwayFavoriteHref, resolveRailwayService, type RailwayMode } from '@/railway-favorites';
@@ -38,11 +38,12 @@ export default function SavedScreen() {
           </Pressable>
         </Link>
       </View>
-      <Filters
+      <Filters horizontal
         options={categories.map((key) => [key, copy.saved.categories[key]])}
         selected={category}
         onSelect={(key) => router.setParams({ category: key })}
       />
+      {category !== 'places' && <HomePinSummary />}
       {(category === 'all' || category === 'buses') && <SavedBuses emptyTitle={copy.saved.empty.buses} />}
       {(category === 'all' || category === 'mtr' || category === 'lightRail') && (
         <SavedRailways mode={category === 'all' ? undefined : category === 'mtr' ? 'mtr' : 'light_rail'} />
@@ -54,33 +55,11 @@ export default function SavedScreen() {
 
 function SavedBuses({ emptyTitle }: { emptyTitle: string }) {
   const { copy } = useLanguage();
-  const router = useRouter();
   const { items, status } = useBusFavorites();
   const unavailable = useUnavailableFavorites(items);
-  const pinCount = pinnedBuses(items).length;
   const labels = copy.busFavorites;
-  const pending = useRef(false);
-  const [busy, setBusy] = useState(false);
-  const [failure, setFailure] = useState<'failed' | 'limit'>();
 
-  async function change(operation: FavoriteChange) {
-    if (pending.current) return;
-    pending.current = true;
-    setBusy(true);
-    setFailure(undefined);
-    const result = await changeBusFavorites(operation);
-    if (result !== 'ok') setFailure(result);
-    pending.current = false;
-    setBusy(false);
-  }
-
-  const heading = (
-    <View style={styles.heading}>
-      <AppText variant="section" accessibilityRole="header" style={styles.sectionTitle}>{copy.saved.busSection}</AppText>
-      <FavoriteAction label={copy.saved.addBus} icon="plus" accessibilityLabel={copy.home.addBus}
-        onPress={() => router.push('/bus')} />
-    </View>
-  );
+  const heading = <AppText variant="section" accessibilityRole="header">{copy.saved.busSection}</AppText>;
 
   if (status === 'loading') return <View style={styles.list}>{heading}<EmptyState icon="clock" title={labels.loading} /></View>;
   if (status === 'error') {
@@ -96,33 +75,18 @@ function SavedBuses({ emptyTitle }: { emptyTitle: string }) {
   return (
     <View style={styles.list}>
       {heading}
-      <AppText variant="caption" tone="muted">{labels.pinCount(pinCount, homeBusLimit)}</AppText>
-      {failure && (
-        <View style={styles.notice} accessibilityRole="alert">
-          <AppText variant="detail" tone="error">{failure === 'limit' ? labels.pinLimit(homeBusLimit) : labels.saveError}</AppText>
-        </View>
-      )}
       {items.length === 0 && <EmptyState icon="bookmark" title={emptyTitle} />}
       {items.map((item) => (
         <View key={item.id} style={savedBusStyles.card}>
-          <FavoriteBusRow favorite={item}>
-            {item.pinOrder !== null && <AppText variant="caption" tone="primary">{labels.pinPosition(item.pinOrder)}</AppText>}
-            {unavailable.has(item.id) && <AppText variant="detail" tone="muted">{labels.unavailable}</AppText>}
-          </FavoriteBusRow>
-          <View style={styles.actions}>
-            <FavoriteAction label={item.pinOrder === null ? labels.pin : labels.unpin}
-              icon={item.pinOrder === null ? 'pin' : 'pin.slash'} disabled={busy}
-              onPress={() => void change({ type: item.pinOrder === null ? 'pin' : 'unpin', id: item.id })} />
-            {item.pinOrder !== null && (
-              <>
-                <FavoriteAction label={labels.moveUp} icon="arrow.up" disabled={busy || item.pinOrder === 1}
-                  onPress={() => void change({ type: 'move', id: item.id, step: -1 })} />
-                <FavoriteAction label={labels.moveDown} icon="arrow.down" disabled={busy || item.pinOrder === pinCount}
-                  onPress={() => void change({ type: 'move', id: item.id, step: 1 })} />
-              </>
-            )}
-            <FavoriteAction label={labels.remove} icon="bookmark.slash" disabled={busy} destructive
-              onPress={() => void change({ type: 'remove', id: item.id })} />
+          <View style={styles.transportLine}>
+            <View style={styles.transportDetails}>
+              <FavoriteBusRow favorite={item} compact>
+                <HomePinPosition pin={{ mode: 'bus', id: item.id }} />
+                {unavailable.has(item.id) && <AppText variant="detail" tone="muted">{labels.unavailable}</AppText>}
+              </FavoriteBusRow>
+            </View>
+            <TransportFavoriteActions pin={{ mode: 'bus', id: item.id }}
+              onRemove={() => changeBusFavorites({ type: 'remove', id: item.id })} />
           </View>
         </View>
       ))}
@@ -160,23 +124,19 @@ function SavedRailways({ mode }: { mode?: RailwayMode }) {
             <AppText variant="caption" tone="primary">{copy.saved.categories[favorite.mode === 'mtr' ? 'mtr' : 'lightRail']}</AppText>
             <AppText variant="homeCardTitle">{line}</AppText>
             <AppText variant="detail">{station}</AppText>
+            <HomePinPosition pin={favorite} />
             {!resolved && <AppText variant="detail" tone="muted">{labels.unavailable}</AppText>}
           </View>
         </>;
         return (
           <View key={favorite.id} style={savedBusStyles.card}>
-            <View style={styles.facilityLine}>
+            <View style={styles.transportLine}>
               {href ? <Pressable accessibilityRole="button" style={({ pressed }) => [styles.facilityRow, pressed && styles.pressed]}
                 onPress={() => router.push(href)}>
-                {content}<Icon name="chevron.right" color={colors.muted} size={12} />
+                {content}
               </Pressable> : <View style={styles.facilityRow}>{content}</View>}
-              <Pressable accessibilityRole="button" disabled={busy}
-                accessibilityLabel={operation === 'uncertain' ? copy.bus.retry : copy.saved.facilities.remove(`${line} · ${station}`)}
-                accessibilityState={{ busy, disabled: busy }} style={({ pressed }) => [styles.facilityAction, pressed && styles.pressed]}
-                onPress={() => void removeSavedRailway(favorite)}>
-                {busy ? <ActivityIndicator color={colors.primary} size="small" />
-                  : <Icon name={operation === 'uncertain' ? 'arrow.clockwise' : 'bookmark.slash'} size={18} />}
-              </Pressable>
+              <TransportFavoriteActions pin={favorite} busy={busy} retryRemoval={operation === 'uncertain'}
+                canPin={Boolean(resolved)} onRemove={() => removeSavedRailway(favorite)} />
             </View>
             {(operation === 'failed' || operation === 'uncertain') && (
               <AppText variant="detail" tone="error" accessibilityRole="alert" style={styles.facilityIssue}>
@@ -186,6 +146,100 @@ function SavedRailways({ mode }: { mode?: RailwayMode }) {
           </View>
         );
       })}
+    </View>
+  );
+}
+
+function HomePinSummary() {
+  const { copy } = useLanguage();
+  const { pins, status } = useHomePins();
+  if (status === 'loading') return <AppText variant="caption" tone="muted">{copy.homePins.loading}</AppText>;
+  if (status === 'error') return <BusAction label={copy.bus.retry} onPress={() => void loadHomePins()} />;
+  return <AppText variant="caption" tone="muted">{copy.busFavorites.pinCount(pins.length, homeTransportLimit)}</AppText>;
+}
+
+function HomePinPosition({ pin }: { pin: HomePin }) {
+  const { copy } = useLanguage();
+  const { pins } = useHomePins();
+  const position = pins.findIndex((item) => homePinKey(item) === homePinKey(pin)) + 1;
+  return position > 0 ? <AppText variant="caption" tone="primary">{copy.busFavorites.pinPosition(position)}</AppText> : null;
+}
+
+function TransportFavoriteActions({ pin, onRemove, busy = false, canPin = true, retryRemoval = false }: {
+  pin: HomePin;
+  onRemove: () => Promise<'ok' | 'failed' | void>;
+  busy?: boolean;
+  canPin?: boolean;
+  retryRemoval?: boolean;
+}) {
+  const { copy, locale } = useLanguage();
+  const { pins, status } = useHomePins();
+  const { width, fontScale } = useWindowDimensions();
+  const pending = useRef(false);
+  const sheetOpen = useRef(false);
+  const [working, setWorking] = useState(false);
+  const labels = copy.busFavorites;
+  const index = pins.findIndex((item) => homePinKey(item) === homePinKey(pin));
+  const pinned = index >= 0;
+  const disabled = busy || working;
+  const pinsDisabled = disabled || status !== 'ready';
+
+  async function run(change: () => Promise<'ok' | 'limit' | 'failed' | void>) {
+    if (pending.current || busy) return;
+    pending.current = true;
+    setWorking(true);
+    try {
+      const result = await change();
+      if (result === 'limit') Alert.alert(copy.homePins.limitTitle, labels.pinLimit(homeTransportLimit));
+      if (result === 'failed') Alert.alert(labels.saveError);
+    } finally {
+      pending.current = false;
+      setWorking(false);
+    }
+  }
+
+  function openMenu() {
+    if (pending.current || busy || sheetOpen.current) return;
+    const moves = pinned ? [
+      { label: labels.moveUp, disabled: pinsDisabled || index === 0, step: -1 as const },
+      { label: labels.moveDown, disabled: pinsDisabled || index === pins.length - 1, step: 1 as const },
+    ] : [];
+    const removeIndex = moves.length;
+    const options = [...moves.map(({ label }) => label), retryRemoval ? copy.bus.retry : labels.remove, copy.bus.cancel];
+    sheetOpen.current = true;
+    ActionSheetIOS.showActionSheetWithOptions({
+      options,
+      cancelButtonIndex: options.length - 1,
+      destructiveButtonIndex: retryRemoval ? undefined : removeIndex,
+      disabledButtonIndices: moves.flatMap((move, option) => move.disabled ? [option] : []),
+    }, (option) => {
+      sheetOpen.current = false;
+      if (option === removeIndex) void run(onRemove);
+      const move = moves[option];
+      if (move && !move.disabled) void run(() => changeHomePin({ type: 'move', pin, step: move.step }));
+    });
+  }
+
+  // Keep the icon and label together and leave room for the card body and More.
+  const minWidthForPinLabel = (locale === 'en' ? 400 : 385) + Math.max(0, fontScale - 1) * 80;
+  const showPinText = !pinned && width >= minWidthForPinLabel && fontScale <= 1.25;
+  return (
+    <View style={styles.transportActions}>
+      {(canPin || pinned) && (
+        <Pressable accessibilityRole="button" accessibilityLabel={pinned ? labels.unpin : labels.pin}
+          accessibilityState={{ disabled: pinsDisabled, busy: working }} disabled={pinsDisabled}
+          onPress={() => void run(() => changeHomePin({ type: pinned ? 'unpin' : 'pin', pin }))}
+          style={({ pressed }) => [styles.quickAction, showPinText && styles.labeledQuickAction,
+            pressed && styles.pressed, pinsDisabled && styles.disabledAction]}>
+          <Icon name={pinned ? 'pin.fill' : 'pin'} size={showPinText ? 16 : 18} />
+          {showPinText && <AppText variant="caption" tone="primary">{labels.pin}</AppText>}
+        </Pressable>
+      )}
+      <Pressable accessibilityRole="button" accessibilityLabel={copy.saved.moreActions}
+        accessibilityState={{ disabled }} disabled={disabled} onPress={openMenu}
+        style={({ pressed }) => [styles.quickAction, pressed && styles.pressed, disabled && styles.disabledAction]}>
+        <Icon name="ellipsis" size={20} />
+      </Pressable>
     </View>
   );
 }
@@ -295,12 +349,14 @@ const styles = StyleSheet.create({
   },
   pressed: { backgroundColor: colors.pressed },
   list: { gap: space.md },
-  sectionTitle: { flexShrink: 1 },
-  notice: { borderRadius: radius.control, backgroundColor: colors.tint, padding: space.md },
-  actions: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, padding: space.md,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border,
+  transportLine: { flexDirection: 'row', alignItems: 'center', paddingRight: space.xs },
+  transportDetails: { flex: 1, minWidth: 0 },
+  transportActions: { flexDirection: 'row', alignItems: 'center', flexShrink: 0 },
+  quickAction: {
+    minWidth: touchTarget, minHeight: touchTarget, alignItems: 'center', justifyContent: 'center', borderRadius: radius.control,
   },
+  labeledQuickAction: { flexDirection: 'row', gap: space.xs, paddingHorizontal: space.xs },
+  disabledAction: { opacity: 0.5 },
   facilityLine: { flexDirection: 'row', alignItems: 'center', paddingRight: space.sm },
   facilityRow: {
     flex: 1, minWidth: 0, minHeight: touchTarget, flexDirection: 'row', alignItems: 'center',

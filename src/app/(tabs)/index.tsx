@@ -3,19 +3,20 @@ import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { loadBusFavorites, useBusFavorites, useUnavailableFavorites } from '@/bus-favorite-hooks';
-import { pinnedBuses } from '@/bus-favorites';
 import { BusAction } from '@/components/bus-ui';
 import { FeaturedCard, HomeHero, HomeLink, HomeSection, QuickLinkCard } from '@/components/home-ui';
 import { HomeFavoriteBus } from '@/components/saved-bus-ui';
+import { HomeFavoriteRailway } from '@/components/home-favorite-railway';
 import { AppText, EmptyState, Icon, Screen, type IconName } from '@/components/ui';
 import { WeatherWarningLink } from '@/components/weather-warning-ui';
 import { getExplorePhoto } from '@/explore-place-images';
 import { getExplorePlace, homeFeaturedPlaceIds } from '@/explore-places';
 import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
+import { homePinKey, loadHomePins, useHomePins } from '@/home-transport-pins';
+import { loadRailwayFavorites, useRailwayFavorites } from '@/railway-favorite-hooks';
 import { colors, homeColors, homeLayout, radius, space, touchTarget } from '@/theme';
 
-const addFrequentRoute = { pathname: '/transport', params: { intent: 'add-frequent-route' } } satisfies Href;
 const facilityMap = { pathname: '/nearby', params: { category: 'all', view: 'map' } } satisfies Href;
 
 type QuickLink = {
@@ -48,8 +49,23 @@ export default function HomeScreen() {
   const { copy, locale } = useLanguage();
   const { home } = copy;
   const { items, status } = useBusFavorites();
-  const pins = useMemo(() => pinnedBuses(items), [items]);
-  const unavailable = useUnavailableFavorites(pins);
+  const railway = useRailwayFavorites();
+  const homePins = useHomePins();
+  const cards = useMemo(() => {
+    const busesById = new Map(items.map((favorite) => [favorite.id, favorite]));
+    const railwaysByKey = new Map(railway.items.map((favorite) => [homePinKey(favorite), favorite]));
+    return homePins.pins.map((pin) => {
+      const key = homePinKey(pin);
+      return pin.mode === 'bus'
+        ? { key, bus: busesById.get(pin.id) }
+        : { key, rail: railwaysByKey.get(key) };
+    });
+  }, [homePins.pins, items, railway.items]);
+  const buses = useMemo(() => cards.flatMap(({ bus }) => bus ? [bus] : []), [cards]);
+  const unavailable = useUnavailableFavorites(buses);
+  const waiting = status === 'loading' || railway.status === 'loading' || homePins.status === 'loading';
+  const hasError = status === 'error' || railway.status === 'error' || homePins.status === 'error';
+  const hasCards = cards.some(({ bus, rail }) => bus || rail);
 
   return (
     <Screen contentStyle={styles.screenContent} topBackgroundColor={homeColors.harbourSky}>
@@ -57,34 +73,25 @@ export default function HomeScreen() {
       <View style={styles.sections}>
         <WeatherWarningLink compact />
 
-        <HomeSection title={home.buses} icon="bus"
-          action={{ label: items.length ? copy.busFavorites.manage : home.viewAll, href: '/saved?category=buses' }}>
-          {status === 'loading' ? (
-            <EmptyState icon="clock" title={copy.busFavorites.loading} />
-          ) : status === 'error' ? (
-            <>
-              <EmptyState icon="exclamationmark.circle" title={copy.busFavorites.loadError} />
-              <BusAction label={copy.bus.retry} onPress={() => void loadBusFavorites()} />
-            </>
-          ) : pins.length > 0 ? (
-            <>
-              {pins.map((favorite) => <HomeFavoriteBus key={favorite.id} favorite={favorite} unavailable={unavailable.has(favorite.id)} />)}
-              <HomeAddBus label={home.addFrequentRoute} />
-            </>
-          ) : items.length > 0 ? (
-            <EmptyState icon="pin" title={copy.busFavorites.noPins} detail={copy.busFavorites.noPinsDetail} />
-          ) : (
-            <View style={styles.busCard}>
-              <View style={styles.busSummary}>
-                <Icon name="bus" color={colors.muted} size={34} />
-                <View style={styles.busCopy}>
-                  <AppText variant="homeCardTitle">{home.busEmpty}</AppText>
-                  <AppText variant="detail" tone="muted">{home.busDetail}</AppText>
-                </View>
-              </View>
-              <HomeAddBus label={home.addFrequentRoute} />
-            </View>
+        <HomeSection title={home.buses} icon="bus" action={{ label: copy.homeRailway.viewSaved, href: '/saved?category=all' }}>
+          {cards.map(({ key, bus, rail }) => {
+            if (bus) return <HomeFavoriteBus key={key} favorite={bus} unavailable={unavailable.has(bus.id)} />;
+            return rail ? <HomeFavoriteRailway key={key} favorite={rail} /> : null;
+          })}
+          {waiting && <AppText variant="detail" tone="muted">{copy.homePins.loading}</AppText>}
+          {hasError && <>
+            <AppText variant="detail" tone="error">{copy.homePins.loadError}</AppText>
+            <BusAction label={copy.bus.retry} onPress={() => {
+              void Promise.all([loadBusFavorites(), loadRailwayFavorites(), loadHomePins()]);
+            }} />
+          </>}
+          {!hasCards && !waiting && !hasError && (
+            <EmptyState icon="pin" title={copy.homePins.empty} detail={copy.homePins.emptyDetail} />
           )}
+          <HomeLink href="/transport" label={home.addFrequentRoute} style={styles.addBus}>
+            <Icon name="plus" size={16} />
+            <AppText variant="detail" tone="primary" style={styles.buttonLabel}>{home.addFrequentRoute}</AppText>
+          </HomeLink>
         </HomeSection>
 
         <HomeSection title={home.shortcuts} icon="safari">
@@ -131,35 +138,9 @@ export default function HomeScreen() {
   );
 }
 
-function HomeAddBus({ label }: { label: string }) {
-  return (
-    <HomeLink href={addFrequentRoute} label={label} style={styles.addBus}>
-      <Icon name="plus" size={16} />
-      <AppText variant="detail" numberOfLines={1} maxFontSizeMultiplier={1.4} tone="primary" style={styles.buttonLabel}>
-        {label}
-      </AppText>
-    </HomeLink>
-  );
-}
-
 const styles = StyleSheet.create({
   screenContent: { paddingHorizontal: 0, paddingTop: 0, gap: 0 },
   sections: { paddingHorizontal: homeLayout.gutter, gap: homeLayout.sectionGap },
-  busCard: {
-    alignItems: 'center',
-    gap: space.sm,
-    padding: space.lg,
-    borderRadius: radius.largeCard,
-    backgroundColor: homeColors.busEmpty,
-  },
-  busSummary: {
-    alignSelf: 'stretch',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: space.lg,
-  },
-  busCopy: { flexShrink: 1, minWidth: 0, gap: space.xs },
   cardCopy: { flex: 1, minWidth: 0, gap: space.xs },
   addBus: {
     maxWidth: '100%',

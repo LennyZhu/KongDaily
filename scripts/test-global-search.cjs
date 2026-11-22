@@ -148,7 +148,7 @@ async function verify() {
     [source, id, zh, en])).sort();
   assert.deepEqual(busStops.index.map(({ result }) => [result.source, result.stopId, result.name.zh, result.name.en]).sort(), seedIds);
   assert.equal(new Set(busStops.index.map(({ result }) => result.key)).size, 7841);
-  assert.equal(db.prepare('PRAGMA user_version').get().user_version, 9);
+  assert.equal(db.prepare('PRAGMA user_version').get().user_version, 10);
 
   const stops = (input) => searchBusStops(prepareGlobalSearchQuery(input), busStops);
   const ferry = stops('CENTRAL (MACAO FERRY)').results[0];

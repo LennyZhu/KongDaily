@@ -20,7 +20,7 @@ const encodeIndex = (index) => JSON.stringify({ ...index, recordsSha256: digest(
   (_key, value) => value && typeof value === 'object' && !Array.isArray(value)
     ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]])) : value)) });
 
-function loadApp(file, { failAfterV8 = false, failAfterV9 = false, changeCatalog, registry, beforeQuery, stubs = {} } = {}) {
+function loadApp(file, { failAfterV8 = false, failAfterV9 = false, failAfterV10 = false, changeCatalog, registry, beforeQuery, stubs = {} } = {}) {
   const loaded = new Map();
   let connection;
   function databaseAdapter(db, afterExec) {
@@ -61,6 +61,9 @@ function loadApp(file, { failAfterV8 = false, failAfterV9 = false, changeCatalog
               failAfterV9 = false;
               throw new Error('Injected failure after v9 DDL');
             }
+            if (failAfterV10 && sql.includes('PRAGMA user_version = 10')) {
+              throw new Error('Injected failure after v10 DDL');
+            }
           }));
           db.exec('COMMIT');
         } catch (error) {
@@ -75,7 +78,7 @@ function loadApp(file, { failAfterV8 = false, failAfterV9 = false, changeCatalog
     const testExports = {
       'app/(tabs)/nearby': 'FacilityListRow',
       'components/facility-selection-card': 'FacilitySummary',
-      'app/(tabs)/saved': 'SavedBuses, SavedFacilities, SavedRailways',
+      'app/(tabs)/saved': 'SavedBuses, SavedFacilities, SavedRailways, TransportFavoriteActions',
       'app/light-rail/[kind]': 'LightRailStationServices, LightRailRouteStops',
       'app/bus/route': 'SelectedStopCard',
       'app/bus/eta': 'EtaDetails',
@@ -136,7 +139,7 @@ function inspectV7Data(file) {
   try {
     const tables = db.prepare(`SELECT name, sql FROM sqlite_schema
       WHERE type IN ('table', 'trigger', 'index') AND sql IS NOT NULL
-        AND name NOT IN ('facility_favorites', 'railway_favorites') ORDER BY name`).all();
+        AND name NOT IN ('facility_favorites', 'railway_favorites', 'home_transport_pins', 'remove_home_bus_pin', 'remove_home_railway_pin') ORDER BY name`).all();
     return [tables, tables.filter(({ sql }) => sql.startsWith('CREATE TABLE')).map(({ name }) =>
       db.prepare(`SELECT * FROM ${name} ORDER BY rowid`).all())];
   } finally {
@@ -208,7 +211,7 @@ async function test() {
   const fresh = join(scratch, 'fresh.db');
   const freshApp = loadApp(fresh);
   const freshDb = await freshApp.load('database').getDatabase();
-  assert.equal((await freshDb.getFirstAsync('PRAGMA user_version')).user_version, 9);
+  assert.equal((await freshDb.getFirstAsync('PRAGMA user_version')).user_version, 10);
   assert.equal(await freshApp.load('database').readLanguage(), 'system');
   freshApp.close();
 
@@ -238,7 +241,7 @@ async function test() {
   assert.equal(rolledBack.prepare("SELECT 1 FROM sqlite_schema WHERE name='facility_favorites'").get(), undefined);
   rolledBack.close();
   assert.deepEqual(inspectV7Data(file), before);
-  assert.equal((await (await db.getDatabase()).getFirstAsync('PRAGMA user_version')).user_version, 9);
+  assert.equal((await (await db.getDatabase()).getFirstAsync('PRAGMA user_version')).user_version, 10);
   assert.equal(await db.readLanguage(), 'en');
   assert.deepEqual(inspectV7Data(file), before);
 
@@ -301,11 +304,13 @@ async function test() {
   assert.deepEqual(inspectV7Data(file), before);
 
   const buses = app.load('bus-favorites');
-  assert.deepEqual(buses.pinnedBuses(await buses.readBusFavorites()).map((bus) => bus.target.number), ['1', '2', '3']);
+  const homePins = app.load('home-transport-pins');
+  const pinFor = (number) => ({ mode: 'bus', id: buses.busFavoriteId(visit(number).target) });
+  assert.deepEqual(await homePins.readHomePins(), [1, 2, 3].map(pinFor));
   await buses.writeBusFavorites({ type: 'save', visit: visit(4) });
   await buses.writeBusFavorites({ type: 'remove', id: buses.busFavoriteId(visit(2).target) });
-  await buses.writeBusFavorites({ type: 'pin', id: buses.busFavoriteId(visit(4).target) });
-  assert.deepEqual(buses.pinnedBuses(await buses.readBusFavorites()).map((bus) => bus.target.number), ['1', '3', '4']);
+  await homePins.changeHomePin({ type: 'pin', pin: pinFor(4) });
+  assert.deepEqual(await homePins.readHomePins(), [1, 3, 4].map(pinFor));
   const savedBeforeClose = await favorites.listFacilityFavorites();
   app.close();
 
@@ -648,7 +653,7 @@ async function testSavedFacilityIntegration() {
     '@/facility-navigation': {},
     '@/bus-favorite-hooks': {
       useBusFavorites: () => ({ status: 'ready', items: [{
-        id: 'bus', pinOrder: 1, target: { source: 'nlb', number: 'B2' },
+        id: 'bus', target: { source: 'nlb', number: 'B2' },
       }] }),
       useUnavailableFavorites: () => new Set(),
     },
@@ -704,7 +709,7 @@ async function testSavedFacilityIntegration() {
     assert.ok(saved().some(({ type, props }) => type === 'EmptyState' && props.title === copy().saved.facilities.emptyTitle));
     const all = saved(SavedScreen);
     assert.ok(all.findIndex(({ type }) => type === SavedBuses) < all.findIndex(({ type }) => type === SavedFacilities));
-    assert.ok(saved(() => SavedBuses({ emptyTitle: '' })).some(({ type, props }) => type === 'FavoriteBusRow' && props.favorite.pinOrder === 1));
+    assert.ok(saved(() => SavedBuses({ emptyTitle: '' })).some(({ type, props }) => type === 'FavoriteBusRow' && props.favorite.id === 'bus'));
     selectTab('saved', { category: 'buses' });
     assert.equal(saved(SavedScreen).some(({ type }) => type === SavedFacilities), false);
     selectTab('saved', { category: 'places' });
@@ -998,7 +1003,10 @@ async function testRouteStopQuickFavorite() {
     assert.ok(tree(a).some(({ type, props }) => type === 'AppText' && props.children === labels().busEta.nextArrival));
     etaButton(legacy).props.onPress();
     await tick();
-    assert.equal(rows()[0].pinOrder, 1);
+    const homePins = app.load('home-transport-pins');
+    const legacyPin = { mode: 'bus', id: bus.busFavoriteId(legacy.target) };
+    assert.deepEqual(await homePins.readHomePins(), [], 'Saving the B2/stop does not pin it');
+    await homePins.changeHomePin({ type: 'pin', pin: legacyPin });
 
     holdInsert = true;
     const firstPress = button(a).props.onPress;
@@ -1018,7 +1026,7 @@ async function testRouteStopQuickFavorite() {
     assert.equal(icon(b), 'bookmark.fill');
     assert.equal(button(a).props.accessibilityLabel, '測試站 · 已收藏 · 取消收藏');
     assert.equal(etaButton(a).props.accessibilityState.selected, true);
-    assert.ok(rows().filter(({ id }) => id !== bus.busFavoriteId(legacy.target)).every(({ pinOrder }) => pinOrder === null));
+    assert.deepEqual(await homePins.readHomePins(), [legacyPin]);
 
     etaButton(a).props.onPress();
     await tick();
@@ -1039,7 +1047,7 @@ async function testRouteStopQuickFavorite() {
       BEGIN SELECT RAISE(ABORT, 'test rejected deletion'); END;`);
     const readsBeforeFailure = reads;
     await button(b).props.onPress();
-    assert.equal(reads - readsBeforeFailure, 2);
+    assert.equal(reads - readsBeforeFailure, 1);
     assert.equal(button(b).props.accessibilityState.selected, true);
     assert.ok(tree(b).some(({ props }) => props?.children === labels().busFavorites.saveError));
     assert.equal(tree(kmb).some(({ props }) => props?.accessibilityRole === 'alert'), false);
@@ -1067,7 +1075,7 @@ async function testRouteStopQuickFavorite() {
     const reopened = loadApp(file, { stubs });
     const current = await reopened.load('bus-favorites').readBusFavorites();
     assert.deepEqual(new Set(current.map(({ id }) => id)), new Set([legacy, kmb, nlb].map(({ target }) => bus.busFavoriteId(target))));
-    assert.deepEqual(bus.pinnedBuses(current).map(({ id }) => id), [bus.busFavoriteId(legacy.target)]);
+    assert.deepEqual(await reopened.load('home-transport-pins').readHomePins(), [legacyPin]);
     reopened.close();
   } finally {
     app.close();
@@ -1108,6 +1116,10 @@ async function testRailwayFavorites() {
   let failRead = false;
   let gate;
   const opened = [];
+  const pinAlerts = [];
+  const actionSheets = [];
+  let cardWidth = 402;
+  let fontScale = 1;
   const stubs = {
     react: {
       useState(initial) {
@@ -1122,6 +1134,8 @@ async function testRailwayFavorites() {
       useSyncExternalStore: (_subscribe, snapshot) => snapshot(),
     },
     'react-native': { View: 'View', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator',
+      ActionSheetIOS: { showActionSheetWithOptions: (options, choose) => actionSheets.push({ options, choose }) },
+      Alert: { alert: (...args) => pinAlerts.push(args) }, useWindowDimensions: () => ({ width: cardWidth, fontScale }),
       StyleSheet: { create: (styles) => styles, hairlineWidth: 1 }, Keyboard: { dismiss() {} } },
     'expo-router': { Link: 'Link', useLocalSearchParams: () => params,
       useRouter: () => ({ push: (href) => opened.push(href), setParams: (next) => { params = { ...params, ...next }; } }) },
@@ -1164,11 +1178,11 @@ async function testRailwayFavorites() {
   const hasText = (tree, value) => tree.some(({ props }) => props?.children === value || props?.title === value);
   try {
     const db = await app.load('database').getDatabase();
-    assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 9);
+    assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 10);
     assert.deepEqual(await db.getAllAsync('SELECT * FROM facility_favorites'), originalFacilities);
     const oldBus = await app.load('bus-favorites').readBusFavorites();
     assert.equal(oldBus[0].id, 'legacy-bus');
-    assert.equal(oldBus[0].pinOrder, 1);
+    assert.deepEqual(await app.load('home-transport-pins').readHomePins(), [{ mode: 'bus', id: 'legacy-bus' }]);
     let time = 100;
     const clock = Date.now;
     try {
@@ -1362,37 +1376,168 @@ async function testRailwayFavorites() {
       useBusFavorites: () => ({ items: busItems, status: busStatus }),
       useUnavailableFavorites: () => new Set(),
     };
-    const { SavedRailways, SavedBuses, SavedFacilities, default: SavedScreen } = reopened.load('app/(tabs)/saved');
+    const { SavedRailways, SavedBuses, SavedFacilities, TransportFavoriteActions, default: SavedScreen } = reopened.load('app/(tabs)/saved');
     stubs['@/components/saved-bus-ui'].HomeFavoriteBus = 'HomeFavoriteBus';
     stubs['@/components/home-ui'] = Object.fromEntries(['FeaturedCard', 'HomeHero', 'HomeLink', 'HomeSection', 'QuickLinkCard'].map((name) => [name, name]));
     stubs['@/components/weather-warning-ui'] = { WeatherWarningLink: 'WeatherWarningLink' };
     stubs['@/explore-place-images'] = { getExplorePhoto: () => undefined };
     stubs['../../../assets/home/west-kowloon.jpg'] = 'fixture-image';
+    let homeRailwayOverride;
+    stubs['@/railway-favorite-hooks'] = {
+      ...newHooks,
+      useRailwayFavorites: () => homeRailwayOverride ?? newHooks.useRailwayFavorites(),
+    };
     const HomeScreen = reopened.load('app/(tabs)/index').default;
+    const { FavoriteBusRow: RealFavoriteBusRow } = reopened.load('components/saved-bus-ui');
     for (const language of ['zh-HK', 'en']) {
       locale = language;
-      const home = render(HomeScreen);
-      assert.deepEqual(home.filter(({ type }) => type === 'HomeFavoriteBus').map(({ props }) => props.favorite), oldBus);
-      assert.ok(home.some(({ type, props }) => type === 'QuickLinkCard' && props.href === '/transport'));
-      assert.ok(home.some(({ type, props }) => type === 'HomeSection' && props.action?.href === '/saved?category=buses'));
+      homeRailwayOverride = { status: 'ready', items: [], operations: new Map() };
+      const pinStore = reopened.load('home-transport-pins');
+      const busPin = { mode: 'bus', id: oldBus[0].id };
+      const railItems = newHooks.useRailwayFavorites().items;
+      const islFavorite = railItems.find(({ id }) => id === repository.railwayFavoriteId(isl));
+      const lrFavorite = railItems.find(({ id }) => id === repository.railwayFavoriteId(lr610));
+      const scenarios = [
+        { buses: oldBus, rails: [], order: [busPin], expected: [oldBus[0]] },
+        { buses: [], rails: [islFavorite], order: [isl], expected: [islFavorite] },
+        { buses: [], rails: [lrFavorite], order: [lr610], expected: [lrFavorite] },
+        { buses: oldBus, rails: railItems, order: [lr610, busPin, isl], expected: [lrFavorite, oldBus[0], islFavorite] },
+        { buses: oldBus, rails: railItems, order: [], expected: [] },
+      ];
+      for (const { buses, rails, order, expected } of scenarios) {
+        for (const pin of await pinStore.readHomePins()) await pinStore.changeHomePin({ type: 'unpin', pin });
+        for (const pin of order) assert.equal(await pinStore.changeHomePin({ type: 'pin', pin }), 'ok');
+        busItems = buses;
+        homeRailwayOverride = { status: 'ready', items: rails, operations: new Map() };
+        const tree = render(HomeScreen);
+        const cards = tree.filter(({ type }) => type === 'HomeFavoriteBus' || type.name === 'HomeFavoriteRailway');
+        assert.deepEqual(cards.map(({ props }) => props.favorite), expected, 'Home follows the persisted order across transport types');
+        assert.equal(tree.some(({ type, props }) => type === 'EmptyState' && props.title === copy().homePins.empty), expected.length === 0);
+        assert.ok(tree.some(({ type, props }) => type === 'HomeSection' && props.action?.href === '/saved?category=all'));
+        assert.ok(tree.some(({ type, props }) => type === 'HomeLink' && props.href === '/transport' && props.label === copy().home.addFrequentRoute));
+      }
+      busItems = oldBus;
+      homeRailwayOverride = undefined;
+      for (const pin of [lr610, busPin, isl]) await pinStore.changeHomePin({ type: 'pin', pin });
+      const renderActions = (pin, extras = {}) => render(TransportFavoriteActions, {
+        pin, onRemove: async () => {}, ...extras,
+      });
+      const action = (tree, label) => tree.find(({ type, props }) => type === 'Pressable' && props.accessibilityLabel === label);
+      const showMenu = (tree) => {
+        action(tree, copy().saved.moreActions).props.onPress();
+        return actionSheets.at(-1);
+      };
+      const first = renderActions(lr610);
+      const middle = renderActions(busPin);
+      const last = renderActions(isl);
+      const menuLabels = language === 'en'
+        ? ['Move up', 'Move down', 'Remove from saved', 'Cancel']
+        : ['上移', '下移', '取消收藏', '取消'];
+      const navBeforeActions = opened.length;
+      for (const [tree, blocked] of [[first, [0]], [middle, []], [last, [1]]]) {
+        assert.deepEqual(tree.filter(({ type }) => type === 'Pressable').map(({ props }) => props.accessibilityLabel),
+          [copy().busFavorites.unpin, copy().saved.moreActions]);
+        assert.ok(tree.some(({ type, props }) => type === 'Icon' && props.name === 'pin.fill'));
+        assert.equal(tree.some(({ type }) => type === 'AppText'), false, 'Pinned actions use the filled icon without a duplicate label');
+        for (const { props } of tree.filter(({ type }) => type === 'Pressable')) {
+          const style = Object.assign({}, ...props.style({ pressed: false }).filter(Boolean));
+          assert(style.minWidth >= 44 && style.minHeight >= 44);
+          assert.equal(style.backgroundColor, undefined);
+        }
+        const menu = showMenu(tree);
+        const menuCount = actionSheets.length;
+        showMenu(tree);
+        assert.equal(actionSheets.length, menuCount, 'A second tap does not stack another menu');
+        assert.deepEqual(menu.options.options, menuLabels);
+        assert.deepEqual(menu.options.disabledButtonIndices, blocked);
+        assert.equal(menu.options.destructiveButtonIndex, 2);
+        if (blocked.length) menu.choose(blocked[0]); else menu.choose(menu.options.cancelButtonIndex);
+        await new Promise(setImmediate);
+        assert.deepEqual(await pinStore.readHomePins(), [lr610, busPin, isl], 'Disabled moves and cancelling the menu are inert');
+      }
+      showMenu(middle).choose(0);
+      await new Promise(setImmediate);
+      assert.deepEqual(await pinStore.readHomePins(), [busPin, lr610, isl]);
+
+      const pinLabel = language === 'en' ? 'Pin to Home' : '置頂首頁';
+      for (const pin of [busPin, eal, lr614]) {
+        const wasPinned = pin === busPin;
+        if (wasPinned) await pinStore.changeHomePin({ type: 'unpin', pin });
+        const labeled = action(renderActions(pin), pinLabel);
+        assert.deepEqual(labeled.props.children.map(({ type }) => type), ['Icon', 'AppText']);
+        assert.equal(labeled.props.children[0].props.name, 'pin');
+        assert.equal(labeled.props.children[1].props.children, pinLabel);
+        const style = Object.assign({}, ...labeled.props.style({ pressed: false }).filter(Boolean));
+        assert(style.minWidth >= 44 && style.minHeight >= 44);
+        assert.equal(style.flexDirection, 'row');
+        cardWidth = 360;
+        const narrow = action(renderActions(pin), pinLabel);
+        assert.ok(elements(narrow).some(({ type, props }) => type === 'Icon' && props.name === 'pin'));
+        assert.equal(elements(narrow).some(({ type }) => type === 'AppText'), false);
+        cardWidth = 402;
+        if (wasPinned) {
+          await pinStore.changeHomePin({ type: 'pin', pin });
+          await pinStore.changeHomePin({ type: 'move', pin, step: -1 });
+          await pinStore.changeHomePin({ type: 'move', pin, step: -1 });
+        }
+      }
+      const fourth = renderActions(eal);
+      action(fourth, pinLabel).props.onPress();
+      await new Promise(setImmediate);
+      assert.deepEqual(pinAlerts.at(-1), [copy().homePins.limitTitle, copy().busFavorites.pinLimit(3)]);
+      assert.deepEqual(await pinStore.readHomePins(), [busPin, lr610, isl]);
+      fontScale = 2.5;
+      const large = renderActions(eal);
+      assert.ok(action(large, pinLabel));
+      assert.ok(action(large, copy().saved.moreActions));
+      assert.equal(large.some(({ type }) => type === 'AppText'), false, 'Largest font uses labeled icons, with no text to clip');
+      const menu = showMenu(large);
+      assert.deepEqual(menu.options.options, menuLabels.slice(2));
+      menu.choose(menu.options.cancelButtonIndex);
+      fontScale = 1;
+      action(renderActions(isl), copy().busFavorites.unpin).props.onPress();
+      await new Promise(setImmediate);
+      assert.deepEqual(await pinStore.readHomePins(), [busPin, lr610]);
+      assert.ok(newHooks.useRailwayFavorites().items.some(({ id }) => id === islFavorite.id));
+      action(renderActions(isl), pinLabel).props.onPress();
+      await new Promise(setImmediate);
+      assert.deepEqual(await pinStore.readHomePins(), [busPin, lr610, isl]);
+      assert.equal(opened.length, navBeforeActions, 'Compact actions must not navigate');
+
+      const savedBusTree = render(SavedBuses, { emptyTitle: copy().saved.empty.buses });
+      const savedBusRow = savedBusTree.find(({ type }) => type === 'FavoriteBusRow');
+      assert.equal(savedBusRow.props.compact, true);
+      const busCardLine = savedBusTree.find(({ props }) => Array.isArray(props?.children)
+        && props.children.some((child) => child?.type === TransportFavoriteActions));
+      const [busBody, busActions] = busCardLine.props.children;
+      assert.equal(busBody.props.children, savedBusRow);
+      assert.equal(busActions.type, TransportFavoriteActions);
+      const busLink = render(RealFavoriteBusRow, savedBusRow.props)[0];
+      assert.equal(busLink.type, 'Pressable');
+      assert.equal(elements(busLink).some(({ type }) => type === TransportFavoriteActions), false);
+      busLink.props.onPress();
+      assert.equal(opened.at(-1).pathname, '/bus/eta');
+      for (const pin of await pinStore.readHomePins()) await pinStore.changeHomePin({ type: 'unpin', pin });
       for (const empty of [false, true]) {
         busItems = empty ? [] : oldBus;
         for (const status of ['ready', 'loading', 'error']) {
           busStatus = status;
           const buses = render(SavedBuses, { emptyTitle: copy().saved.empty.buses });
-          const add = buses.find(({ type, props }) => type === 'FavoriteAction' && props.label === copy().saved.addBus);
-          assert.ok(hasText(buses, language === 'en' ? 'Favorite buses' : '常用巴士'));
-          assert.ok(add && add.props.icon === 'plus');
-          add.props.onPress();
-          assert.equal(opened.at(-1), '/bus', 'Header Add retains the existing bus flow');
-          assert.equal(buses.some(({ type, props }) => type === 'BusAction' && props.label === copy().home.addBus), false);
-          if (!empty && status === 'ready') assert.ok(buses.indexOf(add) < buses.findIndex(({ type }) => type === 'FavoriteBusRow'));
+          assert.ok(buses.some(({ type, props }) => type === 'AppText' && props.accessibilityRole === 'header'
+            && props.children === (language === 'en' ? 'Favorite buses' : '常用巴士')));
+          assert.equal(buses.some(({ type }) => type === 'FavoriteAction' || type === 'Pressable'), false);
+          assert.equal(buses.filter(({ type }) => type === 'FavoriteBusRow').length, status === 'ready' && !empty ? oldBus.length : 0);
+          if (status === 'ready' && empty) {
+            assert.ok(buses.some(({ type, props }) => type === 'EmptyState' && props.title === copy().saved.empty.buses));
+            assert.equal(buses[0].props.children.filter(Boolean).flat().length, 2, 'Empty section only renders the heading and its empty state');
+          }
         }
       }
       busItems = oldBus; busStatus = 'ready';
       for (const category of ['all', 'buses', 'mtr', 'lightRail', 'places']) {
         params = { category };
         const rootTree = render(SavedScreen);
+        assert.equal(rootTree.find(({ type }) => type === 'Filters').props.horizontal, true);
         assert.deepEqual(rootTree.find(({ type }) => type === 'Filters').props.options.map(([key]) => key),
           ['all', 'buses', 'mtr', 'lightRail', 'places']);
         assert.equal(rootTree.some(({ type }) => type === SavedBuses), ['all', 'buses'].includes(category));
@@ -1402,7 +1547,7 @@ async function testRailwayFavorites() {
         if (!railSection) continue;
         const rows = render(SavedRailways, railSection.props);
         const active = newHooks.useRailwayFavorites().items.filter((item) => !railSection.props.mode || item.mode === railSection.props.mode);
-        assert.equal(rows.filter(({ props }) => props?.accessibilityLabel?.startsWith(language === 'en' ? 'Remove ' : '取消收藏：')).length, active.length);
+        assert.equal(rows.filter(({ type }) => type === TransportFavoriteActions).length, active.length);
         assert.ok(hasText(rows, copy().railwayFavorites.title));
         if (category === 'all') {
           assert.ok(hasText(rows, copy().railwayFavorites.unavailable));
@@ -1411,12 +1556,35 @@ async function testRailwayFavorites() {
             ? (repository.resolveRailwayService(item)?.line ?? item.lineSnapshot)[language === 'en' ? 'en' : 'zh']
             : copy().lightRail.route(item.lineId)));
           const clickable = rows.filter(({ type, props }) => type === 'Pressable' && !props.accessibilityLabel);
+          for (const body of clickable) {
+            assert.equal(elements(body).some(({ type }) => type === TransportFavoriteActions), false);
+            assert.ok(rows.some(({ props }) => Array.isArray(props?.children) && props.children[0] === body
+              && props.children[1]?.type === TransportFavoriteActions));
+          }
           assert.equal(clickable.length, active.length - 1);
           clickable.forEach((row) => row.props.onPress());
           assert.deepEqual(opened.slice(-clickable.length), active.filter((item) => repository.railwayFavoriteHref(item)).map(repository.railwayFavoriteHref));
         }
       }
     }
+    homeRailwayOverride = undefined;
+    const removedFromHome = newHooks.useRailwayFavorites().items[0];
+    const reopenedPins = reopened.load('home-transport-pins');
+    await reopenedPins.changeHomePin({ type: 'pin', pin: removedFromHome });
+    assert.equal(render(HomeScreen).some(({ type, props }) => type.name === 'HomeFavoriteRailway' && props.favorite.id === removedFromHome.id), true);
+    const railCardActions = render(SavedRailways).find(({ type, props }) => type === TransportFavoriteActions && props.pin.id === removedFromHome.id);
+    const more = render(TransportFavoriteActions, railCardActions.props)
+      .find(({ props }) => props?.accessibilityLabel === copy().saved.moreActions);
+    const beforeRemoval = opened.length;
+    more.props.onPress();
+    const pinnedRemoveMenu = actionSheets.at(-1);
+    pinnedRemoveMenu.choose(pinnedRemoveMenu.options.destructiveButtonIndex);
+    await new Promise(setImmediate);
+    assert.equal(opened.length, beforeRemoval);
+    assert.deepEqual(await reopenedPins.readHomePins(), []);
+    assert.equal(render(HomeScreen).some(({ type, props }) => type.name === 'HomeFavoriteRailway' && props.favorite.id === removedFromHome.id), false);
+    await newHooks.useRailwayFavorite(removedFromHome).onPress();
+    assert.equal(render(HomeScreen).some(({ type, props }) => type.name === 'HomeFavoriteRailway' && props.favorite.id === removedFromHome.id), false, 'Re-saving does not pin');
     // Category selection stays in the existing tab's route params.
     params = { category: 'mtr' };
     const beforeDetail = render(SavedScreen);
@@ -1427,8 +1595,13 @@ async function testRailwayFavorites() {
     const afterDetail = render(SavedScreen);
     assert.equal(afterDetail.find(({ type }) => type === 'Filters').props.selected, 'lightRail');
     const removed = pair('mtr', 'REMOVED', 'ADM');
-    const unavailableRemove = render(SavedRailways).find(({ props }) => props?.accessibilityLabel === copy().saved.facilities.remove('Old line · Admiralty'));
-    unavailableRemove.props.onPress();
+    const unavailableRemove = render(SavedRailways).find(({ type, props }) => type === TransportFavoriteActions && props.pin.id === repository.railwayFavoriteId(removed));
+    const unavailableActions = render(TransportFavoriteActions, unavailableRemove.props);
+    assert.equal(unavailableActions.filter(({ type }) => type === 'Pressable').length, 1);
+    unavailableActions.find(({ type }) => type === 'Pressable').props.onPress();
+    const removeMenu = actionSheets.at(-1);
+    removeMenu.choose(removeMenu.options.destructiveButtonIndex);
+    await new Promise(setImmediate);
     await new Promise(setImmediate);
     assert.equal(newHooks.useRailwayFavorites().items.length, 7);
     for (const item of [...newHooks.useRailwayFavorites().items]) await newHooks.removeSavedRailway(item);
@@ -1450,7 +1623,69 @@ async function testRailwayFavorites() {
   console.log('PASS: SQLite v8→v9 rollback / old-data preservation, railway pair identities, loops, deduplication, write/read failures, restart / backup copy, bilingual Saved filters, Home bus pins and detail context');
 }
 
-test().then(testNearbyFavoriteButtons).then(testSavedFacilityIntegration).then(testRouteStopQuickFavorite).then(testRailwayFavorites)
-  .then(() => console.log('PASS: registry, SQLite v9, facility favorites, nearby bilingual filters / Map–List / legacy bus / manual location, bus pins and route stop quick favorites'))
+async function testHomePinMigration() {
+  const bus = (id) => ({ mode: 'bus', id });
+  const [mtr, lightRail, olderRail] = [
+    { mode: 'mtr', lineId: 'EAL', stationId: 'ADM' },
+    { mode: 'light_rail', lineId: '610', stationId: '380' },
+    { mode: 'mtr', lineId: 'ISL', stationId: 'ADM' },
+  ];
+  const expected = [[lightRail, mtr], [bus('B'), lightRail, mtr], [bus('B'), bus('A'), lightRail], [bus('B'), bus('A'), bus('C')]];
+  for (const [count, order] of expected.entries()) {
+    const file = join(scratch, `pins-v9-${count}.db`);
+    const seed = new DatabaseSync(file);
+    seed.exec(sqlFromSource.slice(0, 9).join('\n'));
+    const insertBus = seed.prepare(`INSERT INTO bus_favorites (id, source, route_number, direction, stop_id, stop_seq,
+      repeated_stop, station_zh, station_en, destination_zh, destination_en, created_at, updated_at, pin_order)
+      VALUES (?, 'citybus', '1', 'outbound', '000001', 1, 0, '站', 'Stop', '終點', 'Destination', 1, 1, ?)`);
+    const legacyRanks = count === 1 ? { B: 2 } : count === 2 ? { B: 1, A: 3 } : count === 3 ? { B: 1, A: 2, C: 3 } : {};
+    for (const id of ['A', 'B', 'C']) insertBus.run(id, legacyRanks[id] ?? null);
+    const insertRail = seed.prepare(`INSERT INTO railway_favorites VALUES (?, ?, ?, '路線', 'Route', '站', 'Station', ?, 1)`);
+    for (const [pin, time] of [[olderRail, 2], [mtr, 3], [lightRail, 3]]) insertRail.run(pin.mode, pin.lineId, pin.stationId, time);
+    const before = ['bus_favorites', 'railway_favorites'].map((table) => seed.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all());
+    seed.close();
+
+    if (count === 1) {
+      const failure = loadApp(file, { failAfterV10: true });
+      await assert.rejects(failure.load('database').getDatabase(), /v10 DDL/);
+      const rolledBack = new DatabaseSync(file);
+      assert.equal(version(rolledBack), 9);
+      assert.equal(rolledBack.prepare("SELECT name FROM sqlite_schema WHERE name = 'home_transport_pins'").get(), undefined);
+      rolledBack.close();
+    }
+    const migrated = loadApp(file);
+    const store = migrated.load('home-transport-pins');
+    assert.deepEqual(await store.readHomePins(), order);
+    const db = new DatabaseSync(file);
+    assert.equal(version(db), 10);
+    assert.deepEqual(['bus_favorites', 'railway_favorites'].map((table) => db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()), before);
+    db.close();
+    if (count === 1) {
+      assert.equal(await store.changeHomePin({ type: 'pin', pin: lightRail }), 'ok');
+      const results = await Promise.all([bus('C'), olderRail].map((pin) => store.changeHomePin({ type: 'pin', pin })));
+      assert.deepEqual(results, ['limit', 'limit']);
+      assert.deepEqual(await store.readHomePins(), order, 'A fourth pin cannot replace an existing pin');
+      await store.changeHomePin({ type: 'move', pin: lightRail, step: -1 });
+      await store.changeHomePin({ type: 'move', pin: bus('B'), step: 1 });
+      assert.deepEqual(await store.readHomePins(), [lightRail, mtr, bus('B')]);
+      await store.changeHomePin({ type: 'unpin', pin: lightRail });
+      assert.equal((await migrated.load('railway-favorites').listRailwayFavorites()).length, 3);
+      await store.changeHomePin({ type: 'pin', pin: lightRail });
+      await migrated.load('bus-favorites').writeBusFavorites({ type: 'remove', id: 'B' });
+      await migrated.load('railway-favorites').setRailwayFavorite(mtr, false);
+      assert.deepEqual(await store.readHomePins(), [lightRail]);
+      assert.equal(await store.changeHomePin({ type: 'pin', pin: bus('missing') }), 'ok');
+      assert.deepEqual(await store.readHomePins(), [lightRail], 'Only saved services can be pinned');
+    }
+    migrated.close();
+    const reopened = loadApp(file);
+    assert.deepEqual(await reopened.load('home-transport-pins').readHomePins(), count === 1 ? [lightRail] : order);
+    reopened.close();
+  }
+  console.log('PASS: v9→v10 rollback, zero-to-three legacy bus pins, deterministic railway fill, shared limit, cross-mode order, removal and restart');
+}
+
+test().then(testNearbyFavoriteButtons).then(testSavedFacilityIntegration).then(testRouteStopQuickFavorite).then(testRailwayFavorites).then(testHomePinMigration)
+  .then(() => console.log('PASS: registry, SQLite v10, facility favorites, nearby bilingual filters, bus and railway favorites and shared Home pins'))
   .catch((error) => { console.error(error); process.exitCode = 1; })
   .finally(() => rmSync(scratch, { recursive: true, force: true }));

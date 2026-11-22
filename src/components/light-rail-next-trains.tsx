@@ -1,18 +1,16 @@
-import { useCallback } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Icon } from '@/components/ui';
 import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
-import { readLightRailNextTrains } from '@/light-rail-next-train-client';
+import { useLightRailNextTrains } from '@/light-rail-next-train-hooks';
 import { lightRailForecastView, type LightRailTrain } from '@/light-rail-realtime';
-import { useNextTrainReading } from '@/next-train-hooks';
 import { formatHongKongTime } from '@/next-train-time';
 import { colors, radius, space, touchTarget } from '@/theme';
 
 type Labels = Messages['lightRail']['nextTrains'];
 
-function timeText(train: LightRailTrain, labels: Labels) {
+export function lightRailTimeText(train: LightRailTrain, labels: Labels) {
   if (train.serviceIssue) return labels.serviceIssue;
   switch (train.time.kind) {
     case 'minutes': return labels.minutes(train.time.minutes);
@@ -27,8 +25,7 @@ function timeText(train: LightRailTrain, labels: Labels) {
 export function LightRailNextTrains({ stationId, selectedRoute }: { stationId: string; selectedRoute?: string }) {
   const { copy, locale } = useLanguage();
   const labels = copy.lightRail.nextTrains;
-  const read = useCallback(() => readLightRailNextTrains(stationId), [stationId]);
-  const { reading, now, busy, refresh } = useNextTrainReading(stationId, read);
+  const { reading, now, busy, refresh } = useLightRailNextTrains(stationId);
   const view = reading ? lightRailForecastView(reading, now) : undefined;
   const kind = view?.kind ?? 'loading';
   const updatedAt = view && 'updatedAt' in view ? view.updatedAt : undefined;
@@ -72,7 +69,7 @@ export function LightRailNextTrains({ stationId, selectedRoute }: { stationId: s
                   <View style={styles.time}>
                     {showEvent && <AppText variant="caption" tone="muted" style={styles.eventLabel}>{labels[event]}</AppText>}
                     <AppText variant="detail" tone={serviceIssue ? 'muted' : 'primary'} style={styles.timeText}>
-                      {timeText(train, labels)}
+                      {lightRailTimeText(train, labels)}
                     </AppText>
                   </View>
                 </View>
