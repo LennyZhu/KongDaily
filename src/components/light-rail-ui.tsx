@@ -12,8 +12,8 @@ export function lightRailEndpoints(pattern: LightRailPattern, locale: 'zh-HK' | 
   if (first && last) return locale === 'en' ? `${first.en} → ${last.en}` : `${first.zh} → ${last.zh}`;
 }
 
-export function LightRailEntryRow({ entry, sequence, nearby }: {
-  entry: LightRailEntry; sequence?: number; nearby?: { boarding: LightRailStop; distance: string };
+export function LightRailEntryRow({ entry, sequence, nearby, routeId }: {
+  entry: LightRailEntry; sequence?: number; nearby?: { boarding: LightRailStop; distance: string }; routeId?: string;
 }) {
   const { copy, locale } = useLanguage();
   const router = useRouter();
@@ -26,7 +26,10 @@ export function LightRailEntryRow({ entry, sequence, nearby }: {
   return (
     <Pressable accessibilityRole="button" onPress={() => {
       Keyboard.dismiss();
-      router.push({ pathname: '/light-rail/[kind]', params: { kind: isRoute ? 'route' : 'stop', id: entry.id } });
+      router.push({ pathname: '/light-rail/[kind]', params: {
+        kind: isRoute ? 'route' : 'stop', id: entry.id,
+        ...(!isRoute && routeId && entry.routes.includes(routeId) ? { route: routeId } : {}),
+      } });
     }} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
       {sequence === undefined
         ? <Icon name={isRoute ? 'train.side.front.car' : 'mappin'} size={18} />

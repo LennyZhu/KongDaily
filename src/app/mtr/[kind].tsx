@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Alert, Linking, Pressable, StyleSheet, View, type ScrollView } from 'react-native';
 
 import { MtrEntryRow } from '@/components/mtr-ui';
 import { MtrNextTrains } from '@/components/mtr-next-trains';
@@ -13,6 +13,7 @@ import { space, touchTarget } from '@/theme';
 export default function MtrDetailsScreen() {
   const { kind, code, line } = useLocalSearchParams();
   const { copy, locale } = useLanguage();
+  const scrollRef = useRef<ScrollView>(null);
   const entry = kind === 'line' ? findMtrLine(code) : kind === 'station' ? findMtrStation(code) : undefined;
 
   if (!entry) {
@@ -21,13 +22,15 @@ export default function MtrDetailsScreen() {
   const lineContext = line === undefined || typeof line === 'string' ? line : '';
 
   return (
-    <Screen hasHeader contentStyle={styles.section}>
-      <PageHeading title={mtrName(entry, locale)} description={mtrName(entry, locale === 'en' ? 'zh-HK' : 'en')} />
+    <Screen hasHeader contentStyle={styles.section} scrollRef={scrollRef}>
       {entry.kind === 'mtr-line' ? (
-        <MtrLineStations key={entry.id} line={entry} />
+        <>
+          <PageHeading title={mtrName(entry, locale)} description={mtrName(entry, locale === 'en' ? 'zh-HK' : 'en')} />
+          <MtrLineStations key={entry.id} line={entry} />
+        </>
       ) : (
         <>
-          <MtrNextTrains key={JSON.stringify([entry.id, lineContext])} station={entry} initialLine={lineContext} />
+          <MtrNextTrains key={JSON.stringify([entry.id, lineContext])} station={entry} initialLine={lineContext} scrollRef={scrollRef} />
           <View style={styles.rows}>
             {entry.supplemental && <AppText variant="detail" tone="muted">{copy.mtr.racecourse}</AppText>}
             <AppText variant="homeHeading" accessibilityRole="header">{copy.mtr.lines}</AppText>

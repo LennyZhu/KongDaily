@@ -16,8 +16,8 @@ import { TransportSearch, TransportModePicker, TransportUnavailable, type Transp
 import { AppText, EmptyState, Icon } from '@/components/ui';
 import { loadGlobalBusStops, railwaySearchResult, searchTransport, type BusStopSearchResult, type GlobalBusStopsState } from '@/global-search';
 import { useLanguage } from '@/language';
-import { lightRailRoutes, lightRailStops, type LightRailEntry } from '@/light-rail-static';
-import { mtrLines, mtrStations, type MtrEntry } from '@/mtr-static';
+import type { LightRailEntry } from '@/light-rail-static';
+import type { MtrEntry } from '@/mtr-static';
 import {
   kmbNearbyNeedsRefresh, prepareNearbyBusIndex, readNearbyBusStops, refreshKmbNearbyStops,
   type BusSearchRadius, type Coordinates, type NearbyBusStop,
@@ -75,7 +75,6 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   const [mode, setMode] = useState<Mode>('routes');
   const [mtrView, setMtrView] = useState<Mode>('routes');
   const [lightRailView, setLightRailView] = useState<Mode>('routes');
-  const [showRailDirectory, setShowRailDirectory] = useState(false);
   const [expandedStopGroups, setExpandedStopGroups] = useState<Set<string>>(() => new Set());
   const [radiusMeters, setRadiusMeters] = useState<BusSearchRadius>(500);
   const [pickingRadius, setPickingRadius] = useState(false);
@@ -133,8 +132,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   const railCopy = mtrMode ? copy.mtr : lightRailMode ? copy.lightRail : undefined;
   const normalizedQuery = normalizeBusQuery(query);
   const searching = transport && (showBuses || Boolean(railCopy)) && normalizedQuery.length > 0;
-  const railDirectory = Boolean(railCopy) && showRailDirectory;
-  const showingNearby = (showBuses || Boolean(railCopy)) && !railDirectory;
+  const showingNearby = showBuses || Boolean(railCopy);
   const needsNearbyLocation = showingNearby && !searching;
   const searchingBuses = searching && showBuses;
   const mixedSearch = searching && transportMode === 'all';
@@ -161,23 +159,22 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   const routeResult = resultForRadius?.routes;
   const routeRows = showBuses && !searching && mode === 'routes' && Array.isArray(routeResult) ? routeResult : emptyRoutes;
   const view = mtrMode ? mtrView : lightRailMode ? lightRailView : mode;
-  const directory = mtrMode ? (view === 'routes' ? mtrLines : mtrStations) : (view === 'routes' ? lightRailRoutes : lightRailStops);
   // During a passive refresh, All keeps rail and the still-visible bus results on the same reference point.
   const nearbyReference = showBuses && resultForRadius ? resultForRadius.reference : reference;
-  const railRows = useMemo(() => transport && !searching && !railDirectory && nearbyReference
+  const railRows = useMemo(() => transport && !searching && nearbyReference
     && (transportMode === 'all' || mtrMode || lightRailMode)
     ? nearbyRailwayRows(nearbyReference.point, radiusMeters, view, mtrMode ? 'mtr' : lightRailMode ? 'lightRail' : undefined) : [],
-  [transport, searching, railDirectory, nearbyReference, transportMode, mtrMode, lightRailMode, radiusMeters, view]);
+  [transport, searching, nearbyReference, transportMode, mtrMode, lightRailMode, radiusMeters, view]);
   const nearbyRows = useMemo(() => {
     const buses = mode === 'routes' ? routeRows : stopGroups;
     if (!transport || transportMode === 'bus') return buses;
     if (transportMode !== 'all') return railRows;
     return [...buses, ...railRows].sort((a, b) => nearbyDistance(a) - nearbyDistance(b) || browseKey(a).localeCompare(browseKey(b)));
   }, [transport, transportMode, mode, routeRows, stopGroups, railRows]);
-  const rows = searching ? searchResults : railDirectory ? directory : nearbyRows;
+  const rows = searching ? searchResults : nearbyRows;
   const mixedNearby = transport && transportMode === 'all' && !searching;
   const nearbyScope = `${view}:${referenceRevision}:${radiusMeters}`;
-  const contentScope = searching ? 'search' : railDirectory ? `directory:${view}` : nearbyScope;
+  const contentScope = searching ? 'search' : nearbyScope;
   const listScope = transport ? `${transportMode}:${contentScope}` : nearbyScope;
   const browseScope = searching ? `${listScope}:${normalizedQuery}` : listScope;
   const { recordVisible, scrollProps } = useTransportListPosition<ListItem>(transport, browseScope, rows, listRef, browseKey);
@@ -375,7 +372,6 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
 
   function editQuery(value: string) {
     const next = normalizeBusQuery(value);
-    if (!next && normalizedQuery) setShowRailDirectory(false);
     if (next) {
       if (showBuses) setCatalogueRequested(true);
       if (searching && next !== normalizedQuery) listRef.current?.scrollToOffset({ offset: 0, animated: false });
@@ -384,7 +380,6 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   }
 
   function selectTransport(next: TransportMode) {
-    if (next !== transportMode) setShowRailDirectory(false);
     setTransportMode(next);
     if (next !== 'all' && next !== 'bus') {
       setFocusSearchOnMount(false);
@@ -522,11 +517,6 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
               );
             })}
           </View>}
-          {railCopy && <ListAction label={railDirectory ? copy.transport.viewNearby : copy.transport.viewAll}
-            onPress={() => { setShowRailDirectory((show) => !show); setPicking(false); setPickingRadius(false); }} />}
-          {railDirectory && <AppText variant="homeHeading" accessibilityRole="header">
-            {view === 'routes' ? railCopy!.lines : railCopy!.stations}
-          </AppText>}
           {showingNearby && <View style={[styles.heading, transport && styles.transportHeading]}>
             <AppText variant="homeHeading" accessibilityRole="header" style={[styles.copy, transport && styles.transportHeadingTitle]}>
               {transport && transportMode !== 'bus' ? (view === 'routes' ? copy.transport.nearbyRoutes : copy.transport.nearbyStops)
@@ -603,8 +593,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
               detail={transportMode === 'bus' ? copy.bus.searchHint : undefined} />
           </View>
         ) : null
-      ) : railDirectory ? <EmptyState icon={mtrMode ? 'tram.fill.tunnel' : 'train.side.front.car'} title={railCopy!.noDirectory} />
-        : !showingNearby ? <TransportUnavailable copy={copy.transport} mode={transportMode} /> : transport && !reference ? null
+      ) : !showingNearby ? <TransportUnavailable copy={copy.transport} mode={transportMode} /> : transport && !reference ? null
           : railCopy ? <View style={styles.header}>
             <EmptyState icon={mtrMode ? 'tram.fill.tunnel' : 'train.side.front.car'}
               title={(view === 'routes' ? copy.transport.noNearbyRoutes : copy.transport.noNearbyStops)(range)} detail={copy.transport.nearbyHint} />

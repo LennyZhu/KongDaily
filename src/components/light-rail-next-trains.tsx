@@ -24,7 +24,7 @@ function timeText(train: LightRailTrain, labels: Labels) {
   }
 }
 
-export function LightRailNextTrains({ stationId }: { stationId: string }) {
+export function LightRailNextTrains({ stationId, selectedRoute }: { stationId: string; selectedRoute?: string }) {
   const { copy, locale } = useLanguage();
   const labels = copy.lightRail.nextTrains;
   const read = useCallback(() => readLightRailNextTrains(stationId), [stationId]);
@@ -37,6 +37,7 @@ export function LightRailNextTrains({ stationId }: { stationId: string }) {
   return (
     <View style={styles.section}>
       <AppText variant="homeHeading" accessibilityRole="header">{labels.title}</AppText>
+      {selectedRoute && <AppText variant="detail" tone="primary">{copy.railwayFavorites.routeContext(selectedRoute)}</AppText>}
       <View style={styles.card}>
         <View style={styles.toolbar}>
           <AppText variant="caption" tone="muted" style={styles.copy}>{labels.provider}</AppText>
@@ -60,8 +61,9 @@ export function LightRailNextTrains({ stationId }: { stationId: string }) {
               return (
                 <View key={index} style={styles.train}>
                   <View style={styles.copy}>
-                    <AppText variant="detail">
-                      {route.code ? copy.lightRail.route(route.code) : special ? labels.special : labels.unknownRoute}
+                    <AppText variant="detail" tone={selectedRoute === route.code && route.kind === 'regular' ? 'primary' : 'text'}>
+                      {`${route.code ? copy.lightRail.route(route.code) : special ? labels.special : labels.unknownRoute}${
+                        selectedRoute === route.code && route.kind === 'regular' ? ` · ${copy.railwayFavorites.selectedRoute}` : ''}`}
                     </AppText>
                     <AppText variant="detail" tone="muted">{dest ?? labels.unknownDestination}</AppText>
                     {special && route.code && <AppText variant="caption" tone="primary">{labels.special}</AppText>}

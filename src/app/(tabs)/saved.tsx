@@ -12,9 +12,11 @@ import { loadFacilityFavorites, removeSavedFacility, useFacilityFavorites } from
 import { resolveFacilityFavorite } from '@/facility-favorites';
 import { facilityText, facilityType } from '@/facilities';
 import { useLanguage } from '@/language';
+import { loadRailwayFavorites, removeSavedRailway, useRailwayFavorites } from '@/railway-favorite-hooks';
+import { railwayFavoriteHref, resolveRailwayService, type RailwayMode } from '@/railway-favorites';
 import { colors, radius, space, touchTarget } from '@/theme';
 
-const categories = ['all', 'buses', 'places'] as const;
+const categories = ['all', 'buses', 'mtr', 'lightRail', 'places'] as const;
 
 export default function SavedScreen() {
   const { copy } = useLanguage();
@@ -41,8 +43,11 @@ export default function SavedScreen() {
         selected={category}
         onSelect={(key) => router.setParams({ category: key })}
       />
-      {category !== 'places' && <SavedBuses emptyTitle={copy.saved.empty[category]} />}
-      {category !== 'buses' && <SavedFacilities />}
+      {(category === 'all' || category === 'buses') && <SavedBuses emptyTitle={copy.saved.empty.buses} />}
+      {(category === 'all' || category === 'mtr' || category === 'lightRail') && (
+        <SavedRailways mode={category === 'all' ? undefined : category === 'mtr' ? 'mtr' : 'light_rail'} />
+      )}
+      {(category === 'all' || category === 'places') && <SavedFacilities />}
     </Screen>
   );
 }
@@ -69,18 +74,28 @@ function SavedBuses({ emptyTitle }: { emptyTitle: string }) {
     setBusy(false);
   }
 
-  if (status === 'loading') return <EmptyState icon="clock" title={labels.loading} />;
+  const heading = (
+    <View style={styles.heading}>
+      <AppText variant="section" accessibilityRole="header" style={styles.sectionTitle}>{copy.saved.busSection}</AppText>
+      <FavoriteAction label={copy.saved.addBus} icon="plus" accessibilityLabel={copy.home.addBus}
+        onPress={() => router.push('/bus')} />
+    </View>
+  );
+
+  if (status === 'loading') return <View style={styles.list}>{heading}<EmptyState icon="clock" title={labels.loading} /></View>;
   if (status === 'error') {
     return (
-      <>
+      <View style={styles.list}>
+        {heading}
         <EmptyState icon="exclamationmark.circle" title={labels.loadError} />
         <BusAction label={copy.bus.retry} onPress={() => void loadBusFavorites()} />
-      </>
+      </View>
     );
   }
 
   return (
     <View style={styles.list}>
+      {heading}
       <AppText variant="caption" tone="muted">{labels.pinCount(pinCount, homeBusLimit)}</AppText>
       {failure && (
         <View style={styles.notice} accessibilityRole="alert">
@@ -111,7 +126,66 @@ function SavedBuses({ emptyTitle }: { emptyTitle: string }) {
           </View>
         </View>
       ))}
-      <BusAction label={copy.home.addBus} onPress={() => router.push('/bus')} />
+    </View>
+  );
+}
+
+function SavedRailways({ mode }: { mode?: RailwayMode }) {
+  const { copy, locale } = useLanguage();
+  const router = useRouter();
+  const { items, status, operations } = useRailwayFavorites();
+  const labels = copy.railwayFavorites;
+  const visible = mode ? items.filter((item) => item.mode === mode) : items;
+  return (
+    <View style={styles.list}>
+      <AppText variant="section" accessibilityRole="header">{labels.title}</AppText>
+      {status === 'loading' && <EmptyState icon="clock" title={labels.loading} />}
+      {status === 'error' && <>
+        <EmptyState icon="exclamationmark.circle" title={labels.loadError} />
+        <BusAction label={copy.bus.retry} onPress={() => void loadRailwayFavorites()} />
+      </>}
+      {status === 'ready' && visible.length === 0 && <EmptyState icon="bookmark" title={labels.empty} detail={labels.emptyDetail} />}
+      {visible.map((favorite) => {
+        const resolved = resolveRailwayService(favorite);
+        const names = resolved ?? { line: favorite.lineSnapshot, station: favorite.stationSnapshot };
+        const nameKey = locale === 'en' ? 'en' : 'zh';
+        const line = favorite.mode === 'mtr' ? names.line[nameKey] : copy.lightRail.route(favorite.lineId);
+        const station = names.station[nameKey];
+        const href = railwayFavoriteHref(favorite);
+        const operation = operations.get(favorite.id);
+        const busy = operation === 'saving';
+        const content = <>
+          <View style={styles.facilityBadge}><Icon name="train.side.front.car" size={18} /></View>
+          <View style={styles.facilityCopy}>
+            <AppText variant="caption" tone="primary">{copy.saved.categories[favorite.mode === 'mtr' ? 'mtr' : 'lightRail']}</AppText>
+            <AppText variant="homeCardTitle">{line}</AppText>
+            <AppText variant="detail">{station}</AppText>
+            {!resolved && <AppText variant="detail" tone="muted">{labels.unavailable}</AppText>}
+          </View>
+        </>;
+        return (
+          <View key={favorite.id} style={savedBusStyles.card}>
+            <View style={styles.facilityLine}>
+              {href ? <Pressable accessibilityRole="button" style={({ pressed }) => [styles.facilityRow, pressed && styles.pressed]}
+                onPress={() => router.push(href)}>
+                {content}<Icon name="chevron.right" color={colors.muted} size={12} />
+              </Pressable> : <View style={styles.facilityRow}>{content}</View>}
+              <Pressable accessibilityRole="button" disabled={busy}
+                accessibilityLabel={operation === 'uncertain' ? copy.bus.retry : copy.saved.facilities.remove(`${line} · ${station}`)}
+                accessibilityState={{ busy, disabled: busy }} style={({ pressed }) => [styles.facilityAction, pressed && styles.pressed]}
+                onPress={() => void removeSavedRailway(favorite)}>
+                {busy ? <ActivityIndicator color={colors.primary} size="small" />
+                  : <Icon name={operation === 'uncertain' ? 'arrow.clockwise' : 'bookmark.slash'} size={18} />}
+              </Pressable>
+            </View>
+            {(operation === 'failed' || operation === 'uncertain') && (
+              <AppText variant="detail" tone="error" accessibilityRole="alert" style={styles.facilityIssue}>
+                {operation === 'uncertain' ? labels.read : labels.write}
+              </AppText>
+            )}
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -221,6 +295,7 @@ const styles = StyleSheet.create({
   },
   pressed: { backgroundColor: colors.pressed },
   list: { gap: space.md },
+  sectionTitle: { flexShrink: 1 },
   notice: { borderRadius: radius.control, backgroundColor: colors.tint, padding: space.md },
   actions: {
     flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, padding: space.md,

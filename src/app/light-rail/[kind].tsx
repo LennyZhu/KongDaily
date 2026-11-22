@@ -1,36 +1,30 @@
 import { useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { useRef, useState, type RefObject } from 'react';
+import { Alert, Linking, Pressable, StyleSheet, View, type ScrollView } from 'react-native';
 
 import { LightRailNextTrains } from '@/components/light-rail-next-trains';
 import { LightRailEntryRow, lightRailEndpoints } from '@/components/light-rail-ui';
+import { RailwayStationHeading } from '@/components/railway-favorite-action';
 import { AppText, EmptyState, Filters, Icon, PageHeading, Screen } from '@/components/ui';
 import { useLanguage } from '@/language';
 import { lightRailForecastSource } from '@/light-rail-realtime';
-import { findLightRailRoute, findLightRailStop, lightRailSource, type LightRailRoute } from '@/light-rail-static';
+import { findLightRailRoute, findLightRailStop, lightRailSource, type LightRailRoute, type LightRailStop } from '@/light-rail-static';
 import { space, touchTarget } from '@/theme';
 
 export default function LightRailDetailsScreen() {
-  const { kind, id } = useLocalSearchParams();
-  const { copy, locale } = useLanguage();
+  const { kind, id, route } = useLocalSearchParams();
+  const { copy } = useLanguage();
+  const scrollRef = useRef<ScrollView>(null);
   const labels = copy.lightRail;
   const entry = kind === 'route' ? findLightRailRoute(id) : kind === 'stop' ? findLightRailStop(id) : undefined;
   if (!entry) return <Screen hasHeader><EmptyState icon="train.side.front.car" title={labels.unavailable} /></Screen>;
 
   const isRoute = entry.kind === 'light-rail-route';
-  const heading = (
-    <PageHeading title={isRoute ? labels.route(entry.id) : locale === 'en' ? entry.en : entry.zh}
-      description={isRoute ? (entry.circular ? labels.circular : undefined) : locale === 'en' ? entry.zh : entry.en} />
-  );
   return (
-    <Screen hasHeader contentStyle={styles.section}>
-      {isRoute ? heading : (
-        <View style={styles.rows}>
-          {heading}
-          <AppText variant="detail" tone="muted">{labels.stopId(entry.id)}</AppText>
-        </View>
-      )}
-      {!isRoute && <LightRailNextTrains key={entry.id} stationId={entry.id} />}
+    <Screen hasHeader contentStyle={styles.section} scrollRef={scrollRef}>
+      {isRoute && <PageHeading title={labels.route(entry.id)} description={entry.circular ? labels.circular : undefined} />}
+      {!isRoute && <LightRailStationServices key={JSON.stringify([entry.id, route])} station={entry}
+        initialRoute={typeof route === 'string' ? route : undefined} scrollRef={scrollRef} />}
       {isRoute ? <LightRailRouteStops key={entry.id} route={entry} /> : (
         <View style={styles.rows}>
           <AppText variant="homeHeading" accessibilityRole="header">{labels.lines}</AppText>
@@ -42,6 +36,32 @@ export default function LightRailDetailsScreen() {
       )}
       <LightRailSources forecast={!isRoute} />
     </Screen>
+  );
+}
+
+function LightRailStationServices({ station, initialRoute, scrollRef }: {
+  station: LightRailStop; initialRoute?: string; scrollRef?: RefObject<ScrollView | null>;
+}) {
+  const { copy, locale } = useLanguage();
+  const [route, selectRoute] = useState(station.routes.includes(initialRoute ?? '') ? initialRoute
+    : station.routes.length === 1 ? station.routes[0] : undefined);
+  const chooserY = useRef(0);
+  return (
+    <>
+      <View style={styles.rows}>
+        <RailwayStationHeading title={locale === 'en' ? station.en : station.zh} description={locale === 'en' ? station.zh : station.en}
+          identity={route ? { mode: 'light_rail', lineId: route, stationId: station.id } : undefined}
+          chooseHint={copy.railwayFavorites.chooseRoute}
+          onChooseService={() => scrollRef?.current?.scrollTo({ y: chooserY.current, animated: false })} />
+        <AppText variant="detail" tone="muted">{copy.lightRail.stopId(station.id)}</AppText>
+      </View>
+      <View style={styles.rows} onLayout={({ nativeEvent }) => { chooserY.current = nativeEvent.layout.y; }}>
+        <AppText variant="homeHeading" accessibilityRole="header">{copy.railwayFavorites.service}</AppText>
+        <Filters options={station.routes.map((id) => [id, copy.lightRail.route(id)])} selected={route ?? ''} onSelect={selectRoute} />
+        {!route && <AppText variant="detail" tone="muted">{copy.railwayFavorites.chooseRoute}</AppText>}
+        <LightRailNextTrains stationId={station.id} selectedRoute={route} />
+      </View>
+    </>
   );
 }
 
@@ -63,7 +83,7 @@ function LightRailRouteStops({ route }: { route: LightRailRoute }) {
       {pattern?.visits.map(({ stopId, sequence }) => {
         const stop = findLightRailStop(stopId);
         // The same station may occur more than once in a published direction.
-        return stop && <LightRailEntryRow key={`${direction}:${sequence}`} entry={stop} sequence={sequence} />;
+        return stop && <LightRailEntryRow key={`${direction}:${sequence}`} entry={stop} sequence={sequence} routeId={route.id} />;
       })}
     </View>
   );

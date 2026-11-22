@@ -1,30 +1,43 @@
-import { useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { useRef, useState, type RefObject } from 'react';
+import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, View, type ScrollView } from 'react-native';
 
 import { AppText, Filters, Icon } from '@/components/ui';
+import { RailwayStationHeading } from '@/components/railway-favorite-action';
 import { useLanguage } from '@/language';
 import { useMtrNextTrains } from '@/mtr-next-train-hooks';
 import { formatHongKongTime, mtrForecastView, mtrServiceAlertUrl, supportsMtrForecast } from '@/mtr-realtime';
 import { findMtrLine, findMtrStation, mtrName, type MtrStation } from '@/mtr-static';
 import { colors, radius, space, touchTarget } from '@/theme';
 
-export function MtrNextTrains({ station, initialLine }: { station: MtrStation; initialLine?: string }) {
+export function MtrNextTrains({ station, initialLine, scrollRef }: {
+  station: MtrStation; initialLine?: string; scrollRef?: RefObject<ScrollView | null>;
+}) {
   const { copy, locale } = useLanguage();
   const labels = copy.mtr.nextTrains;
-  const [line, selectLine] = useState(initialLine ?? (station.memberships.length === 1 ? station.memberships[0].lineCode : undefined));
+  const [line, selectLine] = useState(
+    station.memberships.some(({ lineCode }) => lineCode === initialLine) ? initialLine
+      : station.memberships.length === 1 ? station.memberships[0].lineCode : undefined,
+  );
+  const chooserY = useRef(0);
   const options = station.memberships.flatMap(({ lineCode }) => {
     const entry = findMtrLine(lineCode);
     return entry ? [[lineCode, mtrName(entry, locale)] as const] : [];
   });
 
   return (
-    <View style={styles.section}>
-      <AppText variant="homeHeading" accessibilityRole="header">{labels.title}</AppText>
-      {options.length > 1 && <Filters options={options} selected={line ?? ''} onSelect={selectLine} />}
-      {line === undefined ? <AppText variant="detail" tone="muted">{labels.chooseLine}</AppText>
-        : supportsMtrForecast(line, station.id) ? <ForecastCard key={line} line={line} station={station.id} />
-          : <AppText variant="detail" tone="muted">{labels.unsupported}</AppText>}
-    </View>
+    <>
+      <RailwayStationHeading title={mtrName(station, locale)} description={mtrName(station, locale === 'en' ? 'zh-HK' : 'en')}
+        identity={line === undefined ? undefined : { mode: 'mtr', lineId: line, stationId: station.id }}
+        chooseHint={labels.chooseLine}
+        onChooseService={() => scrollRef?.current?.scrollTo({ y: chooserY.current, animated: false })} />
+      <View style={styles.section} onLayout={({ nativeEvent }) => { chooserY.current = nativeEvent.layout.y; }}>
+        <AppText variant="homeHeading" accessibilityRole="header">{labels.title}</AppText>
+        {options.length > 1 && <Filters options={options} selected={line ?? ''} onSelect={selectLine} />}
+        {line === undefined ? <AppText variant="detail" tone="muted">{labels.chooseLine}</AppText>
+          : supportsMtrForecast(line, station.id) ? <ForecastCard key={line} line={line} station={station.id} />
+            : <AppText variant="detail" tone="muted">{labels.unsupported}</AppText>}
+      </View>
+    </>
   );
 }
 

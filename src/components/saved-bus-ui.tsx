@@ -84,15 +84,18 @@ export function HomeFavoriteBus({ favorite, unavailable }: { favorite: BusFavori
   );
 }
 
-export function FavoriteAction({ label, icon, onPress, disabled, destructive }: {
+export function FavoriteAction({ label, icon, onPress, disabled, destructive, selected, accessibilityLabel }: {
   label: string;
   icon: IconName;
   onPress: () => void;
   disabled?: boolean;
   destructive?: boolean;
+  selected?: boolean;
+  accessibilityLabel?: string;
 }) {
   return (
-    <Pressable accessibilityRole="button" disabled={disabled} accessibilityState={{ disabled }} onPress={onPress}
+    <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} disabled={disabled}
+      accessibilityState={{ disabled, ...(selected === undefined ? {} : { selected }) }} onPress={onPress}
       style={({ pressed }) => [styles.action, disabled && styles.disabled, pressed && styles.pressed]}>
       <Icon name={icon} size={14} color={destructive ? colors.error : colors.primary} />
       <AppText variant="caption" tone={destructive ? 'error' : 'primary'} style={styles.actionLabel}>{label}</AppText>

@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict');
 const { execFileSync, spawnSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
-const { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs');
+const { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs');
 const { createRequire } = require('node:module');
 const { tmpdir } = require('node:os');
 const { dirname, join, resolve } = require('node:path');
@@ -20,7 +20,7 @@ const encodeIndex = (index) => JSON.stringify({ ...index, recordsSha256: digest(
   (_key, value) => value && typeof value === 'object' && !Array.isArray(value)
     ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]])) : value)) });
 
-function loadApp(file, { failAfterV8 = false, changeCatalog, registry, beforeQuery, stubs = {} } = {}) {
+function loadApp(file, { failAfterV8 = false, failAfterV9 = false, changeCatalog, registry, beforeQuery, stubs = {} } = {}) {
   const loaded = new Map();
   let connection;
   function databaseAdapter(db, afterExec) {
@@ -57,6 +57,10 @@ function loadApp(file, { failAfterV8 = false, changeCatalog, registry, beforeQue
               failAfterV8 = false;
               throw new Error('Injected failure after v8 DDL');
             }
+            if (failAfterV9 && sql.includes('PRAGMA user_version = 9')) {
+              failAfterV9 = false;
+              throw new Error('Injected failure after v9 DDL');
+            }
           }));
           db.exec('COMMIT');
         } catch (error) {
@@ -71,7 +75,8 @@ function loadApp(file, { failAfterV8 = false, changeCatalog, registry, beforeQue
     const testExports = {
       'app/(tabs)/nearby': 'FacilityListRow',
       'components/facility-selection-card': 'FacilitySummary',
-      'app/(tabs)/saved': 'SavedBuses, SavedFacilities',
+      'app/(tabs)/saved': 'SavedBuses, SavedFacilities, SavedRailways',
+      'app/light-rail/[kind]': 'LightRailStationServices, LightRailRouteStops',
       'app/bus/route': 'SelectedStopCard',
       'app/bus/eta': 'EtaDetails',
     }[name];
@@ -130,7 +135,8 @@ function inspectV7Data(file) {
   const db = new DatabaseSync(file);
   try {
     const tables = db.prepare(`SELECT name, sql FROM sqlite_schema
-      WHERE type IN ('table', 'trigger', 'index') AND sql IS NOT NULL AND name <> 'facility_favorites' ORDER BY name`).all();
+      WHERE type IN ('table', 'trigger', 'index') AND sql IS NOT NULL
+        AND name NOT IN ('facility_favorites', 'railway_favorites') ORDER BY name`).all();
     return [tables, tables.filter(({ sql }) => sql.startsWith('CREATE TABLE')).map(({ name }) =>
       db.prepare(`SELECT * FROM ${name} ORDER BY rowid`).all())];
   } finally {
@@ -202,7 +208,7 @@ async function test() {
   const fresh = join(scratch, 'fresh.db');
   const freshApp = loadApp(fresh);
   const freshDb = await freshApp.load('database').getDatabase();
-  assert.equal((await freshDb.getFirstAsync('PRAGMA user_version')).user_version, 8);
+  assert.equal((await freshDb.getFirstAsync('PRAGMA user_version')).user_version, 9);
   assert.equal(await freshApp.load('database').readLanguage(), 'system');
   freshApp.close();
 
@@ -232,7 +238,7 @@ async function test() {
   assert.equal(rolledBack.prepare("SELECT 1 FROM sqlite_schema WHERE name='facility_favorites'").get(), undefined);
   rolledBack.close();
   assert.deepEqual(inspectV7Data(file), before);
-  assert.equal((await (await db.getDatabase()).getFirstAsync('PRAGMA user_version')).user_version, 8);
+  assert.equal((await (await db.getDatabase()).getFirstAsync('PRAGMA user_version')).user_version, 9);
   assert.equal(await db.readLanguage(), 'en');
   assert.deepEqual(inspectV7Data(file), before);
 
@@ -1068,7 +1074,383 @@ async function testRouteStopQuickFavorite() {
   }
 }
 
-test().then(testNearbyFavoriteButtons).then(testSavedFacilityIntegration).then(testRouteStopQuickFavorite)
-  .then(() => console.log('PASS: registry, SQLite v8, facility favorites, nearby bilingual filters / Map–List / legacy bus / manual location, bus pins and route stop quick favorites'))
+async function testRailwayFavorites() {
+  const file = join(scratch, 'railway.db');
+  seedV7(file);
+  const seed = new DatabaseSync(file);
+  seed.exec(sqlFromSource[7]);
+  seed.exec(`INSERT INTO bus_favorites (id, source, route_number, direction, stop_id, stop_seq, repeated_stop,
+    station_zh, station_en, destination_zh, destination_en, created_at, updated_at, pin_order)
+    VALUES ('legacy-bus', 'citybus', '1', 'outbound', '000001', 1, 0, '舊站', 'Legacy stop', '終點', 'End', 10, 10, 1);
+    INSERT INTO facility_favorites VALUES ('lcsd-parks', 'park-035', '香港公園', 'Hong Kong Park', 'parks', 11, 11);`);
+  const originalFacilities = seed.prepare('SELECT * FROM facility_favorites').all();
+  seed.close();
+  const oldData = inspectV7Data(file);
+  const migration = loadApp(file, { failAfterV9: true });
+  await assert.rejects(migration.load('database').getDatabase(), /after v9 DDL/);
+  const rolledBack = new DatabaseSync(file);
+  assert.equal(version(rolledBack), 8);
+  assert.equal(rolledBack.prepare("SELECT 1 FROM sqlite_schema WHERE name='railway_favorites'").get(), undefined);
+  assert.deepEqual(rolledBack.prepare('SELECT * FROM facility_favorites').all(), originalFacilities);
+  rolledBack.close();
+  assert.deepEqual(inspectV7Data(file), oldData);
+  await migration.load('database').getDatabase();
+  migration.close();
+  assert.deepEqual(inspectV7Data(file), oldData);
+
+  let locale = 'zh-HK';
+  let params = {};
+  let slots = [];
+  let cursor = 0;
+  let effects = [];
+  let writes = 0;
+  let failWrite = false;
+  let failRead = false;
+  let gate;
+  const opened = [];
+  const stubs = {
+    react: {
+      useState(initial) {
+        const index = cursor++;
+        const current = slots;
+        if (!(index in current)) current[index] = typeof initial === 'function' ? initial() : initial;
+        return [current[index], (next) => { current[index] = typeof next === 'function' ? next(current[index]) : next; }];
+      },
+      useRef: (current) => ({ current }),
+      useMemo: (fn) => fn(),
+      useEffect: (fn) => effects.push(fn),
+      useSyncExternalStore: (_subscribe, snapshot) => snapshot(),
+    },
+    'react-native': { View: 'View', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator',
+      StyleSheet: { create: (styles) => styles, hairlineWidth: 1 }, Keyboard: { dismiss() {} } },
+    'expo-router': { Link: 'Link', useLocalSearchParams: () => params,
+      useRouter: () => ({ push: (href) => opened.push(href), setParams: (next) => { params = { ...params, ...next }; } }) },
+    '@/components/ui': Object.fromEntries(['AppText', 'Icon', 'EmptyState', 'Filters', 'PageHeading', 'Screen'].map((name) => [name, name])),
+    '@/components/saved-bus-ui': { FavoriteAction: 'FavoriteAction', FavoriteBusRow: 'FavoriteBusRow', savedBusStyles: { card: {} } },
+    '@/components/bus-ui': { BusAction: 'BusAction' },
+    '@/components/nearby-facilities-map': { facilityVisuals: {} },
+    '@/mtr-next-train-hooks': { useMtrNextTrains() { throw new Error('Saved list must not request ETA'); } },
+    '@/components/light-rail-next-trains': { LightRailNextTrains: 'LightRailNextTrains' },
+    '@/language': { useLanguage: () => ({ locale, copy: app.load('i18n').messages[locale] }) },
+  };
+  const app = loadApp(file, { stubs, beforeQuery: async (sql) => {
+    if (!sql.includes('railway_favorites')) return;
+    if (/^(INSERT|DELETE)/.test(sql)) {
+      writes++;
+      if (gate) await gate;
+      if (failWrite) { failWrite = false; throw new Error('Write fixture'); }
+    }
+    if (sql.startsWith('SELECT') && failRead) { failRead = false; throw new Error('Read fixture'); }
+  } });
+  const repository = app.load('railway-favorites');
+  const hooks = app.load('railway-favorite-hooks');
+  const pair = (mode, lineId, stationId) => ({ mode, lineId, stationId });
+  const isl = pair('mtr', 'ISL', 'ADM');
+  const eal = pair('mtr', 'EAL', 'ADM');
+  const lr610 = pair('light_rail', '610', '380');
+  const lr614 = pair('light_rail', '614', '380');
+  const lr705 = pair('light_rail', '705', '430');
+  const lr706 = pair('light_rail', '706', '430');
+  const hoiWong = pair('light_rail', '614', '250');
+  const identities = [isl, eal, lr610, lr614, lr705, lr706, hoiWong];
+  const list = () => repository.listRailwayFavorites();
+  const copy = () => app.load('i18n').messages[locale];
+  function render(component, props = {}, state = []) {
+    slots = state; cursor = 0; effects = [];
+    const tree = elements(component(props));
+    effects.forEach((effect) => effect());
+    return tree;
+  }
+  const hasText = (tree, value) => tree.some(({ props }) => props?.children === value || props?.title === value);
+  try {
+    const db = await app.load('database').getDatabase();
+    assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 9);
+    assert.deepEqual(await db.getAllAsync('SELECT * FROM facility_favorites'), originalFacilities);
+    const oldBus = await app.load('bus-favorites').readBusFavorites();
+    assert.equal(oldBus[0].id, 'legacy-bus');
+    assert.equal(oldBus[0].pinOrder, 1);
+    let time = 100;
+    const clock = Date.now;
+    try {
+      Date.now = () => ++time;
+      for (const identity of identities) await repository.setRailwayFavorite(identity, true);
+    } finally { Date.now = clock; }
+    const initial = await list();
+    assert.deepEqual(initial.map(({ id }) => id), [...identities].reverse().map(repository.railwayFavoriteId));
+    assert.equal(new Set(initial.map(({ id }) => id)).size, 7);
+    assert.equal(initial[0].stationSnapshot.zh, '海皇路');
+    await Promise.all(Array.from({ length: 5 }, () => repository.setRailwayFavorite(isl, true)));
+    assert.deepEqual(await list(), initial, 'Duplicate inserts preserve original timestamps and sorting');
+    for (const identity of [pair('mtr', 'ISL', '金鐘'), pair('mtr', 'ISL', 'HOK'), pair('light_rail', '610', '250'),
+      pair('light_rail', 'special', '380'), pair('light_rail', '610', 'YUL')]) {
+      assert.equal(repository.railwayFavoriteHref(identity), undefined);
+      await assert.rejects(repository.setRailwayFavorite(identity, true), /Unavailable/);
+    }
+    assert.deepEqual(repository.railwayFavoriteHref(eal), { pathname: '/mtr/[kind]', params: { kind: 'station', code: 'ADM', line: 'EAL' } });
+    assert.deepEqual(repository.railwayFavoriteHref(lr706), { pathname: '/light-rail/[kind]', params: { kind: 'stop', id: '430', route: '706' } });
+    await repository.setRailwayFavorite(isl, false);
+    assert.ok((await list()).some(({ id }) => id === repository.railwayFavoriteId(eal)));
+    await repository.setRailwayFavorite(isl, true);
+
+    failRead = true;
+    await hooks.loadRailwayFavorites();
+    assert.equal(hooks.useRailwayFavorites().status, 'error');
+    const beforeRetry = writes;
+    await hooks.useRailwayFavorite(isl).onPress();
+    assert.equal(writes, beforeRetry, 'Read retry must not toggle a saved item');
+    assert.equal(hooks.useRailwayFavorite(isl).saved, true);
+
+    let release;
+    gate = new Promise((resolve) => { release = resolve; });
+    const changing = hooks.useRailwayFavorite(isl).onPress();
+    assert.equal(hooks.useRailwayFavorite(isl).busy, true);
+    await hooks.useRailwayFavorite(isl).onPress(); // A stale / rapid second press is ignored.
+    release(); gate = undefined;
+    await changing;
+    assert.equal(hooks.useRailwayFavorite(isl).saved, false);
+    await hooks.useRailwayFavorite(isl).onPress();
+    failWrite = true;
+    await hooks.useRailwayFavorite(isl).onPress();
+    assert.equal(hooks.useRailwayFavorite(isl).saved, true);
+    assert.equal(hooks.useRailwayFavorite(isl).issue, 'write');
+    failRead = true;
+    await hooks.useRailwayFavorite(isl).onPress(); // Removal committed, read-back failed.
+    assert.equal(hooks.useRailwayFavorite(isl).issue, 'read');
+    const uncertainWrites = writes;
+    await hooks.useRailwayFavorite(isl).onPress();
+    assert.equal(writes, uncertainWrites, 'Uncertain removal retries only the read');
+    assert.equal(hooks.useRailwayFavorite(isl).saved, false);
+    await Promise.all([hooks.useRailwayFavorite(isl).onPress(), hooks.useRailwayFavorite(eal).onPress()]);
+    assert.equal(hooks.useRailwayFavorite(isl).saved, true);
+    assert.equal(hooks.useRailwayFavorite(eal).saved, false);
+    await hooks.useRailwayFavorite(eal).onPress();
+
+    // MTR detail shares the actual selected forecast line; unknown/global context requires a choice.
+    const { MtrNextTrains } = app.load('components/mtr-next-trains');
+    const { findMtrStation } = app.load('mtr-static');
+    const { RailwayFavoriteAction: action, RailwayStationHeading: heading } = app.load('components/railway-favorite-action');
+    const headingProps = (tree) => tree.find(({ type }) => type === heading).props;
+    const buttonProps = (tree) => {
+      const button = tree.find(({ type }) => type.name === 'FavoriteButton');
+      return render(button.type, button.props).find(({ type }) => type === 'Pressable').props;
+    };
+    const favoriteButton = (identity) => buttonProps(render(action, { identity }));
+    const titleButton = (tree) => {
+      const header = render(heading, headingProps(tree));
+      const savedAction = header.find(({ type }) => type === action);
+      return savedAction ? favoriteButton(savedAction.props.identity) : buttonProps(header);
+    };
+    const mtrState = [];
+    const scrolls = [];
+    const scrollRef = { current: { scrollTo: (request) => scrolls.push(request) } };
+    const mtrProps = { station: findMtrStation('ADM'), scrollRef };
+    let mtr = render(MtrNextTrains, mtrProps, mtrState);
+    assert.equal(headingProps(mtr).identity, undefined);
+    const mtrWrites = writes;
+    mtr.find(({ props }) => props?.onLayout).props.onLayout({ nativeEvent: { layout: { y: 180 } } });
+    titleButton(mtr).onPress();
+    assert.deepEqual(scrolls.at(-1), { y: 180, animated: false });
+    assert.equal(writes, mtrWrites, 'A title button with no line context only reveals the existing selector');
+    assert.equal(mtr.filter(({ type }) => type === 'Filters').length, 1);
+    assert.equal(mtr.some(({ type }) => type === action), false);
+    mtr.find(({ type }) => type === 'Filters').props.onSelect('ISL');
+    mtr = render(MtrNextTrains, mtrProps, mtrState);
+    assert.deepEqual(headingProps(mtr).identity, isl);
+    assert.equal(titleButton(mtr).accessibilityState.selected, true);
+    assert.ok(titleButton(mtr).accessibilityLabel.includes('港島綫'));
+    assert.ok(mtr.findIndex(({ type }) => type === heading) < mtr.findIndex(({ type }) => type === 'Filters'));
+    assert.equal(mtr.some(({ type }) => type === action), false, 'No standalone favorite remains between filters and forecast');
+    mtr.find(({ type }) => type === 'Filters').props.onSelect('EAL');
+    mtr = render(MtrNextTrains, mtrProps, mtrState);
+    assert.deepEqual(headingProps(mtr).identity, eal);
+    for (const language of ['zh-HK', 'en']) {
+      locale = language;
+      assert.equal(favoriteButton(isl).accessibilityState.selected, true);
+      const savedStyle = Object.assign({}, ...favoriteButton(isl).style({ pressed: false }).filter(Boolean));
+      assert.ok(savedStyle.minHeight >= 44 && savedStyle.minWidth >= 44);
+      assert.ok(favoriteButton(isl).accessibilityLabel.includes(language === 'en' ? 'Admiralty' : '金鐘'));
+      favoriteButton(isl).onPress();
+      assert.equal(favoriteButton(isl).disabled, true);
+      await new Promise(setImmediate);
+      assert.equal(favoriteButton(isl).accessibilityState.selected, false);
+      const unsavedStyle = Object.assign({}, ...favoriteButton(isl).style({ pressed: false }).filter(Boolean));
+      assert.notEqual(savedStyle.backgroundColor, unsavedStyle.backgroundColor);
+      assert.ok(elements({ props: favoriteButton(isl) }).some(({ props }) => props?.children === copy().railwayFavorites.save));
+      // Switching from saved East Rail to now-unsaved Island Line must update the title immediately.
+      mtr.find(({ type }) => type === 'Filters').props.onSelect('ISL');
+      mtr = render(MtrNextTrains, mtrProps, mtrState);
+      assert.equal(titleButton(mtr).accessibilityState.selected, false);
+      mtr.find(({ type }) => type === 'Filters').props.onSelect('EAL');
+      mtr = render(MtrNextTrains, mtrProps, mtrState);
+      assert.equal(titleButton(mtr).accessibilityState.selected, true);
+      assert.equal(hooks.useRailwayFavorite(eal).saved, true, 'Toggling Island Line does not remove East Rail at Admiralty');
+      favoriteButton(isl).onPress();
+      await new Promise(setImmediate);
+      assert.equal(favoriteButton(isl).accessibilityState.selected, true);
+      const buttonTree = render(action, { identity: isl });
+      assert.ok(buttonTree.some(({ props }) => props?.label === copy().railwayFavorites.saved));
+    }
+    const invalidMtr = render(MtrNextTrains, { station: findMtrStation('ADM'), initialLine: 'AEL' });
+    assert.equal(headingProps(invalidMtr).identity, undefined);
+
+    const { LightRailStationServices, LightRailRouteStops } = app.load('app/light-rail/[kind]');
+    const { findLightRailStop, findLightRailRoute } = app.load('light-rail-static');
+    const lrState = [];
+    const lrProps = { station: findLightRailStop('380'), scrollRef };
+    let lr = render(LightRailStationServices, lrProps, lrState);
+    assert.equal(headingProps(lr).identity, undefined);
+    const lrWrites = writes;
+    lr.find(({ props }) => props?.onLayout).props.onLayout({ nativeEvent: { layout: { y: 195 } } });
+    titleButton(lr).onPress();
+    assert.deepEqual(scrolls.at(-1), { y: 195, animated: false });
+    assert.equal(writes, lrWrites);
+    assert.equal(lr.filter(({ type }) => type === 'Filters').length, 1);
+    lr.find(({ type }) => type === 'Filters').props.onSelect('610');
+    lr = render(LightRailStationServices, lrProps, lrState);
+    assert.deepEqual(headingProps(lr).identity, lr610);
+    assert.equal(lr.find(({ type }) => type === 'LightRailNextTrains').props.selectedRoute, '610');
+    assert.ok(lr.findIndex(({ type }) => type === heading) < lr.findIndex(({ type }) => type === 'Filters'));
+    assert.equal(lr.some(({ type }) => type === action), false);
+    for (const language of ['zh-HK', 'en']) {
+      locale = language;
+      titleButton(lr).onPress();
+      await new Promise(setImmediate);
+      assert.equal(titleButton(lr).accessibilityState.selected, false);
+      lr.find(({ type }) => type === 'Filters').props.onSelect('614');
+      lr = render(LightRailStationServices, lrProps, lrState);
+      assert.deepEqual(headingProps(lr).identity, lr614);
+      assert.equal(titleButton(lr).accessibilityState.selected, true);
+      assert.ok(titleButton(lr).accessibilityLabel.includes('614'));
+      lr.find(({ type }) => type === 'Filters').props.onSelect('610');
+      lr = render(LightRailStationServices, lrProps, lrState);
+      assert.equal(titleButton(lr).accessibilityState.selected, false);
+      titleButton(lr).onPress();
+      await new Promise(setImmediate);
+      assert.equal(titleButton(lr).accessibilityState.selected, true);
+    }
+    for (const route of ['705', '706']) {
+      const fromSaved = render(LightRailStationServices, { station: findLightRailStop('430'), initialRoute: route });
+      assert.equal(fromSaved.find(({ type }) => type === 'LightRailNextTrains').props.selectedRoute, route);
+    }
+    const invalidLr = render(LightRailStationServices, { station: findLightRailStop('250'), initialRoute: '610' });
+    assert.equal(invalidLr.find(({ type }) => type === 'LightRailNextTrains').props.selectedRoute, undefined);
+    assert.equal(headingProps(invalidLr).identity, undefined);
+    const routeStops = render(LightRailRouteStops, { route: findLightRailRoute('610') });
+    const stationRow = routeStops.find(({ props }) => props?.entry?.id === '380');
+    render(stationRow.type, stationRow.props).find(({ type }) => type === 'Pressable').props.onPress();
+    assert.deepEqual(opened.at(-1), repository.railwayFavoriteHref(lr610));
+
+    // Missing static records retain readable snapshots and are removable, never navigable.
+    await db.runAsync(`INSERT INTO railway_favorites VALUES ('mtr', 'REMOVED', 'ADM', '舊路線', 'Old line', '金鐘', 'Admiralty', 1, 1)`);
+    app.close();
+    const persisted = loadApp(file);
+    const restartItems = await persisted.load('railway-favorites').listRailwayFavorites();
+    assert.equal(restartItems.length, 8);
+    assert.equal(persisted.load('railway-favorites').railwayFavoriteHref(restartItems.at(-1)), undefined);
+    assert.deepEqual(await persisted.load('bus-favorites').readBusFavorites(), oldBus);
+    persisted.close();
+    const backup = join(scratch, 'railway-backup.db');
+    copyFileSync(file, backup);
+
+    const reopened = loadApp(file, { stubs });
+    // Language stubs only need the shared i18n module; both loaders use the same static catalogue.
+    const newHooks = reopened.load('railway-favorite-hooks');
+    await newHooks.loadRailwayFavorites();
+    let busItems = oldBus;
+    let busStatus = 'ready';
+    stubs['@/bus-favorite-hooks'] = {
+      useBusFavorites: () => ({ items: busItems, status: busStatus }),
+      useUnavailableFavorites: () => new Set(),
+    };
+    const { SavedRailways, SavedBuses, SavedFacilities, default: SavedScreen } = reopened.load('app/(tabs)/saved');
+    stubs['@/components/saved-bus-ui'].HomeFavoriteBus = 'HomeFavoriteBus';
+    stubs['@/components/home-ui'] = Object.fromEntries(['FeaturedCard', 'HomeHero', 'HomeLink', 'HomeSection', 'QuickLinkCard'].map((name) => [name, name]));
+    stubs['@/components/weather-warning-ui'] = { WeatherWarningLink: 'WeatherWarningLink' };
+    stubs['@/explore-place-images'] = { getExplorePhoto: () => undefined };
+    stubs['../../../assets/home/west-kowloon.jpg'] = 'fixture-image';
+    const HomeScreen = reopened.load('app/(tabs)/index').default;
+    for (const language of ['zh-HK', 'en']) {
+      locale = language;
+      const home = render(HomeScreen);
+      assert.deepEqual(home.filter(({ type }) => type === 'HomeFavoriteBus').map(({ props }) => props.favorite), oldBus);
+      assert.ok(home.some(({ type, props }) => type === 'QuickLinkCard' && props.href === '/transport'));
+      assert.ok(home.some(({ type, props }) => type === 'HomeSection' && props.action?.href === '/saved?category=buses'));
+      for (const empty of [false, true]) {
+        busItems = empty ? [] : oldBus;
+        for (const status of ['ready', 'loading', 'error']) {
+          busStatus = status;
+          const buses = render(SavedBuses, { emptyTitle: copy().saved.empty.buses });
+          const add = buses.find(({ type, props }) => type === 'FavoriteAction' && props.label === copy().saved.addBus);
+          assert.ok(hasText(buses, language === 'en' ? 'Favorite buses' : '常用巴士'));
+          assert.ok(add && add.props.icon === 'plus');
+          add.props.onPress();
+          assert.equal(opened.at(-1), '/bus', 'Header Add retains the existing bus flow');
+          assert.equal(buses.some(({ type, props }) => type === 'BusAction' && props.label === copy().home.addBus), false);
+          if (!empty && status === 'ready') assert.ok(buses.indexOf(add) < buses.findIndex(({ type }) => type === 'FavoriteBusRow'));
+        }
+      }
+      busItems = oldBus; busStatus = 'ready';
+      for (const category of ['all', 'buses', 'mtr', 'lightRail', 'places']) {
+        params = { category };
+        const rootTree = render(SavedScreen);
+        assert.deepEqual(rootTree.find(({ type }) => type === 'Filters').props.options.map(([key]) => key),
+          ['all', 'buses', 'mtr', 'lightRail', 'places']);
+        assert.equal(rootTree.some(({ type }) => type === SavedBuses), ['all', 'buses'].includes(category));
+        assert.equal(rootTree.some(({ type }) => type === SavedFacilities), ['all', 'places'].includes(category));
+        const railSection = rootTree.find(({ type }) => type === SavedRailways);
+        assert.equal(!!railSection, ['all', 'mtr', 'lightRail'].includes(category));
+        if (!railSection) continue;
+        const rows = render(SavedRailways, railSection.props);
+        const active = newHooks.useRailwayFavorites().items.filter((item) => !railSection.props.mode || item.mode === railSection.props.mode);
+        assert.equal(rows.filter(({ props }) => props?.accessibilityLabel?.startsWith(language === 'en' ? 'Remove ' : '取消收藏：')).length, active.length);
+        assert.ok(hasText(rows, copy().railwayFavorites.title));
+        if (category === 'all') {
+          assert.ok(hasText(rows, copy().railwayFavorites.unavailable));
+          const names = rows.filter(({ type, props }) => type === 'AppText' && props.variant === 'homeCardTitle').map(({ props }) => props.children);
+          assert.deepEqual(names, active.map((item) => item.mode === 'mtr'
+            ? (repository.resolveRailwayService(item)?.line ?? item.lineSnapshot)[language === 'en' ? 'en' : 'zh']
+            : copy().lightRail.route(item.lineId)));
+          const clickable = rows.filter(({ type, props }) => type === 'Pressable' && !props.accessibilityLabel);
+          assert.equal(clickable.length, active.length - 1);
+          clickable.forEach((row) => row.props.onPress());
+          assert.deepEqual(opened.slice(-clickable.length), active.filter((item) => repository.railwayFavoriteHref(item)).map(repository.railwayFavoriteHref));
+        }
+      }
+    }
+    // Category selection stays in the existing tab's route params.
+    params = { category: 'mtr' };
+    const beforeDetail = render(SavedScreen);
+    beforeDetail.find(({ type }) => type === 'Filters').props.onSelect('lightRail');
+    assert.equal(params.category, 'lightRail');
+    const station = render(SavedRailways, { mode: 'mtr' }).find(({ type, props }) => type === 'Pressable' && !props.accessibilityLabel);
+    station.props.onPress();
+    const afterDetail = render(SavedScreen);
+    assert.equal(afterDetail.find(({ type }) => type === 'Filters').props.selected, 'lightRail');
+    const removed = pair('mtr', 'REMOVED', 'ADM');
+    const unavailableRemove = render(SavedRailways).find(({ props }) => props?.accessibilityLabel === copy().saved.facilities.remove('Old line · Admiralty'));
+    unavailableRemove.props.onPress();
+    await new Promise(setImmediate);
+    assert.equal(newHooks.useRailwayFavorites().items.length, 7);
+    for (const item of [...newHooks.useRailwayFavorites().items]) await newHooks.removeSavedRailway(item);
+    assert.ok(hasText(render(SavedRailways), copy().railwayFavorites.empty));
+    for (const identity of [isl, lr610]) {
+      await newHooks.useRailwayFavorite(identity).onPress();
+      const only = render(SavedRailways, { mode: identity.mode });
+      assert.equal(only.filter(({ type, props }) => type === 'AppText' && props.variant === 'homeCardTitle').length, 1);
+      assert.ok(hasText(render(SavedRailways, { mode: identity.mode === 'mtr' ? 'light_rail' : 'mtr' }), copy().railwayFavorites.empty));
+      await newHooks.removeSavedRailway(identity);
+    }
+    assert.deepEqual(await reopened.load('bus-favorites').readBusFavorites(), oldBus);
+    reopened.close();
+    const restored = loadApp(backup);
+    assert.deepEqual(await restored.load('railway-favorites').listRailwayFavorites(), restartItems);
+    restored.close();
+    assert.deepEqual(inspectV7Data(file), oldData);
+  } finally { app.close(); }
+  console.log('PASS: SQLite v8→v9 rollback / old-data preservation, railway pair identities, loops, deduplication, write/read failures, restart / backup copy, bilingual Saved filters, Home bus pins and detail context');
+}
+
+test().then(testNearbyFavoriteButtons).then(testSavedFacilityIntegration).then(testRouteStopQuickFavorite).then(testRailwayFavorites)
+  .then(() => console.log('PASS: registry, SQLite v9, facility favorites, nearby bilingual filters / Map–List / legacy bus / manual location, bus pins and route stop quick favorites'))
   .catch((error) => { console.error(error); process.exitCode = 1; })
   .finally(() => rmSync(scratch, { recursive: true, force: true }));

@@ -167,6 +167,21 @@ function navigate(result, name, expectedParams) {
 }
 
 async function main() {
+  const { railwayFavoriteHref } = load('railway-favorites');
+  for (const identity of [
+    { mode: 'mtr', lineId: 'ISL', stationId: 'ADM' }, { mode: 'mtr', lineId: 'EAL', stationId: 'ADM' },
+    { mode: 'light_rail', lineId: '705', stationId: '430' }, { mode: 'light_rail', lineId: '706', stationId: '430' },
+  ]) {
+    const category = identity.mode === 'mtr' ? 'mtr' : 'lightRail';
+    const saved = stack.getRehydratedState(stateFor(`/saved?category=${category}`), options);
+    const href = railwayFavoriteHref(identity);
+    const detail = push(saved, href);
+    assert.equal(detail.routes.at(-1).name, identity.mode === 'mtr' ? 'mtr/[kind]' : 'light-rail/[kind]');
+    assert.deepEqual(detail.routes.at(-1).params, href.params);
+    assert.equal(detail.routes[0], saved.routes[0], 'Opening favorites retains the original tab instance and its scroll state');
+    assert.equal(pop(detail).routes[0], saved.routes[0]);
+    assert.deepEqual(pop(detail).routes[0].state, saved.routes[0].state);
+  }
   const { railwaySearchResult } = load('global-search');
   const { findMtrLine, findMtrStation } = load('mtr-static');
   const { findLightRailRoute, findLightRailStop } = load('light-rail-static');

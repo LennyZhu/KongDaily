@@ -338,7 +338,7 @@ function renderRailUi(locale, sample) {
   const requests = [];
   const copy = source('i18n').messages[locale];
   const load = sources({
-    react: { useState(initial) {
+    react: { useRef: (current) => ({ current }), useState(initial) {
       if (!initialized) { initialized = true; selected = initial; }
       return [selected, (value) => { selected = value; }];
     } },
@@ -347,6 +347,7 @@ function renderRailUi(locale, sample) {
       StyleSheet: { create: (styles) => styles },
     },
     '@/components/ui': { AppText: 'AppText', Filters: 'Filters', Icon: 'Icon' },
+    '@/components/railway-favorite-action': { RailwayStationHeading: 'RailwayStationHeading' },
     '@/language': { useLanguage: () => ({ copy, locale }) },
     '@/mtr-next-train-hooks': { useMtrNextTrains(line, station) {
       requests.push([line, station]);
@@ -384,7 +385,7 @@ test('rail preview asks for the line at shared stations and never fetches an inv
   fromLine.render('HOK', 'AEL');
   assert.deepEqual(fromLine.requests, [['AEL', 'HOK']]);
   const invalid = renderRailUi('en', reading({ kind: 'failed' }));
-  assert.ok(invalid.render('HOK', 'EAL').some(({ props }) => props.children === invalid.copy.unsupported));
+  assert.ok(invalid.render('HOK', 'EAL').some(({ props }) => props.children === invalid.copy.chooseLine));
   assert.deepEqual(invalid.requests, []);
 });
 
@@ -658,6 +659,14 @@ for (const locale of ['zh-HK', 'en']) {
       locale === 'en' ? 'English fixture note' : '繁中測試備註']) assert.ok(strings.includes(content), content);
     assert.ok(!strings.includes(copy.lightRail.route('901')));
     assert.equal(nodes.filter(({ type }) => type === 'Pressable').length, 1, 'Only the refresh action is interactive');
+    const selected = elements(LightRailNextTrains({ stationId: '250', selectedRoute: '505' }));
+    assert.ok(selected.some(({ props }) => props.children === copy.railwayFavorites.routeContext('505')));
+    assert.ok(selected.some(({ props }) => props.children === `${copy.lightRail.route('505')} · ${copy.railwayFavorites.selectedRoute}`
+      && props.tone === 'primary'));
+    assert.ok(selected.some(({ props }) => props.children === labels.platform(1))
+      && selected.some(({ props }) => props.children === labels.platform(3)), 'Selection retains every original platform group');
+    const specialSelection = elements(LightRailNextTrains({ stationId: '250', selectedRoute: '507*' }));
+    assert.equal(specialSelection.some(({ props }) => props.children === `${copy.lightRail.route('507*')} · ${copy.railwayFavorites.selectedRoute}`), false);
     now = clockAfter(60_000);
     const stale = elements(LightRailNextTrains({ stationId: '250' })).map(({ props }) => props.children);
     assert.ok(stale.includes(labels.stale) && stale.includes(labels.updated(timestamp)));

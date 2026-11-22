@@ -2,7 +2,7 @@ import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
 import { type LanguagePreference } from '@/i18n';
 
-const schemaVersion = 8;
+const schemaVersion = 9;
 let databasePromise: Promise<SQLiteDatabase> | undefined;
 
 async function openAppDatabase() {
@@ -158,6 +158,24 @@ async function openAppDatabase() {
             PRIMARY KEY (source, stable_facility_id)
           );
           PRAGMA user_version = 8;
+        `);
+      }
+
+      if (version.user_version < 9) {
+        await transaction.execAsync(`
+          CREATE TABLE railway_favorites (
+            mode TEXT NOT NULL CHECK (mode IN ('mtr', 'light_rail')),
+            line_id TEXT NOT NULL CHECK (length(trim(line_id)) > 0),
+            station_id TEXT NOT NULL CHECK (length(trim(station_id)) > 0),
+            line_zh_snapshot TEXT NOT NULL,
+            line_en_snapshot TEXT NOT NULL,
+            station_zh_snapshot TEXT NOT NULL,
+            station_en_snapshot TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL,
+            PRIMARY KEY (mode, line_id, station_id)
+          );
+          PRAGMA user_version = 9;
         `);
       }
     });
