@@ -4,6 +4,8 @@ import { busSources, normalizeBusQuery, type BusRoute } from '@/bus-routes';
 import { getExplorePlace } from '@/explore-places';
 import { resolveStableFacilityIdentity } from '@/facility-identity';
 import type { GlobalSearchResult } from '@/global-search';
+import { findLightRailRoute, findLightRailStop } from '@/light-rail-static';
+import { findMtrLine, findMtrStation } from '@/mtr-static';
 
 type SearchDestination = { href: Href } | { issue: 'resultUnavailable' | 'facilityUnavailable' | 'facilityNeedsReview' };
 
@@ -25,6 +27,26 @@ function isCatalogueIdentity(route: BusRoute) {
 
 export function searchResultDestination(result: GlobalSearchResult): SearchDestination {
   switch (result.kind) {
+    case 'mtr_line':
+      if (result.entry.kind === 'mtr-line' && findMtrLine(result.entry.id)) {
+        return { href: { pathname: '/mtr/[kind]', params: { kind: 'line', code: result.entry.id } } };
+      }
+      break;
+    case 'mtr_station':
+      if (result.entry.kind === 'mtr-station' && findMtrStation(result.entry.id)) {
+        return { href: { pathname: '/mtr/[kind]', params: { kind: 'station', code: result.entry.id } } };
+      }
+      break;
+    case 'light_rail_route':
+      if (result.entry.kind === 'light-rail-route' && findLightRailRoute(result.entry.id)) {
+        return { href: { pathname: '/light-rail/[kind]', params: { kind: 'route', id: result.entry.id } } };
+      }
+      break;
+    case 'light_rail_stop':
+      if (result.entry.kind === 'light-rail-stop' && findLightRailStop(result.entry.id)) {
+        return { href: { pathname: '/light-rail/[kind]', params: { kind: 'stop', id: result.entry.id } } };
+      }
+      break;
     case 'bus_route':
       if (isCatalogueIdentity(result.route)) {
         return { href: { pathname: '/bus/route', params: { routeId: result.route.id } } };

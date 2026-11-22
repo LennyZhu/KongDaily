@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { describeEta, etaEntryNotes, etaIsStale } from '@/bus-eta';
 import { limitedServiceTimetable } from '@/bus-limited-service';
 import { useBusCatalogue } from '@/bus-hooks';
-import { busSources, matchBusRoutes, normalizeBusQuery, routePlaceName, type BusRoute } from '@/bus-routes';
+import { busSources, normalizeBusQuery, routePlaceName, type BusRoute } from '@/bus-routes';
 import { routeStopKey } from '@/bus-stops';
 import { BusRouteRow } from '@/components/bus-ui';
 import { GlobalSearchResultRow } from '@/components/global-search-result-row';
@@ -14,10 +14,10 @@ import { LightRailEntryRow } from '@/components/light-rail-ui';
 import { MtrEntryRow } from '@/components/mtr-ui';
 import { TransportSearch, TransportModePicker, TransportUnavailable, type TransportMode } from '@/components/transport-ui';
 import { AppText, EmptyState, Icon } from '@/components/ui';
-import { loadGlobalBusStops, prepareGlobalSearchQuery, searchBusStops, type BusStopSearchResult, type GlobalBusStopsState } from '@/global-search';
+import { loadGlobalBusStops, railwaySearchResult, searchTransport, type BusStopSearchResult, type GlobalBusStopsState } from '@/global-search';
 import { useLanguage } from '@/language';
-import { lightRailRoutes, lightRailStops, searchLightRail, type LightRailEntry } from '@/light-rail-static';
-import { mtrLines, mtrStations, searchMtr, type MtrEntry } from '@/mtr-static';
+import { lightRailRoutes, lightRailStops, type LightRailEntry } from '@/light-rail-static';
+import { mtrLines, mtrStations, type MtrEntry } from '@/mtr-static';
 import {
   kmbNearbyNeedsRefresh, prepareNearbyBusIndex, readNearbyBusStops, refreshKmbNearbyStops,
   type BusSearchRadius, type Coordinates, type NearbyBusStop,
@@ -45,7 +45,9 @@ const radii = [500, 1000, 2000] as const;
 
 function browseKey(item: ListItem) {
   if ('kind' in item && item.kind === 'bus_stop') return item.key;
+  if ('kind' in item && item.kind !== 'nearby-railway') return railwaySearchResult(item).key;
   if ('kind' in item) return `${item.kind}:${item.id}`;
+  if ('number' in item) return `bus_route:${item.id}`;
   // A location refresh can change the recommended stop while the service stays the same.
   return 'route' in item ? routeStopKey(item.route.target) : item.id;
 }
@@ -137,21 +139,20 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   const searchingBuses = searching && showBuses;
   const mixedSearch = searching && transportMode === 'all';
   const searchRoutes = useMemo(() => busSources.flatMap((source) => catalogue.feeds[source]?.routes ?? []), [catalogue.feeds]);
-  const busResults = useMemo(() => searchingBuses ? matchBusRoutes(searchRoutes, normalizedQuery) : emptySearchResults,
-    [normalizedQuery, searchRoutes, searchingBuses]);
   useEffect(() => {
     if (!searchingBuses || busSearchStops.status !== 'not_loaded') return;
     let active = true;
     void loadGlobalBusStops().then((state) => { if (active) setBusSearchStops(state); });
     return () => { active = false; };
   }, [searchingBuses, busSearchStops.status]);
-  const stopSearch = useMemo(() => searchBusStops(prepareGlobalSearchQuery(normalizedQuery), busSearchStops), [normalizedQuery, busSearchStops]);
-  const searchResults = useMemo(() => {
-    if (mtrMode && searching) return searchMtr(normalizedQuery);
-    if (lightRailMode && searching) return searchLightRail(normalizedQuery);
-    if (mixedSearch) return [...busResults, ...stopSearch.results, ...searchMtr(normalizedQuery), ...searchLightRail(normalizedQuery)];
-    return searchingBuses ? [...busResults, ...stopSearch.results] : busResults;
-  }, [busResults, stopSearch, searchingBuses, lightRailMode, mixedSearch, mtrMode, normalizedQuery, searching]);
+  const transportMatches = useMemo(() => searchTransport(searching ? normalizedQuery : '', {
+    busCatalogue: catalogue, busStops: busSearchStops, surface: 'transport',
+    mode: mtrMode ? 'mtr' : lightRailMode ? 'lightRail' : transportMode === 'bus' ? 'bus' : undefined,
+  }), [searching, normalizedQuery, catalogue.feeds, catalogue.loading, catalogue.failed, busSearchStops, mtrMode, lightRailMode, transportMode]);
+  const busResults = transportMatches.routes.bus?.results ?? emptySearchResults;
+  const stopSearch = transportMatches.stops.bus;
+  const searchResults = useMemo(() => [...transportMatches.routes.results, ...transportMatches.stops.results]
+    .map((result) => result.kind === 'bus_route' ? result.route : result.kind === 'bus_stop' ? result : result.entry), [transportMatches]);
   const searchFailed = busSources.some((source) => catalogue.failed[source]);
   const showSearchCount = Boolean(railCopy) || (mixedSearch
     ? searchResults.length > 0 || (!catalogue.loading && !searchFailed)
@@ -458,7 +459,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
             <AppText variant="detail" tone="muted" accessibilityRole="alert">{copy.search.stopsFailed}</AppText>
             <ListAction label={copy.bus.retry} onPress={() => setBusSearchStops({ status: 'not_loaded' })} />
           </>}
-          {searchingBuses && stopSearch.hasMore && <AppText variant="detail" tone="muted">
+          {searchingBuses && stopSearch?.hasMore && <AppText variant="detail" tone="muted">
             {copy.transport.stopSearchCount(stopSearch.results.length, stopSearch.totalMatches)}
           </AppText>}
           {searchingBuses && searchFailed && (

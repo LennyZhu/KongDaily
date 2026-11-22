@@ -5,11 +5,12 @@ import { AppText, Icon, type IconName } from '@/components/ui';
 import { facilityText } from '@/facilities';
 import type { GlobalSearchKind, GlobalSearchResult } from '@/global-search';
 import { useLanguage } from '@/language';
+import { findMtrLine, mtrName } from '@/mtr-static';
 import { colors, radius, space } from '@/theme';
 
 export const searchGroupIcons: Record<GlobalSearchKind, IconName> = {
-  bus_route: 'bus',
-  bus_stop: 'mappin',
+  transport_route: 'bus',
+  transport_stop: 'mappin',
   facility: 'tree',
   explore_place: 'safari',
 };
@@ -25,14 +26,14 @@ function resultCopy(result: GlobalSearchResult, { copy, locale }: ReturnType<typ
       const destination = routePlaceName(route.destination, locale);
       const operator = copy.bus.sources[route.source];
       if (route.source === 'nlb') return {
-        title: route.number, detail: [operator, routePlaceName(route.routeName, locale)],
+        title: route.number, detail: [copy.transport.modes.bus, operator, routePlaceName(route.routeName, locale)],
         note: route.special ? copy.bus.specialRoute : undefined,
       };
       if (route.source === 'citybus') return {
-        title: route.number, detail: [operator, [origin, destination].filter(Boolean).join(' – ')],
+        title: route.number, detail: [copy.transport.modes.bus, operator, [origin, destination].filter(Boolean).join(' – ')],
       };
       return {
-        title: route.number, detail: [operator, copy.bus.directions[route.direction],
+        title: route.number, detail: [copy.transport.modes.bus, operator, copy.bus.directions[route.direction],
           destination && copy.busDetail.towards(destination)],
         note: copy.bus.service(route.serviceType),
       };
@@ -40,9 +41,23 @@ function resultCopy(result: GlobalSearchResult, { copy, locale }: ReturnType<typ
     case 'bus_stop':
       return {
         title: routePlaceName(result.name, locale),
-        detail: [copy.bus.sources[result.source], routePlaceName(result.street, locale)],
+        detail: [copy.transport.modes.bus, copy.bus.sources[result.source], routePlaceName(result.street, locale)],
         note: copy.nearbyBus.officialStopId(result.stopId),
       };
+    case 'mtr_line':
+      return { title: mtrName(result.entry, locale), detail: [copy.mtr.lineType, result.entry.id,
+        mtrName(result.entry, locale === 'en' ? 'zh-HK' : 'en')] };
+    case 'mtr_station':
+      return { title: mtrName(result.entry, locale), detail: [copy.mtr.stationType, result.entry.id,
+        mtrName(result.entry, locale === 'en' ? 'zh-HK' : 'en')],
+      note: result.entry.memberships.flatMap(({ lineCode }) => { const line = findMtrLine(lineCode); return line ? [mtrName(line, locale)] : []; }).join(' · ') };
+    case 'light_rail_route':
+      return { title: copy.lightRail.route(result.entry.id), detail: [copy.lightRail.routeType],
+        note: result.entry.circular ? copy.lightRail.circular : undefined };
+    case 'light_rail_stop':
+      return { title: locale === 'en' ? result.entry.en : result.entry.zh,
+        detail: [copy.lightRail.stopType, result.entry.id, locale === 'en' ? result.entry.zh : result.entry.en],
+        note: copy.lightRail.servedBy(result.entry.routes.join(' · ')) };
     case 'facility': {
       const { facility, typeLabel } = result;
       const area = facility.district ?? facility.area ?? facility.address;
@@ -60,7 +75,10 @@ export function GlobalSearchResultRow({ result, first, last, onPress }: {
 }) {
   const language = useLanguage();
   const icon = result.kind === 'facility' ? facilityIcons[result.facility.category]
-    : result.kind === 'explore_place' ? placeIcons[result.place.category] : searchGroupIcons[result.kind];
+    : result.kind === 'explore_place' ? placeIcons[result.place.category]
+      : result.kind === 'mtr_line' || result.kind === 'mtr_station' ? 'tram.fill.tunnel'
+        : result.kind === 'light_rail_route' || result.kind === 'light_rail_stop' ? 'train.side.front.car'
+          : result.kind === 'bus_route' ? 'bus' : 'mappin';
   const { title, detail, note } = resultCopy(result, language);
   const subtitle = detail.filter(Boolean).join(' · ');
 

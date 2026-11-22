@@ -1,17 +1,19 @@
 import { isBusFeedFresh, type BusFeed, type BusFeedFailure, type BusFeeds } from '@/bus-data';
-import { busRouteSearchNames, busSources, compareBusRoutes, normalizeBusQuery, type BusRoute, type BusSource, type RouteName } from '@/bus-routes';
+import { busRouteSearchNames, busSources, compareBusRoutes, matchBusRoutes, normalizeBusQuery, type BusRoute, type BusSource, type RouteName } from '@/bus-routes';
 import { getExplorePlaces, type ExplorePlace } from '@/explore-places';
 import { facilityFavoriteKey, resolveFacilityIdentity, type FacilityFavoriteIdentity } from '@/facility-identity';
 import { facilityType, nearbyFacilities, type Facility } from '@/facilities';
 import { messages } from '@/i18n';
+import { searchLightRail, type LightRailEntry, type LightRailRoute, type LightRailStop } from '@/light-rail-static';
+import { searchMtr, type MtrEntry, type MtrLine, type MtrStation } from '@/mtr-static';
 import { readBusStopsForSearch } from '@/nearby-bus-data';
 
-export const globalSearchKinds = ['bus_route', 'bus_stop', 'facility', 'explore_place'] as const;
+export const globalSearchKinds = ['transport_route', 'transport_stop', 'facility', 'explore_place'] as const;
 export type GlobalSearchKind = (typeof globalSearchKinds)[number];
 export type GlobalSearchCategory = 'all' | GlobalSearchKind;
 export const globalSearchMaxLength = 80;
 const previewLimit = 8;
-const categoryLimits: Record<GlobalSearchKind, number> = { bus_route: 30, bus_stop: 30, facility: 15, explore_place: 8 };
+const categoryLimits = { bus_route: 30, bus_stop: 30, facility: 15, explore_place: 8, transport_route: 30, transport_stop: 30 };
 
 export type BusRouteSearchResult = { kind: 'bus_route'; key: string; route: BusRoute };
 export type BusStopSearchResult = {
@@ -35,7 +37,15 @@ export type ExploreSearchResult = {
   key: string;
   place: Pick<ExplorePlace, 'id' | 'title' | 'district' | 'category' | 'additionalCategories'>;
 };
-export type GlobalSearchResult = BusRouteSearchResult | BusStopSearchResult | FacilitySearchResult | ExploreSearchResult;
+export type RailwayRouteSearchResult = { kind: 'mtr_line'; key: string; entry: MtrLine }
+  | { kind: 'light_rail_route'; key: string; entry: LightRailRoute };
+export type RailwayStopSearchResult = { kind: 'mtr_station'; key: string; entry: MtrStation }
+  | { kind: 'light_rail_stop'; key: string; entry: LightRailStop };
+export type RailwaySearchResult = RailwayRouteSearchResult | RailwayStopSearchResult;
+export type TransportRouteSearchResult = BusRouteSearchResult | RailwayRouteSearchResult;
+export type TransportStopSearchResult = BusStopSearchResult | RailwayStopSearchResult;
+export type TransportSearchResult = TransportRouteSearchResult | TransportStopSearchResult;
+export type GlobalSearchResult = TransportSearchResult | FacilitySearchResult | ExploreSearchResult;
 
 type SourceStatus = 'not_loaded' | 'loading' | 'ready' | 'failed';
 type GroupStatus = SourceStatus | 'partial';
@@ -49,7 +59,9 @@ type RouteSourceState = {
   persisted?: boolean;
 };
 type RouteSearchGroup = SearchGroup<BusRouteSearchResult> & { sources: Record<BusSource, RouteSourceState> };
-export type GlobalSearchGroup = RouteSearchGroup | SearchGroup<BusStopSearchResult>
+type TransportRouteGroup = ResultPage<TransportRouteSearchResult> & { kind: 'transport_route'; status: GroupStatus; bus?: RouteSearchGroup };
+type TransportStopGroup = ResultPage<TransportStopSearchResult> & { kind: 'transport_stop'; status: GroupStatus; bus?: SearchGroup<BusStopSearchResult> };
+export type GlobalSearchGroup = TransportRouteGroup | TransportStopGroup
   | SearchGroup<FacilitySearchResult> | SearchGroup<ExploreSearchResult>;
 
 type CatalogueState = { feeds: BusFeeds; loading: boolean; failed: Partial<Record<BusSource, BusFeedFailure>> };
@@ -129,7 +141,7 @@ function emptyPage() {
   return { results: [], totalMatches: 0, hasMore: false };
 }
 
-function limitFor(kind: GlobalSearchKind, scope: SearchScope) {
+function limitFor(kind: keyof typeof categoryLimits, scope: SearchScope) {
   return scope === 'preview' ? previewLimit : categoryLimits[kind];
 }
 
@@ -222,6 +234,78 @@ export function searchBusStops(query: PreparedSearch, stops?: GlobalBusStopsStat
   return { kind: 'bus_stop', status: stops?.status ?? 'not_loaded', ...matches };
 }
 
+export function railwaySearchResult(entry: MtrEntry | LightRailEntry): RailwaySearchResult {
+  switch (entry.kind) {
+    case 'mtr-line': return { kind: 'mtr_line', key: `mtr_line:${entry.id}`, entry };
+    case 'mtr-station': return { kind: 'mtr_station', key: `mtr_station:${entry.id}`, entry };
+    case 'light-rail-route': return { kind: 'light_rail_route', key: `light_rail_route:${entry.id}`, entry };
+    case 'light-rail-stop': return { kind: 'light_rail_stop', key: `light_rail_stop:${entry.id}`, entry };
+  }
+}
+
+type TransportMode = 'bus' | 'mtr' | 'lightRail';
+type TransportPages = { routes: ResultPage<TransportRouteSearchResult>; stops: ResultPage<TransportStopSearchResult> };
+type TransportContext = { query: PreparedSearch; busRoutes: RouteSearchGroup; busStops: SearchGroup<BusStopSearchResult> };
+type TransportSearchSource = { id: TransportMode; search: (input: string, context: TransportContext) => TransportPages };
+
+function railwayPages(entries: readonly (MtrEntry | LightRailEntry)[]): TransportPages {
+  const routes: RailwayRouteSearchResult[] = [];
+  const stops: RailwayStopSearchResult[] = [];
+  for (const entry of entries) {
+    const result = railwaySearchResult(entry);
+    if (result.kind === 'mtr_line' || result.kind === 'light_rail_route') routes.push(result);
+    else stops.push(result);
+  }
+  return { routes: { results: routes, totalMatches: routes.length, hasMore: false },
+    stops: { results: stops, totalMatches: stops.length, hasMore: false } };
+}
+
+/** Register a verified transport source here; matching remains owned by each existing catalogue. */
+const transportSearchSources: readonly TransportSearchSource[] = [
+  { id: 'bus', search: (_input, context) => ({ routes: context.busRoutes, stops: context.busStops }) },
+  { id: 'mtr', search: (input, { query }) => railwayPages(query.status === 'ready' ? searchMtr(input) : []) },
+  { id: 'lightRail', search: (input, { query }) => railwayPages(query.status === 'ready' ? searchLightRail(input) : []) },
+];
+
+function combineTransportPages<Result>(pages: readonly ResultPage<Result>[], limit: number): ResultPage<Result> {
+  const results: Result[] = [];
+  // Preserve each source's ranking while keeping matching rail sources visible in bounded previews.
+  for (let index = 0; results.length < limit && pages.some((page) => index < page.results.length); index++) {
+    for (const page of pages) if (index < page.results.length && results.length < limit) results.push(page.results[index]);
+  }
+  const totalMatches = pages.reduce((total, page) => total + page.totalMatches, 0);
+  return { results, totalMatches, hasMore: totalMatches > results.length };
+}
+
+export function searchTransport(input: string, { busCatalogue, busStops, now, mode, scope = 'category', surface = 'global' }: {
+  busCatalogue?: CatalogueState; busStops?: GlobalBusStopsState; now?: number; mode?: TransportMode;
+  scope?: SearchScope; surface?: 'global' | 'transport';
+} = {}): { routes: TransportRouteGroup; stops: TransportStopGroup } {
+  const query = prepareGlobalSearchQuery(input);
+  const includeBus = mode === undefined || mode === 'bus';
+  const baseRoutes = searchBusRoutes(surface === 'transport' ? { status: 'empty', text: '' } : query,
+    includeBus ? busCatalogue : undefined, scope, now);
+  // The dedicated transport surface retains its established substring bus-route rule.
+  const busMatches = surface === 'transport' && includeBus && query.status === 'ready'
+    ? matchBusRoutes(busSources.flatMap((source) => busCatalogue?.feeds[source]?.routes ?? []), input)
+      .map((route): BusRouteSearchResult => ({ kind: 'bus_route', key: `bus_route:${route.id}`, route })) : undefined;
+  const context: TransportContext = {
+    query, busRoutes: busMatches ? { ...baseRoutes, results: busMatches, totalMatches: busMatches.length, hasMore: false } : baseRoutes,
+    busStops: searchBusStops(query, includeBus ? busStops : undefined, scope),
+  };
+  const sources = transportSearchSources.filter((source) => mode === undefined || source.id === mode);
+  const pages = sources.map((source) => source.search(input, context));
+  const hasLocalRail = sources.some(({ id }) => id !== 'bus');
+  const status = (busStatus: GroupStatus): GroupStatus => !includeBus ? 'ready'
+    : hasLocalRail && busStatus !== 'ready' ? 'partial' : busStatus;
+  return {
+    routes: { kind: 'transport_route', status: status(context.busRoutes.status), bus: includeBus ? context.busRoutes : undefined,
+      ...combineTransportPages(pages.map(({ routes }) => routes), surface === 'transport' ? Infinity : limitFor('transport_route', scope)) },
+    stops: { kind: 'transport_stop', status: status(context.busStops.status), bus: includeBus ? context.busStops : undefined,
+      ...combineTransportPages(pages.map(({ stops }) => stops), surface === 'transport' ? Infinity : limitFor('transport_stop', scope)) },
+  };
+}
+
 let facilities: IndexedResult<FacilitySearchResult>[] | undefined;
 function facilityIndex() {
   if (facilities) return facilities;
@@ -273,12 +357,13 @@ export function searchExplorePlaces(query: PreparedSearch, scope: SearchScope = 
 
 export function searchGlobal(input: string, { category = 'all', busCatalogue, busStops, requestId, now }: GlobalSearchOptions = {}) {
   const prepared = prepareGlobalSearchQuery(input);
-  const query: PreparedSearch = category !== 'all' && category !== 'bus_route' && prepared.status === 'ready' && !prepared.terms.matchNames
+  const query: PreparedSearch = category !== 'all' && category !== 'transport_route' && prepared.status === 'ready' && !prepared.terms.matchNames
     ? { status: 'too_short', text: prepared.text } : prepared;
   const scope = category === 'all' ? 'preview' : 'category';
+  const transport = searchTransport(query.status === 'ready' ? input : '', { busCatalogue, busStops, now, scope });
   const searches: Record<GlobalSearchKind, () => GlobalSearchGroup> = {
-    bus_route: () => searchBusRoutes(query, busCatalogue, scope, now),
-    bus_stop: () => searchBusStops(query, busStops, scope),
+    transport_route: () => transport.routes,
+    transport_stop: () => transport.stops,
     facility: () => searchFacilities(query, scope),
     explore_place: () => searchExplorePlaces(query, scope),
   };

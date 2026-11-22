@@ -159,7 +159,9 @@ const list = (screen) => find(screen, 'FlatList').props;
 const input = (screen) => find(screen, 'TextInput').props;
 const empty = (screen) => list(screen).ListEmptyComponent;
 const resultItems = (screen) => list(screen).data.filter((row) => row.type === 'result').map((row) => row.result);
-const displayed = (screen, kind) => resultItems(screen).filter((result) => result.kind === kind);
+const displayed = (screen, kind) => resultItems(screen).filter((result) => kind === 'transport_route'
+  ? ['bus_route', 'mtr_line', 'light_rail_route'].includes(result.kind)
+  : kind === 'transport_stop' ? ['bus_stop', 'mtr_station', 'light_rail_stop'].includes(result.kind) : result.kind === kind);
 const hasCopy = (tree, copy) => nodes(tree, true).some(({ props }) => props.children === copy || props.title === copy);
 function tapText(tree, label) {
   const action = nodes(tree, true).find(({ type, props }) =>
@@ -305,7 +307,7 @@ async function verify() {
   let screen = render();
   assert(hasCopy(empty(screen), labels().search.introduction));
   for (const title of Object.values(labels().search.groups)) assert(hasCopy(empty(screen), title));
-  assert(!nodes(empty(screen), true).some(({ type }) => type === 'Pressable'));
+  assert.equal(nodes(empty(screen), true).filter(({ type }) => type === 'Pressable').length, 4);
   assert.equal(nodes(screen).filter(({ type }) => type === 'TextInput').length, 1);
   assert.equal(input(screen).maxLength, search.globalSearchMaxLength);
   assert.equal(input(screen).submitBehavior, 'blurAndSubmit');
@@ -345,15 +347,15 @@ async function verify() {
   assert(list(screen).initialNumToRender < list(screen).data.length);
   assert.equal(list(screen).automaticallyAdjustKeyboardInsets, true);
   assert.equal(list(screen).keyboardShouldPersistTaps, 'handled');
-  const stopHeading = list(screen).data.find((row) => row.type === 'group' && row.kind === 'bus_stop');
+  const stopHeading = list(screen).data.find((row) => row.type === 'group' && row.kind === 'transport_stop');
   const placeHeading = list(screen).data.find((row) => row.type === 'group' && row.kind === 'explore_place');
   assert.equal(placeHeading.canExpand, false);
   assert.equal(stopHeading.canExpand, true);
   const mixedScroll = list(screen).onScroll;
   mixedScroll({ nativeEvent: { contentOffset: { y: 190 } } });
-  tapText(list(screen).renderItem({ item: stopHeading }), labels().search.viewAllFor(labels().search.groups.bus_stop));
+  tapText(list(screen).renderItem({ item: stopHeading }), labels().search.viewAllFor(labels().search.groups.transport_stop));
   screen = render();
-  assert.equal(displayed(screen, 'bus_stop').length, 30);
+  assert.equal(displayed(screen, 'transport_stop').length, 30);
   assert.equal(displayed(screen, 'facility').length, 0);
   assert(hasCopy(list(screen).ListFooterComponent, labels().search.refine));
   assert.equal(list(screen).contentOffset.y, 0);
@@ -380,7 +382,7 @@ async function verify() {
   assert.deepEqual(scrolls, [190]);
   assert.equal(input(render()).value, '香港');
 
-  tapText(list(screen).renderItem({ item: stopHeading }), labels().search.viewAllFor(labels().search.groups.bus_stop));
+  tapText(list(screen).renderItem({ item: stopHeading }), labels().search.viewAllFor(labels().search.groups.transport_stop));
   screen = render();
   const scopedData = list(screen).data;
   const stopRow = scopedData.find((entry) => entry.type === 'result');
@@ -423,7 +425,7 @@ async function verify() {
   screen = render();
   assert.equal(input(screen).value, '香港');
   assert.deepEqual(resultItems(screen).map(({ key }) => key), mixedKeys);
-  assert(hasCopy(list(screen).renderItem({ item: stopHeading }), labels().search.groups.bus_stop));
+  assert(hasCopy(list(screen).renderItem({ item: stopHeading }), labels().search.groups.transport_stop));
   input(screen).onChangeText('PARK');
   screen = render();
   assert.equal(resultItems(screen).length, 0);
@@ -502,7 +504,77 @@ async function verify() {
   screen = await flush();
   assert(!hasCopy(list(screen).ListHeaderComponent, labels().search.stopsFailed));
 
-  console.log('PASS: C2 bilingual search, bounded expansion and source states; C3 result presses, single push and scoped scroll return');
+  for (locale of ['zh-HK', 'en']) {
+    reset(); cached = liveFeeds; operatorFailures = new Set(); stopsTask = undefined; stopsFail = false;
+    screen = render();
+    assert.deepEqual(Object.values(labels().search.groups), locale === 'en'
+      ? ['Transport routes', 'Transport stops', 'Nearby facilities', 'Featured places']
+      : ['交通路線', '交通車站', '附近設施', '精選地點']);
+    tapText(empty(screen), labels().search.groups.transport_route);
+    screen = render();
+    assert(hasCopy(screen, labels().search.backToAll));
+    for (const [query, kind, id, href] of [
+      ['B2', 'bus_route', undefined, undefined],
+      [locale === 'en' ? 'Island Line' : '港島綫', 'mtr_line', 'ISL', { pathname: '/mtr/[kind]', params: { kind: 'line', code: 'ISL' } }],
+      ['610', 'light_rail_route', '610', { pathname: '/light-rail/[kind]', params: { kind: 'route', id: '610' } }],
+    ]) {
+      input(screen).onChangeText(query); screen = await complete();
+      assert(resultItems(screen).every(({ kind }) => ['bus_route', 'mtr_line', 'light_rail_route'].includes(kind)));
+      const row = list(screen).data.find((row) => row.type === 'result' && row.result.kind === kind && (!id || row.result.entry?.id === id));
+      assert(row, `${locale}: ${query}`);
+      const actionsBefore = pushed.length;
+      const returnScrolls = [];
+      find(screen, 'FlatList').props.ref.current = { scrollToOffset: ({ offset }) => returnScrolls.push(offset) };
+      list(screen).onScroll({ nativeEvent: { contentOffset: { y: 175 } } });
+      pressRow(row).props.onPress(); pressRow(row).props.onPress();
+      assert.equal(pushed.length, actionsBefore + 1);
+      if (href) assert.deepEqual(pushed.at(-1), href);
+      blur(); blur = focusEffect(); advance(16); screen = render();
+      assert.equal(input(screen).value, query);
+      assert.deepEqual(returnScrolls, [175]);
+      assert(hasCopy(screen, labels().search.backToAll));
+    }
+    tapText(screen, labels().search.clear); screen = render();
+    tapText(empty(screen), labels().search.groups.transport_stop); screen = render();
+    for (const [query, kind, id, href] of [
+      ['Admiralty', 'mtr_station', 'ADM', { pathname: '/mtr/[kind]', params: { kind: 'station', code: 'ADM' } }],
+      ['ADM', 'mtr_station', 'ADM', { pathname: '/mtr/[kind]', params: { kind: 'station', code: 'ADM' } }],
+      [locale === 'en' ? 'Hoi Wong Road' : '海皇路', 'light_rail_stop', '250', { pathname: '/light-rail/[kind]', params: { kind: 'stop', id: '250' } }],
+      ['250', 'light_rail_stop', '250', { pathname: '/light-rail/[kind]', params: { kind: 'stop', id: '250' } }],
+    ]) {
+      input(screen).onChangeText(query); screen = await complete();
+      assert(resultItems(screen).every(({ kind }) => ['bus_stop', 'mtr_station', 'light_rail_stop'].includes(kind)));
+      const row = list(screen).data.find((row) => row.type === 'result' && row.result.kind === kind && row.result.entry.id === id);
+      assert(row, `${locale}: ${query}`);
+      const actual = pressRow(row);
+      assert(actual.props.accessibilityLabel.includes(kind === 'mtr_station' ? labels().transport.modes.mtr : labels().transport.modes.lightRail));
+      actual.props.onPress();
+      assert.deepEqual(pushed.at(-1), href);
+      blur(); blur = focusEffect(); advance(16); screen = render();
+      assert.equal(input(screen).value, query);
+    }
+    input(screen).onChangeText('洪水橋'); screen = await complete();
+    assert(displayed(screen, 'bus_stop').length > 0);
+    assert(displayed(screen, 'light_rail_stop').some(({ key }) => key === 'light_rail_stop:380'));
+    assert.equal(new Set(resultItems(screen).map(({ key }) => key)).size, resultItems(screen).length);
+    input(screen).onChangeText('ADM'); render(); advance(90);
+    input(render()).onChangeText('250'); render(); advance(90);
+    assert.equal(resultItems(render()).length, 0, 'An older railway query timer cannot publish stale results');
+    advance(90); screen = await flush();
+    assert(displayed(screen, 'light_rail_stop').some(({ key }) => key === 'light_rail_stop:250'));
+    assert.equal(displayed(screen, 'mtr_station').length, 0);
+    tapText(screen, labels().search.clear); screen = render();
+    assert.equal(nodes(empty(screen), true).filter(({ type }) => type === 'Pressable').length, 4);
+  }
+  reset(); cached = {}; operatorFailures = new Set(['kmbLwb', 'citybus', 'nlb']); stopsTask = undefined; stopsFail = true;
+  screen = render(); input(screen).onChangeText('610'); screen = await complete();
+  assert(displayed(screen, 'light_rail_route').some(({ key }) => key === 'light_rail_route:610'));
+  assert(hasCopy(list(screen).ListHeaderComponent, labels().search.routeFailed));
+  input(screen).onChangeText('Admiralty'); screen = await complete();
+  assert(displayed(screen, 'mtr_station').some(({ key }) => key === 'mtr_station:ADM'));
+  assert(hasCopy(list(screen).ListHeaderComponent, labels().search.stopsFailed));
+
+  console.log('PASS: four interactive bilingual entry cards; three transport sources, scoped categories, detail navigation, debounce/return and offline rail under bus failures; facilities and places unchanged');
 }
 
 verify().catch((error) => { console.error(error); process.exitCode = 1; }).finally(reset);

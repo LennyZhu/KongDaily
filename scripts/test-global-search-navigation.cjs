@@ -167,6 +167,21 @@ function navigate(result, name, expectedParams) {
 }
 
 async function main() {
+  const { railwaySearchResult } = load('global-search');
+  const { findMtrLine, findMtrStation } = load('mtr-static');
+  const { findLightRailRoute, findLightRailStop } = load('light-rail-static');
+  for (const entry of [findMtrLine('ISL'), findMtrStation('ADM'), findMtrStation('CEN'), findMtrStation('HOK')]) {
+    const result = railwaySearchResult(entry);
+    navigate(result, 'mtr/[kind]', { kind: entry.kind === 'mtr-line' ? 'line' : 'station', code: entry.id });
+    assert.deepEqual(searchResultDestination({ ...result, entry: { ...entry, id: 'UNKNOWN' } }), { issue: 'resultUnavailable' });
+  }
+  for (const entry of [findLightRailRoute('610'), findLightRailRoute('705'), findLightRailRoute('706'), findLightRailStop('250'), findLightRailStop('380')]) {
+    const result = railwaySearchResult(entry);
+    navigate(result, 'light-rail/[kind]', { kind: entry.kind === 'light-rail-route' ? 'route' : 'stop', id: entry.id });
+    assert.deepEqual(searchResultDestination({ ...result, entry: { ...entry, id: 'UNKNOWN' } }), { issue: 'resultUnavailable' });
+  }
+  assert.deepEqual(searchResultDestination({ kind: 'mtr_station', entry: findLightRailStop('250') }), { issue: 'resultUnavailable' });
+  assert.deepEqual(searchResultDestination({ kind: 'light_rail_stop', entry: findMtrStation('ADM') }), { issue: 'resultUnavailable' });
   for (const route of [...kmb, city, nlb]) navigate(routeResult(route), 'bus/route', { routeId: route.id });
   assert.notEqual(searchResultDestination(routeResult(kmb[0])).href.params.routeId, city.id);
   for (const route of [

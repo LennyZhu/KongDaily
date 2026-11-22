@@ -1412,10 +1412,10 @@ test('All search separates Bus, MTR and Light Rail identities and restores nearb
   const lightRailRow = page.rows().findIndex(({ kind, id }) => kind === 'light-rail-stop' && id === '600');
   assert.ok(busRow >= 0 && mtrRow > busRow && lightRailRow > mtrRow);
   assert.equal(page.renderRow(busRow).props.modeLabel, page.transportCopy.modes.bus);
-  assert.equal(page.list().props.keyExtractor(page.rows()[mtrRow]), 'mtr-station:YUL');
+  assert.equal(page.list().props.keyExtractor(page.rows()[mtrRow]), 'mtr_station:YUL');
   page.openResult(mtrRow);
   assert.deepEqual(page.routes.at(-1), { pathname: '/mtr/[kind]', params: { kind: 'station', code: 'YUL' } });
-  assert.equal(page.list().props.keyExtractor(page.rows()[lightRailRow]), 'light-rail-stop:600');
+  assert.equal(page.list().props.keyExtractor(page.rows()[lightRailRow]), 'light_rail_stop:600');
   page.openResult(lightRailRow);
   assert.deepEqual(page.routes.at(-1), { pathname: '/light-rail/[kind]', params: { kind: 'stop', id: '600' } });
   page.focus(false);

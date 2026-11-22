@@ -62,7 +62,7 @@ function group(result, kind) {
   return found;
 }
 const { searchGlobal, loadGlobalBusStops, prepareGlobalSearchQuery, searchBusRoutes, searchBusStops,
-  searchFacilities, searchExplorePlaces, globalSearchMaxLength } = load('global-search');
+  searchFacilities, searchExplorePlaces, searchTransport, railwaySearchResult, globalSearchMaxLength } = load('global-search');
 
 const { parseBusCatalogue, matchBusRoutes } = load('bus-routes');
 const now = Date.parse('2026-11-19T07:00:00Z');
@@ -81,13 +81,13 @@ const feeds = {
   ] }), fetchedAt: now, persisted: true },
 };
 const catalogue = { feeds, loading: false, failed: {} };
-const bus = (text, state = catalogue) => group(searchGlobal(text, { category: 'bus_route', busCatalogue: state, now }), 'bus_route');
+const bus = (text, state = catalogue) => searchBusRoutes(prepareGlobalSearchQuery(text), state, 'category', now);
 
 async function verify() {
   const blank = searchGlobal(' \t　\n');
   assert.equal(blank.queryStatus, 'empty');
   assert.deepEqual(blank.groups.map(({ kind, status, totalMatches }) => [kind, status, totalMatches]), [
-    ['bus_route', 'not_loaded', 0], ['bus_stop', 'not_loaded', 0], ['facility', 'ready', 0], ['explore_place', 'ready', 0],
+    ['transport_route', 'partial', 0], ['transport_stop', 'partial', 0], ['facility', 'ready', 0], ['explore_place', 'ready', 0],
   ]);
   assert.equal(searchGlobal('🤔!').queryStatus, 'too_short');
   assert.equal(searchGlobal('x'.repeat(globalSearchMaxLength + 1)).queryStatus, 'too_long');
@@ -97,7 +97,7 @@ async function verify() {
   assert.equal(short.queryStatus, 'ready');
   assert.equal(short.requestId, 7);
   assert.equal(group(short, 'facility').totalMatches, 0);
-  assert.equal(searchGlobal('1', { category: 'bus_stop' }).queryStatus, 'too_short');
+  assert.equal(searchGlobal('1', { category: 'transport_stop' }).queryStatus, 'too_short');
 
   assert.deepEqual(bus('１').results.map(({ route }) => route.id), ['KMB-LWB:1:I:1', 'CTB:1', 'KMB-LWB:12:O:1']);
   assert.deepEqual(bus('２６８ｘ').results.map(({ route }) => [route.id, route.direction, route.serviceType]), [
@@ -133,7 +133,7 @@ async function verify() {
   assert.equal(routesLimited.results.length, 30);
   assert.deepEqual(routesLimited.results.slice(0, 3).map(({ route }) => route.number), ['100', '101', '102']);
   assert(routesLimited.hasMore);
-  assert.equal(group(searchGlobal('1', { busCatalogue: longFeed }), 'bus_route').results.length, 8);
+  assert.equal(group(searchGlobal('1', { busCatalogue: longFeed }), 'transport_route').results.length, 8);
 
   assert.equal(stopReads, 0, 'Querying alone never reads or fetches a catalogue');
   const stopStarted = performance.now();
@@ -150,7 +150,7 @@ async function verify() {
   assert.equal(new Set(busStops.index.map(({ result }) => result.key)).size, 7841);
   assert.equal(db.prepare('PRAGMA user_version').get().user_version, 8);
 
-  const stops = (input) => group(searchGlobal(input, { category: 'bus_stop', busStops }), 'bus_stop');
+  const stops = (input) => searchBusStops(prepareGlobalSearchQuery(input), busStops);
   const ferry = stops('CENTRAL (MACAO FERRY)').results[0];
   assert.equal(ferry.source, 'citybus');
   assert.equal(ferry.stopId, '001027');
@@ -235,21 +235,62 @@ async function verify() {
   assert.deepEqual(searchBusStops(prepareGlobalSearchQuery('公園'), busStops), moreStops);
 
   const noCatalogue = searchGlobal('香港公園', { busStops });
-  assert.equal(group(noCatalogue, 'bus_route').status, 'not_loaded');
+  assert.equal(group(noCatalogue, 'transport_route').bus.status, 'not_loaded');
   const failed = searchGlobal('香港公園', { busStops, busCatalogue: { feeds: {}, loading: false, failed: { kmbLwb: 'network' } } });
-  assert.equal(group(failed, 'bus_route').status, 'failed');
-  for (const kind of ['bus_stop', 'facility', 'explore_place']) {
+  assert.equal(group(failed, 'transport_route').bus.status, 'failed');
+  for (const kind of ['transport_stop', 'facility', 'explore_place']) {
     assert.deepEqual(group(noCatalogue, kind), group(failed, kind));
   }
   const stopsLoading = searchGlobal('香港公園', { busStops: { status: 'loading' } });
-  assert.equal(group(stopsLoading, 'bus_stop').status, 'loading');
+  assert.equal(group(stopsLoading, 'transport_stop').bus.status, 'loading');
   failStopRead = true;
   const failedStops = await loadGlobalBusStops();
-  assert.equal(group(searchGlobal('香港公園', { busStops: failedStops }), 'bus_stop').status, 'failed');
+  assert.equal(group(searchGlobal('香港公園', { busStops: failedStops }), 'transport_stop').bus.status, 'failed');
   assert(group(searchGlobal('香港公園', { busStops: failedStops }), 'explore_place').totalMatches > 0);
   failStopRead = false;
   assert.equal((await loadGlobalBusStops()).status, 'ready', 'A later load can retry after a storage failure');
   assert.equal(stopReads, 3);
+
+  // Phase 3A: both surfaces query the same typed registry and retain operator identities.
+  const transportOptions = { busCatalogue: catalogue, busStops, now };
+  const { mtrLines, mtrStations } = load('mtr-static');
+  const { lightRailRoutes, lightRailStops } = load('light-rail-static');
+  for (const [mode, entries] of [['mtr', [...mtrLines, ...mtrStations]], ['lightRail', [...lightRailRoutes, ...lightRailStops]]]) {
+    for (const entry of entries) {
+      const expected = railwaySearchResult(entry);
+      const global = searchTransport(entry.id, { ...transportOptions, mode });
+      const transport = searchTransport(entry.id, { ...transportOptions, mode, surface: 'transport' });
+      const family = entry.kind === 'mtr-line' || entry.kind === 'light-rail-route' ? 'routes' : 'stops';
+      assert.equal(global[family].results.find(({ key }) => key === expected.key).entry, entry);
+      assert.equal(transport[family].results.find(({ key }) => key === expected.key).entry, entry);
+    }
+  }
+  for (const [input, family, kind, id] of [
+    ['港島綫', 'routes', 'mtr_line', 'ISL'], ['ISL', 'routes', 'mtr_line', 'ISL'],
+    ['Admiralty', 'stops', 'mtr_station', 'ADM'], ['金鐘', 'stops', 'mtr_station', 'ADM'],
+    ['610', 'routes', 'light_rail_route', '610'], ['250', 'stops', 'light_rail_stop', '250'],
+    ['Hoi Wong Road', 'stops', 'light_rail_stop', '250'], ['海皇路', 'stops', 'light_rail_stop', '250'],
+    ['洪水橋', 'stops', 'light_rail_stop', '380'],
+  ]) {
+    const results = searchTransport(input, transportOptions)[family].results;
+    assert(results.some((result) => result.kind === kind && result.entry.id === id), `${input}: ${kind}/${id}`);
+  }
+  const b2 = searchTransport('B2', transportOptions).routes.results;
+  assert(b2.some((result) => result.kind === 'bus_route' && result.route.number === 'B2'));
+  const hungShuiKiu = searchTransport('洪水橋', transportOptions).stops;
+  assert(hungShuiKiu.results.some(({ kind }) => kind === 'bus_stop'));
+  assert(hungShuiKiu.results.some(({ kind }) => kind === 'light_rail_stop'));
+  const yuenLong = searchTransport('元朗', transportOptions).stops.results;
+  assert(yuenLong.some(({ key }) => key === 'mtr_station:YUL'));
+  assert(yuenLong.some(({ key }) => key === 'light_rail_stop:600'));
+  assert.equal(new Set(yuenLong.map(({ key }) => key)).size, yuenLong.length);
+  assert.equal(searchTransport('ADM', transportOptions).stops.results.filter(({ key }) => key === 'mtr_station:ADM').length, 1);
+  const noBus = { busCatalogue: { feeds: {}, loading: false, failed: { kmbLwb: 'network' } }, busStops: { status: 'failed' } };
+  assert(group(searchGlobal('610', noBus), 'transport_route').results.some(({ kind }) => kind === 'light_rail_route'));
+  assert(group(searchGlobal('Admiralty', noBus), 'transport_stop').results.some(({ kind }) => kind === 'mtr_station'));
+  assert.equal(searchTransport('68x', { ...transportOptions, mode: 'bus' }).routes.totalMatches, 0);
+  assert.equal(searchTransport('68x', { ...transportOptions, mode: 'bus', surface: 'transport' }).routes.totalMatches, 2,
+    'The dedicated bus substring rule remains explicit in the shared adapter');
 
   const inputs = ['公園', 'CENTRAL', '香港', 'TOILETS', '龍脊', 'LIBRARY', '268X', '西九', '站', 'PARK'];
   const durations = [];
@@ -262,7 +303,7 @@ async function verify() {
   console.log(`Node timing | first stop SQLite load/index ${stopInitMs.toFixed(1)} ms | first facility index/query ${facilitiesInitMs.toFixed(1)} ms | 200 warm mixed queries median ${durations[100].toFixed(2)} ms, p95 ${durations[189].toFixed(2)} ms`);
   assert.equal(stopReads, 3, 'Repeated queries use prepared indices');
   assert.equal(networkCalls, 0, 'Global search never fetches by keystroke');
-  console.log('PASS: four search groups, official identities and counts, matching, ordering, limits, failure isolation and offline reads');
+  console.log('PASS: four groups, shared transport registry, all 187 railway entries, bilingual/code queries, stable IDs, failure isolation and offline reads');
 }
 
 verify().catch((error) => { console.error(error); process.exitCode = 1; }).finally(() => {

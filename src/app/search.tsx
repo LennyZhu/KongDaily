@@ -49,8 +49,8 @@ export default function SearchScreen() {
   const searching = prepared.status === 'ready' && settledId !== draft.id;
   const canSearch = prepared.status === 'ready' && !searching;
   const canSearchNames = canSearch && prepared.terms.matchNames;
-  const needsCatalogue = canSearch && (category === 'all' || category === 'bus_route');
-  const needsStops = canSearchNames && (category === 'all' || category === 'bus_stop');
+  const needsCatalogue = canSearch && (category === 'all' || category === 'transport_route');
+  const needsStops = canSearchNames && (category === 'all' || category === 'transport_stop');
 
   useEffect(() => {
     if (!searching) return;
@@ -78,12 +78,14 @@ export default function SearchScreen() {
     busCatalogue: catalogueRequested ? { feeds, failed, loading: catalogueLoading } : undefined,
   }) : undefined, [canSearch, draft, category, busStops, catalogueRequested, feeds, failed, catalogueLoading]);
   const groups = result?.queryStatus === 'ready'
-    ? result.groups.filter(({ kind }) => kind === 'bus_route' || canSearchNames) : [];
+    ? result.groups.filter(({ kind }) => kind === 'transport_route' || canSearchNames) : [];
   const rows = resultRows(groups, category);
   const pendingSources = groups.some((group) => group.status === 'loading' || group.status === 'not_loaded'
-    || (group.kind === 'bus_route' && group.status === 'partial' && catalogueLoading));
+    || ((group.kind === 'transport_route' || group.kind === 'transport_stop')
+      && (group.bus?.status === 'loading' || group.bus?.status === 'not_loaded'))
+    || (group.kind === 'transport_route' && group.bus?.status === 'partial' && catalogueLoading));
   const incomplete = groups.some((group) => group.status !== 'ready'
-    || (group.kind === 'bus_route' && Object.values(group.sources).some(({ failure }) => !!failure)));
+    || (group.kind === 'transport_route' && group.bus && Object.values(group.bus.sources).some(({ failure }) => !!failure)));
   const scopedGroup = category === 'all' ? undefined : groups[0];
   const offsets = scrollPositions.current;
   const initialOffset = useMemo(() => ({ x: 0, y: offsets[category] ?? 0 }), [category, offsets]);
@@ -201,7 +203,9 @@ export default function SearchScreen() {
           </>
         )}
         ListEmptyComponent={(
-          queryStatus === 'empty' ? <Introduction labels={labels} />
+          queryStatus === 'empty' ? <Introduction labels={labels} selected={category} onChoose={(kind) => {
+            chooseCategory(kind); input.current?.focus();
+          }} />
             : searching ? <Feedback text={labels.searching} busy />
             : queryStatus === 'too_short' ? <Feedback text={labels.tooShort} />
             : queryStatus === 'too_long' ? <Feedback text={labels.tooLong(globalSearchMaxLength)} />
@@ -236,7 +240,9 @@ function resultRows(groups: readonly GlobalSearchGroup[], category: GlobalSearch
   });
 }
 
-function Introduction({ labels }: { labels: SearchCopy }) {
+function Introduction({ labels, selected, onChoose }: {
+  labels: SearchCopy; selected: GlobalSearchCategory; onChoose: (kind: GlobalSearchKind) => void;
+}) {
   return (
     <View style={styles.intro}>
       <SearchHarbourIllustration />
@@ -246,13 +252,15 @@ function Introduction({ labels }: { labels: SearchCopy }) {
       </View>
       <View style={styles.guide}>
         {globalSearchKinds.map((kind) => (
-          <View key={kind} style={styles.guideRow}>
+          <Pressable key={kind} accessibilityRole="button" accessibilityLabel={labels.groups[kind]}
+            accessibilityState={{ selected: selected === kind }} onPress={() => onChoose(kind)}
+            style={({ pressed }) => [styles.guideRow, pressed && styles.pressed]}>
             <View style={styles.guideIcon}><Icon name={searchGroupIcons[kind]} size={20} /></View>
             <View style={styles.guideText}>
               <AppText variant="homeCardTitle">{labels.groups[kind]}</AppText>
               <AppText variant="detail" tone="muted">{labels.examples[kind]}</AppText>
             </View>
-          </View>
+          </Pressable>
         ))}
       </View>
     </View>
@@ -282,19 +290,19 @@ function SourceNotice({ group, labels, catalogueLoading, retryLabel, retryCatalo
   group: GlobalSearchGroup; labels: SearchCopy; catalogueLoading: boolean; retryLabel: string;
   retryCatalogue: () => void; retryStops: () => void;
 }) {
-  if (group.kind === 'bus_stop') {
-    if (group.status === 'not_loaded') return <Feedback text={labels.stopsNotLoaded} />;
-    if (group.status === 'loading') return <Feedback text={labels.stopsLoading} busy />;
-    if (group.status === 'failed') return <Feedback text={labels.stopsFailed} retryLabel={retryLabel} onRetry={retryStops} />;
+  if (group.kind === 'transport_stop') {
+    if (group.bus?.status === 'not_loaded') return <Feedback text={labels.stopsNotLoaded} />;
+    if (group.bus?.status === 'loading') return <Feedback text={labels.stopsLoading} busy />;
+    if (group.bus?.status === 'failed') return <Feedback text={labels.stopsFailed} retryLabel={retryLabel} onRetry={retryStops} />;
   }
-  if (group.kind === 'bus_route') {
-    const sources = Object.values(group.sources);
+  if (group.kind === 'transport_route' && group.bus) {
+    const sources = Object.values(group.bus.sources);
     const failed = sources.some(({ failure }) => !!failure);
     const retry = failed && !catalogueLoading ? retryCatalogue : undefined;
-    if (group.status === 'not_loaded') return <Feedback text={labels.routeNotLoaded} />;
-    if (group.status === 'loading') return <Feedback text={labels.routeLoading} busy />;
-    if (group.status === 'failed') return <Feedback text={labels.routeFailed} retryLabel={retryLabel} onRetry={retry} />;
-    if (group.status === 'partial') return <Feedback text={labels.routePartial} busy={catalogueLoading} retryLabel={retryLabel} onRetry={retry} />;
+    if (group.bus.status === 'not_loaded') return <Feedback text={labels.routeNotLoaded} />;
+    if (group.bus.status === 'loading') return <Feedback text={labels.routeLoading} busy />;
+    if (group.bus.status === 'failed') return <Feedback text={labels.routeFailed} retryLabel={retryLabel} onRetry={retry} />;
+    if (group.bus.status === 'partial') return <Feedback text={labels.routePartial} busy={catalogueLoading} retryLabel={retryLabel} onRetry={retry} />;
     if (failed || sources.some(({ freshness }) => freshness === 'stale')) {
       return <Feedback text={labels.routeCached} busy={catalogueLoading} retryLabel={retryLabel} onRetry={retry} />;
     }
