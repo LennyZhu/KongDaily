@@ -1,0 +1,2071 @@
+{
+  "schemaVersion": 1,
+  "reviewedOn": "2026-11-22",
+  "sourceSha256": "77ed7fa19aa9443cc6a33c15e8c466839342df1561034711d9cdd597e86feb43",
+  "catalogueSha256": {
+    "mtr": "f72ba44ee94642a181d0d538541a7333fdc7ba23020fb3a4227c14ff57196c43",
+    "lightRail": "103062099d3a0bf4458f6fb937fdbcc4a70f9db838e2eb3d85142913c5d95560"
+  },
+  "mappingBasis": {
+    "mtr": "Explicit MTR station-code to iGeoCom GEONAMEID crosswalk: TRS/RSN classification, unique bilingual operator station identity (two documented glyph variants). Each entrance ID is allowlisted and has matching official E_SITENAME and C_SITENAME parent fields; no proximity join or fuzzy acceptance.",
+    "lightRail": "Explicit MTR Light Rail numeric stop-ID to iGeoCom GEONAMEID crosswalk: TRS/LRA classification, unique exact bilingual current operator stop identity and Light Rail service-area coordinates. LRA is a station-level reference, not a verified centre, entrance or platform."
+  },
+  "nameExceptions": {
+    "mtr/LAK": {
+      "catalogue": "茘景",
+      "source": "香港鐵路荔景站",
+      "basis": "Same unique official English Lai King identity, railway type and bilingual operator catalogue; 茘/荔 glyph variant only. Original catalogue unchanged."
+    },
+    "mtr/LCK": {
+      "catalogue": "茘枝角",
+      "source": "香港鐵路荔枝角站",
+      "basis": "Same unique official English Lai Chi Kok identity, railway type and bilingual operator catalogue; 茘/荔 glyph variant only. Original catalogue unchanged."
+    }
+  },
+  "unresolvedSourceRecords": [
+    {
+      "recordId": "21279579",
+      "reason": "Diamond Hill D access has no E_SITENAME/C_SITENAME parent association in this snapshot; withheld rather than assigning by name alone."
+    }
+  ],
+  "mtr": {
+    "ADM": {
+      "stationRecordId": "538320",
+      "sourceName": {
+        "en": "Mass Transit Railway Admiralty Station",
+        "zh": "香港鐵路金鐘站"
+      },
+      "entranceRecordIds": [
+        "530422",
+        "535960",
+        "544126",
+        "549939",
+        "551528",
+        "553384",
+        "21171060"
+      ]
+    },
+    "AIR": {
+      "stationRecordId": "556376",
+      "sourceName": {
+        "en": "Mass Transit Railway Airport Station",
+        "zh": "香港鐵路機場站"
+      },
+      "entranceRecordIds": [
+        "533022",
+        "21117713",
+        "21117714",
+        "21117717",
+        "21117718",
+        "21277873",
+        "21277874",
+        "21277875",
+        "21277876",
+        "21277877"
+      ]
+    },
+    "AUS": {
+      "stationRecordId": "545064",
+      "sourceName": {
+        "en": "Mass Transit Railway Austin Station",
+        "zh": "香港鐵路柯士甸站"
+      },
+      "entranceRecordIds": [
+        "549684",
+        "549861",
+        "553783",
+        "559843",
+        "560927",
+        "561959",
+        "562187",
+        "21015130",
+        "21015144",
+        "21125035",
+        "21125036",
+        "21125037",
+        "21155547"
+      ]
+    },
+    "AWE": {
+      "stationRecordId": "542563",
+      "sourceName": {
+        "en": "Mass Transit Railway AsiaWorld-Expo Station",
+        "zh": "香港鐵路博覽館站"
+      },
+      "entranceRecordIds": [
+        "539943",
+        "539944"
+      ]
+    },
+    "CAB": {
+      "stationRecordId": "541275",
+      "sourceName": {
+        "en": "Mass Transit Railway Causeway Bay Station",
+        "zh": "香港鐵路銅鑼灣站"
+      },
+      "entranceRecordIds": [
+        "538596",
+        "540043",
+        "540180",
+        "543203",
+        "543701",
+        "544719",
+        "554718",
+        "558566",
+        "561135",
+        "562652",
+        "21127585"
+      ]
+    },
+    "CEN": {
+      "stationRecordId": "546117",
+      "sourceName": {
+        "en": "Mass Transit Railway Central Station",
+        "zh": "香港鐵路中環站"
+      },
+      "entranceRecordIds": [
+        "529565",
+        "529602",
+        "529700",
+        "529825",
+        "530389",
+        "538594",
+        "542394",
+        "543387",
+        "545157",
+        "545592",
+        "550478",
+        "553891",
+        "555609",
+        "560769"
+      ]
+    },
+    "CHH": {
+      "stationRecordId": "537728",
+      "sourceName": {
+        "en": "Mass Transit Railway Choi Hung Station",
+        "zh": "香港鐵路彩虹站"
+      },
+      "entranceRecordIds": [
+        "529955",
+        "530433",
+        "540038",
+        "543406",
+        "544006",
+        "544469",
+        "545553",
+        "563067"
+      ]
+    },
+    "CHW": {
+      "stationRecordId": "558819",
+      "sourceName": {
+        "en": "Mass Transit Railway Chai Wan Station",
+        "zh": "香港鐵路柴灣站"
+      },
+      "entranceRecordIds": [
+        "529526",
+        "530437",
+        "536482",
+        "540443",
+        "553776"
+      ]
+    },
+    "CIO": {
+      "stationRecordId": "553913",
+      "sourceName": {
+        "en": "Mass Transit Railway City One Station",
+        "zh": "香港鐵路第一城站"
+      },
+      "entranceRecordIds": [
+        "538108",
+        "538216",
+        "545587",
+        "558469"
+      ]
+    },
+    "CKT": {
+      "stationRecordId": "537797",
+      "sourceName": {
+        "en": "Mass Transit Railway Che Kung Temple Station",
+        "zh": "香港鐵路車公廟站"
+      },
+      "entranceRecordIds": [
+        "538177",
+        "538554",
+        "543920",
+        "561144",
+        "563799",
+        "563800"
+      ]
+    },
+    "CSW": {
+      "stationRecordId": "552423",
+      "sourceName": {
+        "en": "Mass Transit Railway Cheung Sha Wan Station",
+        "zh": "香港鐵路長沙灣站"
+      },
+      "entranceRecordIds": [
+        "526900",
+        "529277",
+        "529483",
+        "529807",
+        "529969",
+        "559433",
+        "21067809"
+      ]
+    },
+    "DIH": {
+      "stationRecordId": "541087",
+      "sourceName": {
+        "en": "Mass Transit Railway Diamond Hill Station",
+        "zh": "香港鐵路鑽石山站"
+      },
+      "entranceRecordIds": [
+        "529254",
+        "529680",
+        "530228",
+        "538087",
+        "544223",
+        "21148165"
+      ]
+    },
+    "DIS": {
+      "stationRecordId": "545340",
+      "sourceName": {
+        "en": "Mass Transit Railway Disneyland Resort Station",
+        "zh": "香港鐵路迪士尼站"
+      },
+      "entranceRecordIds": [
+        "547252"
+      ]
+    },
+    "ETS": {
+      "stationRecordId": "537798",
+      "sourceName": {
+        "en": "Mass Transit Railway East Tsim Sha Tsui Station",
+        "zh": "香港鐵路尖東站"
+      },
+      "entranceRecordIds": [
+        "537883",
+        "537946",
+        "538267",
+        "538294",
+        "538791",
+        "543630",
+        "543997",
+        "545803",
+        "547661",
+        "550091",
+        "552005",
+        "557994",
+        "558036",
+        "558037",
+        "558038",
+        "21111629"
+      ]
+    },
+    "EXC": {
+      "stationRecordId": "21170932",
+      "sourceName": {
+        "en": "Mass Transit Railway Exhibition Centre Station",
+        "zh": "香港鐵路會展站"
+      },
+      "entranceRecordIds": [
+        "21171047",
+        "21171050",
+        "21171053",
+        "21171055",
+        "21171056",
+        "21171057"
+      ]
+    },
+    "FAN": {
+      "stationRecordId": "537330",
+      "sourceName": {
+        "en": "Mass Transit Railway Fanling Station",
+        "zh": "香港鐵路粉嶺站"
+      },
+      "entranceRecordIds": [
+        "532288",
+        "546122",
+        "561710",
+        "562243",
+        "562511"
+      ]
+    },
+    "FOH": {
+      "stationRecordId": "537793",
+      "sourceName": {
+        "en": "Mass Transit Railway Fortress Hill Station",
+        "zh": "香港鐵路炮台山站"
+      },
+      "entranceRecordIds": [
+        "539272",
+        "557864"
+      ]
+    },
+    "FOT": {
+      "stationRecordId": "562871",
+      "sourceName": {
+        "en": "Mass Transit Railway Fo Tan Station",
+        "zh": "香港鐵路火炭站"
+      },
+      "entranceRecordIds": [
+        "529718",
+        "532444",
+        "537495",
+        "537496"
+      ]
+    },
+    "HAH": {
+      "stationRecordId": "557941",
+      "sourceName": {
+        "en": "Mass Transit Railway Hang Hau Station",
+        "zh": "香港鐵路坑口站"
+      },
+      "entranceRecordIds": [
+        "542489",
+        "542491",
+        "544526",
+        "560375"
+      ]
+    },
+    "HEO": {
+      "stationRecordId": "537432",
+      "sourceName": {
+        "en": "Mass Transit Railway Heng On Station",
+        "zh": "香港鐵路恆安站"
+      },
+      "entranceRecordIds": [
+        "537704",
+        "538174",
+        "538215"
+      ]
+    },
+    "HFC": {
+      "stationRecordId": "557703",
+      "sourceName": {
+        "en": "Mass Transit Railway Heng Fa Chuen Station",
+        "zh": "香港鐵路杏花邨站"
+      },
+      "entranceRecordIds": [
+        "544283",
+        "545917"
+      ]
+    },
+    "HIK": {
+      "stationRecordId": "21139986",
+      "sourceName": {
+        "en": "Mass Transit Railway Hin Keng Station",
+        "zh": "香港鐵路顯徑站"
+      },
+      "entranceRecordIds": [
+        "21139987"
+      ]
+    },
+    "HKU": {
+      "stationRecordId": "544265",
+      "sourceName": {
+        "en": "Mass Transit Railway HKU Station",
+        "zh": "香港鐵路香港大學站"
+      },
+      "entranceRecordIds": [
+        "559212",
+        "559800",
+        "560348",
+        "560349",
+        "560350",
+        "560351"
+      ]
+    },
+    "HOK": {
+      "stationRecordId": "550143",
+      "sourceName": {
+        "en": "Mass Transit Railway Hong Kong Station",
+        "zh": "香港鐵路香港站"
+      },
+      "entranceRecordIds": [
+        "531051",
+        "535336",
+        "538318",
+        "539009",
+        "539754",
+        "549762",
+        "554004"
+      ]
+    },
+    "HOM": {
+      "stationRecordId": "21070302",
+      "sourceName": {
+        "en": "Mass Transit Railway Ho Man Tin Station",
+        "zh": "香港鐵路何文田站"
+      },
+      "entranceRecordIds": [
+        "21070386",
+        "21070387",
+        "21070388",
+        "21070389",
+        "21070390",
+        "21253036",
+        "21253037"
+      ]
+    },
+    "HUH": {
+      "stationRecordId": "544547",
+      "sourceName": {
+        "en": "Mass Transit Railway Hung Hom Station",
+        "zh": "香港鐵路紅磡站"
+      },
+      "entranceRecordIds": [
+        "531391",
+        "532023",
+        "534184",
+        "537910",
+        "537937",
+        "538745",
+        "544307",
+        "544981",
+        "545253",
+        "545796",
+        "546284",
+        "546373",
+        "549463",
+        "549741"
+      ]
+    },
+    "JOR": {
+      "stationRecordId": "537420",
+      "sourceName": {
+        "en": "Mass Transit Railway Jordan Station",
+        "zh": "香港鐵路佐敦站"
+      },
+      "entranceRecordIds": [
+        "533185",
+        "538603",
+        "540145",
+        "543129",
+        "546152",
+        "547728",
+        "554313"
+      ]
+    },
+    "KAT": {
+      "stationRecordId": "21141902",
+      "sourceName": {
+        "en": "Mass Transit Railway Kai Tak Station",
+        "zh": "香港鐵路啟德站"
+      },
+      "entranceRecordIds": [
+        "21141897",
+        "21141898",
+        "21141899",
+        "21148162",
+        "21148164",
+        "21201710",
+        "21253035"
+      ]
+    },
+    "KET": {
+      "stationRecordId": "539995",
+      "sourceName": {
+        "en": "Mass Transit Railway Kennedy Town Station",
+        "zh": "香港鐵路堅尼地城站"
+      },
+      "entranceRecordIds": [
+        "554088",
+        "554145",
+        "554146"
+      ]
+    },
+    "KOB": {
+      "stationRecordId": "537332",
+      "sourceName": {
+        "en": "Mass Transit Railway Kowloon Bay Station",
+        "zh": "香港鐵路九龍灣站"
+      },
+      "entranceRecordIds": [
+        "529827",
+        "529947",
+        "533215"
+      ]
+    },
+    "KOT": {
+      "stationRecordId": "544548",
+      "sourceName": {
+        "en": "Mass Transit Railway Kowloon Tong Station",
+        "zh": "香港鐵路九龍塘站"
+      },
+      "entranceRecordIds": [
+        "529043",
+        "529859",
+        "532298",
+        "537691",
+        "538295",
+        "543448",
+        "546789",
+        "547513",
+        "549704",
+        "549732",
+        "562534"
+      ]
+    },
+    "KOW": {
+      "stationRecordId": "538374",
+      "sourceName": {
+        "en": "Mass Transit Railway Kowloon Station",
+        "zh": "香港鐵路九龍站"
+      },
+      "entranceRecordIds": [
+        "531438",
+        "537947",
+        "539010",
+        "540523",
+        "552098",
+        "555048",
+        "21015504",
+        "21015505",
+        "21015506",
+        "21015507",
+        "21015508",
+        "21015509"
+      ]
+    },
+    "KSR": {
+      "stationRecordId": "538152",
+      "sourceName": {
+        "en": "Mass Transit Railway Kam Sheung Road Station",
+        "zh": "香港鐵路錦上路站"
+      },
+      "entranceRecordIds": [
+        "536860",
+        "536875",
+        "536876",
+        "549134"
+      ]
+    },
+    "KWF": {
+      "stationRecordId": "549394",
+      "sourceName": {
+        "en": "Mass Transit Railway Kwai Fong Station",
+        "zh": "香港鐵路葵芳站"
+      },
+      "entranceRecordIds": [
+        "529544",
+        "529768",
+        "530304",
+        "535808",
+        "543351"
+      ]
+    },
+    "KWH": {
+      "stationRecordId": "539603",
+      "sourceName": {
+        "en": "Mass Transit Railway Kwai Hing Station",
+        "zh": "香港鐵路葵興站"
+      },
+      "entranceRecordIds": [
+        "530431",
+        "540686",
+        "549160",
+        "550071",
+        "560612"
+      ]
+    },
+    "KWT": {
+      "stationRecordId": "547337",
+      "sourceName": {
+        "en": "Mass Transit Railway Kwun Tong Station",
+        "zh": "香港鐵路觀塘站"
+      },
+      "entranceRecordIds": [
+        "529791",
+        "529956",
+        "530417",
+        "530419",
+        "530434",
+        "530435",
+        "537985",
+        "543055",
+        "544730",
+        "544766",
+        "545453",
+        "546094",
+        "21129392",
+        "21129393",
+        "21129394",
+        "21129395"
+      ]
+    },
+    "LAK": {
+      "stationRecordId": "556400",
+      "sourceName": {
+        "en": "Mass Transit Railway Lai King Station",
+        "zh": "香港鐵路荔景站"
+      },
+      "entranceRecordIds": [
+        "530344",
+        "530421",
+        "543202",
+        "543671",
+        "544980"
+      ]
+    },
+    "LAT": {
+      "stationRecordId": "537374",
+      "sourceName": {
+        "en": "Mass Transit Railway Lam Tin Station",
+        "zh": "香港鐵路藍田站"
+      },
+      "entranceRecordIds": [
+        "530453",
+        "538458",
+        "549111",
+        "549798",
+        "562071"
+      ]
+    },
+    "LCK": {
+      "stationRecordId": "562503",
+      "sourceName": {
+        "en": "Mass Transit Railway Lai Chi Kok Station",
+        "zh": "香港鐵路荔枝角站"
+      },
+      "entranceRecordIds": [
+        "529269",
+        "537552",
+        "546797",
+        "558735",
+        "558878",
+        "558879",
+        "558880",
+        "21015049"
+      ]
+    },
+    "LET": {
+      "stationRecordId": "21070318",
+      "sourceName": {
+        "en": "Mass Transit Railway Lei Tung Station",
+        "zh": "香港鐵路利東站"
+      },
+      "entranceRecordIds": [
+        "21070324",
+        "21070326",
+        "21070327"
+      ]
+    },
+    "LHP": {
+      "stationRecordId": "538396",
+      "sourceName": {
+        "en": "Mass Transit Railway LOHAS Park Station",
+        "zh": "香港鐵路康城站"
+      },
+      "entranceRecordIds": [
+        "556852",
+        "562032",
+        "21178062"
+      ]
+    },
+    "LMC": {
+      "stationRecordId": "548743",
+      "sourceName": {
+        "en": "Mass Transit Railway Lok Ma Chau Station",
+        "zh": "香港鐵路落馬洲站"
+      },
+      "entranceRecordIds": [
+        "21117709"
+      ]
+    },
+    "LOF": {
+      "stationRecordId": "538339",
+      "sourceName": {
+        "en": "Mass Transit Railway Lok Fu Station",
+        "zh": "香港鐵路樂富站"
+      },
+      "entranceRecordIds": [
+        "529042",
+        "529461"
+      ]
+    },
+    "LOP": {
+      "stationRecordId": "537383",
+      "sourceName": {
+        "en": "Mass Transit Railway Long Ping Station",
+        "zh": "香港鐵路朗屏站"
+      },
+      "entranceRecordIds": [
+        "536707",
+        "536969",
+        "537144",
+        "537351",
+        "543847",
+        "546780",
+        "555254"
+      ]
+    },
+    "LOW": {
+      "stationRecordId": "543362",
+      "sourceName": {
+        "en": "Mass Transit Railway Lo Wu Station",
+        "zh": "香港鐵路羅湖站"
+      },
+      "entranceRecordIds": [
+        "21117708"
+      ]
+    },
+    "MEF": {
+      "stationRecordId": "537796",
+      "sourceName": {
+        "en": "Mass Transit Railway Mei Foo Station",
+        "zh": "香港鐵路美孚站"
+      },
+      "entranceRecordIds": [
+        "529268",
+        "531433",
+        "537553",
+        "543848",
+        "546476",
+        "549338",
+        "553787",
+        "562331"
+      ]
+    },
+    "MKK": {
+      "stationRecordId": "557494",
+      "sourceName": {
+        "en": "Mass Transit Railway Mong Kok East Station",
+        "zh": "香港鐵路旺角東站"
+      },
+      "entranceRecordIds": [
+        "529303",
+        "532892",
+        "537497",
+        "563091"
+      ]
+    },
+    "MOK": {
+      "stationRecordId": "545293",
+      "sourceName": {
+        "en": "Mass Transit Railway Mong Kok Station",
+        "zh": "香港鐵路旺角站"
+      },
+      "entranceRecordIds": [
+        "526861",
+        "529600",
+        "529601",
+        "530308",
+        "531526",
+        "531527",
+        "533184",
+        "538602",
+        "540144",
+        "543867",
+        "545596",
+        "547727",
+        "551634",
+        "562939",
+        "21118041"
+      ]
+    },
+    "MOS": {
+      "stationRecordId": "548676",
+      "sourceName": {
+        "en": "Mass Transit Railway Ma On Shan Station",
+        "zh": "香港鐵路馬鞍山站"
+      },
+      "entranceRecordIds": [
+        "538172",
+        "538173",
+        "557272"
+      ]
+    },
+    "NAC": {
+      "stationRecordId": "537319",
+      "sourceName": {
+        "en": "Mass Transit Railway Nam Cheong Station",
+        "zh": "香港鐵路南昌站"
+      },
+      "entranceRecordIds": [
+        "537820",
+        "543948",
+        "560770",
+        "21177759",
+        "21177760",
+        "21177761"
+      ]
+    },
+    "NOP": {
+      "stationRecordId": "545222",
+      "sourceName": {
+        "en": "Mass Transit Railway North Point Station",
+        "zh": "香港鐵路北角站"
+      },
+      "entranceRecordIds": [
+        "529629",
+        "530832",
+        "538726",
+        "538988",
+        "540183",
+        "546606",
+        "549547",
+        "558401",
+        "21127583"
+      ]
+    },
+    "NTK": {
+      "stationRecordId": "542244",
+      "sourceName": {
+        "en": "Mass Transit Railway Ngau Tau Kok Station",
+        "zh": "香港鐵路牛頭角站"
+      },
+      "entranceRecordIds": [
+        "529903",
+        "530416",
+        "538954",
+        "545023",
+        "545844",
+        "546984",
+        "552358",
+        "21129391"
+      ]
+    },
+    "OCP": {
+      "stationRecordId": "21070309",
+      "sourceName": {
+        "en": "Mass Transit Railway Ocean Park Station",
+        "zh": "香港鐵路海洋公園站"
+      },
+      "entranceRecordIds": [
+        "21070330",
+        "21070346",
+        "21070349"
+      ]
+    },
+    "OLY": {
+      "stationRecordId": "545322",
+      "sourceName": {
+        "en": "Mass Transit Railway Olympic Station",
+        "zh": "香港鐵路奧運站"
+      },
+      "entranceRecordIds": [
+        "530523",
+        "538319",
+        "539423",
+        "540251",
+        "543363",
+        "546367",
+        "547508",
+        "553892",
+        "560328",
+        "560329",
+        "561222",
+        "563264"
+      ]
+    },
+    "POA": {
+      "stationRecordId": "542102",
+      "sourceName": {
+        "en": "Mass Transit Railway Po Lam Station",
+        "zh": "香港鐵路寶琳站"
+      },
+      "entranceRecordIds": [
+        "533555",
+        "534079",
+        "534080",
+        "537916",
+        "552660",
+        "563878"
+      ]
+    },
+    "PRE": {
+      "stationRecordId": "537817",
+      "sourceName": {
+        "en": "Mass Transit Railway Prince Edward Station",
+        "zh": "香港鐵路太子站"
+      },
+      "entranceRecordIds": [
+        "528920",
+        "529719",
+        "530307",
+        "540024",
+        "543056",
+        "561230",
+        "21014827"
+      ]
+    },
+    "QUB": {
+      "stationRecordId": "540803",
+      "sourceName": {
+        "en": "Mass Transit Railway Quarry Bay Station",
+        "zh": "香港鐵路鰂魚涌站"
+      },
+      "entranceRecordIds": [
+        "529604",
+        "538597",
+        "540200"
+      ]
+    },
+    "RAC": {
+      "stationRecordId": "545946",
+      "sourceName": {
+        "en": "Mass Transit Railway Racecourse Station",
+        "zh": "香港鐵路馬場站"
+      },
+      "entranceRecordIds": [
+        "532382",
+        "547267",
+        "558649"
+      ]
+    },
+    "SHM": {
+      "stationRecordId": "537463",
+      "sourceName": {
+        "en": "Mass Transit Railway Shek Mun Station",
+        "zh": "香港鐵路石門站"
+      },
+      "entranceRecordIds": [
+        "530719",
+        "537562",
+        "538107",
+        "538175"
+      ]
+    },
+    "SHS": {
+      "stationRecordId": "537329",
+      "sourceName": {
+        "en": "Mass Transit Railway Sheung Shui Station",
+        "zh": "香港鐵路上水站"
+      },
+      "entranceRecordIds": [
+        "532285",
+        "532286",
+        "539712",
+        "539713",
+        "544397",
+        "545045",
+        "547917",
+        "558607",
+        "562391",
+        "562488",
+        "21203726"
+      ]
+    },
+    "SHT": {
+      "stationRecordId": "537331",
+      "sourceName": {
+        "en": "Mass Transit Railway Sha Tin Station",
+        "zh": "香港鐵路沙田站"
+      },
+      "entranceRecordIds": [
+        "542073",
+        "542921",
+        "543392",
+        "546689",
+        "557340"
+      ]
+    },
+    "SHW": {
+      "stationRecordId": "537840",
+      "sourceName": {
+        "en": "Mass Transit Railway Sheung Wan Station",
+        "zh": "香港鐵路上環站"
+      },
+      "entranceRecordIds": [
+        "529564",
+        "529789",
+        "531027",
+        "531028",
+        "539931",
+        "541051",
+        "546586",
+        "547310",
+        "551724",
+        "552359"
+      ]
+    },
+    "SIH": {
+      "stationRecordId": "537465",
+      "sourceName": {
+        "en": "Mass Transit Railway Siu Hong Station",
+        "zh": "香港鐵路兆康站"
+      },
+      "entranceRecordIds": [
+        "536677",
+        "536678",
+        "536679",
+        "536706",
+        "536942",
+        "544462",
+        "552329",
+        "552365",
+        "552366"
+      ]
+    },
+    "SKM": {
+      "stationRecordId": "553912",
+      "sourceName": {
+        "en": "Mass Transit Railway Shek Kip Mei Station",
+        "zh": "香港鐵路石硤尾站"
+      },
+      "entranceRecordIds": [
+        "526902",
+        "531251",
+        "533211",
+        "540162",
+        "21067810"
+      ]
+    },
+    "SKW": {
+      "stationRecordId": "537743",
+      "sourceName": {
+        "en": "Mass Transit Railway Shau Kei Wan Station",
+        "zh": "香港鐵路筲箕灣站"
+      },
+      "entranceRecordIds": [
+        "529679",
+        "529698",
+        "529826",
+        "534062",
+        "543057",
+        "553372",
+        "553786",
+        "558717",
+        "21103963"
+      ]
+    },
+    "SOH": {
+      "stationRecordId": "21070319",
+      "sourceName": {
+        "en": "Mass Transit Railway South Horizons Station",
+        "zh": "香港鐵路海怡半島站"
+      },
+      "entranceRecordIds": [
+        "21070320",
+        "21070322",
+        "21070323"
+      ]
+    },
+    "SSP": {
+      "stationRecordId": "537744",
+      "sourceName": {
+        "en": "Mass Transit Railway Sham Shui Po Station",
+        "zh": "香港鐵路深水埗站"
+      },
+      "entranceRecordIds": [
+        "526901",
+        "529441",
+        "529599",
+        "529628",
+        "530012",
+        "540380",
+        "547671",
+        "562386"
+      ]
+    },
+    "STW": {
+      "stationRecordId": "542807",
+      "sourceName": {
+        "en": "Mass Transit Railway Sha Tin Wai Station",
+        "zh": "香港鐵路沙田圍站"
+      },
+      "entranceRecordIds": [
+        "537493",
+        "538176",
+        "542260",
+        "559035"
+      ]
+    },
+    "SUN": {
+      "stationRecordId": "538237",
+      "sourceName": {
+        "en": "Mass Transit Railway Sunny Bay Station",
+        "zh": "香港鐵路欣澳站"
+      },
+      "entranceRecordIds": [
+        "539619"
+      ]
+    },
+    "SUW": {
+      "stationRecordId": "21157766",
+      "sourceName": {
+        "en": "Mass Transit Railway Sung Wong Toi Station",
+        "zh": "香港鐵路宋皇臺站"
+      },
+      "entranceRecordIds": [
+        "21157767",
+        "21157769",
+        "21157770",
+        "21157773",
+        "21157778"
+      ]
+    },
+    "SWH": {
+      "stationRecordId": "540805",
+      "sourceName": {
+        "en": "Mass Transit Railway Sai Wan Ho Station",
+        "zh": "香港鐵路西灣河站"
+      },
+      "entranceRecordIds": [
+        "546977",
+        "554574"
+      ]
+    },
+    "SYP": {
+      "stationRecordId": "539978",
+      "sourceName": {
+        "en": "Mass Transit Railway Sai Ying Pun Station",
+        "zh": "香港鐵路西營盤站"
+      },
+      "entranceRecordIds": [
+        "554949",
+        "554951",
+        "554989",
+        "554990",
+        "555004",
+        "555005"
+      ]
+    },
+    "TAK": {
+      "stationRecordId": "538314",
+      "sourceName": {
+        "en": "Mass Transit Railway Tai Koo Station",
+        "zh": "香港鐵路太古站"
+      },
+      "entranceRecordIds": [
+        "529041",
+        "529828",
+        "530173",
+        "530227",
+        "530436",
+        "530833",
+        "547839",
+        "547957",
+        "553603"
+      ]
+    },
+    "TAP": {
+      "stationRecordId": "558626",
+      "sourceName": {
+        "en": "Mass Transit Railway Tai Po Market Station",
+        "zh": "香港鐵路大埔墟站"
+      },
+      "entranceRecordIds": [
+        "541717",
+        "552787",
+        "557575",
+        "558257"
+      ]
+    },
+    "TAW": {
+      "stationRecordId": "542884",
+      "sourceName": {
+        "en": "Mass Transit Railway Tai Wai Station",
+        "zh": "香港鐵路大圍站"
+      },
+      "entranceRecordIds": [
+        "531392",
+        "532297",
+        "532383",
+        "538178",
+        "538480",
+        "539004",
+        "545282",
+        "21202649"
+      ]
+    },
+    "TIH": {
+      "stationRecordId": "541161",
+      "sourceName": {
+        "en": "Mass Transit Railway Tin Hau Station",
+        "zh": "香港鐵路天后站"
+      },
+      "entranceRecordIds": [
+        "529678",
+        "531759",
+        "541055"
+      ]
+    },
+    "TIK": {
+      "stationRecordId": "537795",
+      "sourceName": {
+        "en": "Mass Transit Railway Tiu Keng Leng Station",
+        "zh": "香港鐵路調景嶺站"
+      },
+      "entranceRecordIds": [
+        "535493",
+        "548200",
+        "557878"
+      ]
+    },
+    "TIS": {
+      "stationRecordId": "534509",
+      "sourceName": {
+        "en": "Mass Transit Railway Tin Shui Wai Station",
+        "zh": "香港鐵路天水圍站"
+      },
+      "entranceRecordIds": [
+        "537111",
+        "540666",
+        "543846",
+        "549016",
+        "552845",
+        "552881",
+        "563934"
+      ]
+    },
+    "TKO": {
+      "stationRecordId": "537520",
+      "sourceName": {
+        "en": "Mass Transit Railway Tseung Kwan O Station",
+        "zh": "香港鐵路將軍澳站"
+      },
+      "entranceRecordIds": [
+        "533541",
+        "541874",
+        "549880",
+        "550404",
+        "553788"
+      ]
+    },
+    "TKW": {
+      "stationRecordId": "21157761",
+      "sourceName": {
+        "en": "Mass Transit Railway To Kwa Wan Station",
+        "zh": "香港鐵路土瓜灣站"
+      },
+      "entranceRecordIds": [
+        "21157762",
+        "21157763",
+        "21157764",
+        "21157765"
+      ]
+    },
+    "TSH": {
+      "stationRecordId": "544940",
+      "sourceName": {
+        "en": "Mass Transit Railway Tai Shui Hang Station",
+        "zh": "香港鐵路大水坑站"
+      },
+      "entranceRecordIds": [
+        "538106",
+        "541008"
+      ]
+    },
+    "TST": {
+      "stationRecordId": "537333",
+      "sourceName": {
+        "en": "Mass Transit Railway Tsim Sha Tsui Station",
+        "zh": "香港鐵路尖沙咀站"
+      },
+      "entranceRecordIds": [
+        "529699",
+        "530769",
+        "538593",
+        "544600",
+        "545536",
+        "545918",
+        "547362",
+        "548560",
+        "556947",
+        "561780",
+        "21104076",
+        "21127550"
+      ]
+    },
+    "TSW": {
+      "stationRecordId": "549418",
+      "sourceName": {
+        "en": "Mass Transit Railway Tsuen Wan Station",
+        "zh": "香港鐵路荃灣站"
+      },
+      "entranceRecordIds": [
+        "529543",
+        "530432",
+        "531909",
+        "531910",
+        "537893",
+        "538592",
+        "548957",
+        "549015",
+        "557565",
+        "562889",
+        "563463"
+      ]
+    },
+    "TSY": {
+      "stationRecordId": "552874",
+      "sourceName": {
+        "en": "Mass Transit Railway Tsing Yi Station",
+        "zh": "香港鐵路青衣站"
+      },
+      "entranceRecordIds": [
+        "530027",
+        "530336",
+        "531396",
+        "538325",
+        "556058",
+        "560177"
+      ]
+    },
+    "TUC": {
+      "stationRecordId": "549769",
+      "sourceName": {
+        "en": "Mass Transit Railway Tung Chung Station",
+        "zh": "香港鐵路東涌站"
+      },
+      "entranceRecordIds": [
+        "537654",
+        "543299",
+        "544788",
+        "561160"
+      ]
+    },
+    "TUM": {
+      "stationRecordId": "559980",
+      "sourceName": {
+        "en": "Mass Transit Railway Tuen Mun Station",
+        "zh": "香港鐵路屯門站"
+      },
+      "entranceRecordIds": [
+        "536659",
+        "537327",
+        "543845",
+        "548265",
+        "552197",
+        "555239",
+        "563166",
+        "563302",
+        "563303"
+      ]
+    },
+    "TWH": {
+      "stationRecordId": "537941",
+      "sourceName": {
+        "en": "Mass Transit Railway Tai Wo Hau Station",
+        "zh": "香港鐵路大窩口站"
+      },
+      "entranceRecordIds": [
+        "537702",
+        "546497",
+        "21127581"
+      ]
+    },
+    "TWO": {
+      "stationRecordId": "546275",
+      "sourceName": {
+        "en": "Mass Transit Railway Tai Wo Station",
+        "zh": "香港鐵路太和站"
+      },
+      "entranceRecordIds": [
+        "532289",
+        "548713"
+      ]
+    },
+    "TWW": {
+      "stationRecordId": "544704",
+      "sourceName": {
+        "en": "Mass Transit Railway Tsuen Wan West Station",
+        "zh": "香港鐵路荃灣西站"
+      },
+      "entranceRecordIds": [
+        "535148",
+        "536897",
+        "558635",
+        "561586",
+        "561615",
+        "21137156",
+        "21137157",
+        "21140728",
+        "21140729",
+        "21140730",
+        "21140731",
+        "21140732"
+      ]
+    },
+    "UNI": {
+      "stationRecordId": "549768",
+      "sourceName": {
+        "en": "Mass Transit Railway University Station",
+        "zh": "香港鐵路大學站"
+      },
+      "entranceRecordIds": [
+        "531171",
+        "538829",
+        "556771",
+        "562952"
+      ]
+    },
+    "WAC": {
+      "stationRecordId": "545834",
+      "sourceName": {
+        "en": "Mass Transit Railway Wan Chai Station",
+        "zh": "香港鐵路灣仔站"
+      },
+      "entranceRecordIds": [
+        "529472",
+        "529677",
+        "529865",
+        "530232",
+        "540181",
+        "540201",
+        "540528",
+        "543358",
+        "21108861"
+      ]
+    },
+    "WCH": {
+      "stationRecordId": "21070314",
+      "sourceName": {
+        "en": "Mass Transit Railway Wong Chuk Hang Station",
+        "zh": "香港鐵路黃竹坑站"
+      },
+      "entranceRecordIds": [
+        "21070328",
+        "21070329",
+        "21081435",
+        "21081877"
+      ]
+    },
+    "WHA": {
+      "stationRecordId": "21070305",
+      "sourceName": {
+        "en": "Mass Transit Railway Whampoa Station",
+        "zh": "香港鐵路黃埔站"
+      },
+      "entranceRecordIds": [
+        "21070356",
+        "21070357",
+        "21070360",
+        "21070361",
+        "21077785",
+        "21078940",
+        "21078942"
+      ]
+    },
+    "WKS": {
+      "stationRecordId": "537345",
+      "sourceName": {
+        "en": "Mass Transit Railway Wu Kai Sha Station",
+        "zh": "香港鐵路烏溪沙站"
+      },
+      "entranceRecordIds": [
+        "537846",
+        "540726",
+        "559491"
+      ]
+    },
+    "WTS": {
+      "stationRecordId": "541160",
+      "sourceName": {
+        "en": "Mass Transit Railway Wong Tai Sin Station",
+        "zh": "香港鐵路黃大仙站"
+      },
+      "entranceRecordIds": [
+        "529954",
+        "538587",
+        "539932",
+        "542600",
+        "543034",
+        "543921",
+        "550415",
+        "553361",
+        "553413",
+        "562461"
+      ]
+    },
+    "YAT": {
+      "stationRecordId": "560875",
+      "sourceName": {
+        "en": "Mass Transit Railway Yau Tong Station",
+        "zh": "香港鐵路油塘站"
+      },
+      "entranceRecordIds": [
+        "533012",
+        "533059",
+        "545338",
+        "21015045"
+      ]
+    },
+    "YMT": {
+      "stationRecordId": "538316",
+      "sourceName": {
+        "en": "Mass Transit Railway Yau Ma Tei Station",
+        "zh": "香港鐵路油麻地站"
+      },
+      "entranceRecordIds": [
+        "526731",
+        "528689",
+        "529660",
+        "531528",
+        "549754",
+        "558136",
+        "21104154"
+      ]
+    },
+    "YUL": {
+      "stationRecordId": "538112",
+      "sourceName": {
+        "en": "Mass Transit Railway Yuen Long Station",
+        "zh": "香港鐵路元朗站"
+      },
+      "entranceRecordIds": [
+        "532264",
+        "536970",
+        "537037",
+        "539793",
+        "544068",
+        "544186",
+        "548079",
+        "549541",
+        "561821",
+        "21103949"
+      ]
+    }
+  },
+  "lightRail": {
+    "1": {
+      "stationRecordId": "529010",
+      "sourceName": {
+        "en": "LR-Tuen Mun Ferry Pier",
+        "zh": "輕鐵－屯門碼頭"
+      },
+      "entranceRecordIds": []
+    },
+    "10": {
+      "stationRecordId": "546711",
+      "sourceName": {
+        "en": "LR-Melody Garden",
+        "zh": "輕鐵－美樂"
+      },
+      "entranceRecordIds": []
+    },
+    "100": {
+      "stationRecordId": "529484",
+      "sourceName": {
+        "en": "LR-Siu Hong",
+        "zh": "輕鐵－兆康"
+      },
+      "entranceRecordIds": []
+    },
+    "110": {
+      "stationRecordId": "546316",
+      "sourceName": {
+        "en": "LR-Kei Lun",
+        "zh": "輕鐵－麒麟"
+      },
+      "entranceRecordIds": []
+    },
+    "120": {
+      "stationRecordId": "529008",
+      "sourceName": {
+        "en": "LR-Ching Chung",
+        "zh": "輕鐵－青松"
+      },
+      "entranceRecordIds": []
+    },
+    "130": {
+      "stationRecordId": "556351",
+      "sourceName": {
+        "en": "LR-Kin Sang",
+        "zh": "輕鐵－建生"
+      },
+      "entranceRecordIds": []
+    },
+    "140": {
+      "stationRecordId": "554002",
+      "sourceName": {
+        "en": "LR-Tin King",
+        "zh": "輕鐵－田景"
+      },
+      "entranceRecordIds": []
+    },
+    "15": {
+      "stationRecordId": "539801",
+      "sourceName": {
+        "en": "LR-Butterfly",
+        "zh": "輕鐵－蝴蝶"
+      },
+      "entranceRecordIds": []
+    },
+    "150": {
+      "stationRecordId": "558903",
+      "sourceName": {
+        "en": "LR-Leung King",
+        "zh": "輕鐵－良景"
+      },
+      "entranceRecordIds": []
+    },
+    "160": {
+      "stationRecordId": "530161",
+      "sourceName": {
+        "en": "LR-San Wai",
+        "zh": "輕鐵－新圍"
+      },
+      "entranceRecordIds": []
+    },
+    "170": {
+      "stationRecordId": "528975",
+      "sourceName": {
+        "en": "LR-Shek Pai",
+        "zh": "輕鐵－石排"
+      },
+      "entranceRecordIds": []
+    },
+    "180": {
+      "stationRecordId": "548929",
+      "sourceName": {
+        "en": "LR-Shan King (North)",
+        "zh": "輕鐵－山景(北)"
+      },
+      "entranceRecordIds": []
+    },
+    "190": {
+      "stationRecordId": "531139",
+      "sourceName": {
+        "en": "LR-Shan King (South)",
+        "zh": "輕鐵－山景(南)"
+      },
+      "entranceRecordIds": []
+    },
+    "20": {
+      "stationRecordId": "529046",
+      "sourceName": {
+        "en": "LR-Light Rail Depot",
+        "zh": "輕鐵－輕鐵車廠"
+      },
+      "entranceRecordIds": []
+    },
+    "200": {
+      "stationRecordId": "528891",
+      "sourceName": {
+        "en": "LR-Ming Kum",
+        "zh": "輕鐵－鳴琴"
+      },
+      "entranceRecordIds": []
+    },
+    "212": {
+      "stationRecordId": "529486",
+      "sourceName": {
+        "en": "LR-Tai Hing (North)",
+        "zh": "輕鐵－大興(北)"
+      },
+      "entranceRecordIds": []
+    },
+    "220": {
+      "stationRecordId": "529989",
+      "sourceName": {
+        "en": "LR-Tai Hing (South)",
+        "zh": "輕鐵－大興(南)"
+      },
+      "entranceRecordIds": []
+    },
+    "230": {
+      "stationRecordId": "529014",
+      "sourceName": {
+        "en": "LR-Ngan Wai",
+        "zh": "輕鐵－銀圍"
+      },
+      "entranceRecordIds": []
+    },
+    "240": {
+      "stationRecordId": "531741",
+      "sourceName": {
+        "en": "LR-Siu Hei",
+        "zh": "輕鐵－兆禧"
+      },
+      "entranceRecordIds": []
+    },
+    "250": {
+      "stationRecordId": "529462",
+      "sourceName": {
+        "en": "LR-Hoi Wong Road",
+        "zh": "輕鐵－海皇路"
+      },
+      "entranceRecordIds": []
+    },
+    "260": {
+      "stationRecordId": "529355",
+      "sourceName": {
+        "en": "LR-Goodview Garden",
+        "zh": "輕鐵－豐景園"
+      },
+      "entranceRecordIds": []
+    },
+    "265": {
+      "stationRecordId": "528894",
+      "sourceName": {
+        "en": "LR-Siu Lun",
+        "zh": "輕鐵－兆麟"
+      },
+      "entranceRecordIds": []
+    },
+    "270": {
+      "stationRecordId": "529005",
+      "sourceName": {
+        "en": "LR-On Ting",
+        "zh": "輕鐵－安定"
+      },
+      "entranceRecordIds": []
+    },
+    "275": {
+      "stationRecordId": "528895",
+      "sourceName": {
+        "en": "LR-Yau Oi",
+        "zh": "輕鐵－友愛"
+      },
+      "entranceRecordIds": []
+    },
+    "280": {
+      "stationRecordId": "558756",
+      "sourceName": {
+        "en": "LR-Town Centre",
+        "zh": "輕鐵－市中心"
+      },
+      "entranceRecordIds": []
+    },
+    "295": {
+      "stationRecordId": "531658",
+      "sourceName": {
+        "en": "LR-Tuen Mun",
+        "zh": "輕鐵－屯門"
+      },
+      "entranceRecordIds": []
+    },
+    "30": {
+      "stationRecordId": "529047",
+      "sourceName": {
+        "en": "LR-Lung Mun",
+        "zh": "輕鐵－龍門"
+      },
+      "entranceRecordIds": []
+    },
+    "300": {
+      "stationRecordId": "531659",
+      "sourceName": {
+        "en": "LR-Pui To",
+        "zh": "輕鐵－杯渡"
+      },
+      "entranceRecordIds": []
+    },
+    "310": {
+      "stationRecordId": "540255",
+      "sourceName": {
+        "en": "LR-Hoh Fuk Tong",
+        "zh": "輕鐵－何福堂"
+      },
+      "entranceRecordIds": []
+    },
+    "320": {
+      "stationRecordId": "545236",
+      "sourceName": {
+        "en": "LR-San Hui",
+        "zh": "輕鐵－新墟"
+      },
+      "entranceRecordIds": []
+    },
+    "330": {
+      "stationRecordId": "555955",
+      "sourceName": {
+        "en": "LR-Prime View",
+        "zh": "輕鐵－景峰"
+      },
+      "entranceRecordIds": []
+    },
+    "340": {
+      "stationRecordId": "539800",
+      "sourceName": {
+        "en": "LR-Fung Tei",
+        "zh": "輕鐵－鳳地"
+      },
+      "entranceRecordIds": []
+    },
+    "350": {
+      "stationRecordId": "530286",
+      "sourceName": {
+        "en": "LR-Lam Tei",
+        "zh": "輕鐵－藍地"
+      },
+      "entranceRecordIds": []
+    },
+    "360": {
+      "stationRecordId": "531859",
+      "sourceName": {
+        "en": "LR-Nai Wai",
+        "zh": "輕鐵－泥圍"
+      },
+      "entranceRecordIds": []
+    },
+    "370": {
+      "stationRecordId": "544486",
+      "sourceName": {
+        "en": "LR-Chung Uk Tsuen",
+        "zh": "輕鐵－鍾屋村"
+      },
+      "entranceRecordIds": []
+    },
+    "380": {
+      "stationRecordId": "540033",
+      "sourceName": {
+        "en": "LR-Hung Shui Kiu",
+        "zh": "輕鐵－洪水橋"
+      },
+      "entranceRecordIds": []
+    },
+    "390": {
+      "stationRecordId": "528976",
+      "sourceName": {
+        "en": "LR-Tong Fong Tsuen",
+        "zh": "輕鐵－塘坊村"
+      },
+      "entranceRecordIds": []
+    },
+    "40": {
+      "stationRecordId": "528892",
+      "sourceName": {
+        "en": "LR-Tsing Shan Tsuen",
+        "zh": "輕鐵－青山村"
+      },
+      "entranceRecordIds": []
+    },
+    "400": {
+      "stationRecordId": "528893",
+      "sourceName": {
+        "en": "LR-Ping Shan",
+        "zh": "輕鐵－屏山"
+      },
+      "entranceRecordIds": []
+    },
+    "425": {
+      "stationRecordId": "551035",
+      "sourceName": {
+        "en": "LR-Hang Mei Tsuen",
+        "zh": "輕鐵－坑尾村"
+      },
+      "entranceRecordIds": []
+    },
+    "430": {
+      "stationRecordId": "560198",
+      "sourceName": {
+        "en": "LR-Tin Shui Wai",
+        "zh": "輕鐵－天水圍"
+      },
+      "entranceRecordIds": []
+    },
+    "435": {
+      "stationRecordId": "537105",
+      "sourceName": {
+        "en": "LR-Tin Tsz",
+        "zh": "輕鐵－天慈"
+      },
+      "entranceRecordIds": []
+    },
+    "445": {
+      "stationRecordId": "542549",
+      "sourceName": {
+        "en": "LR-Tin Yiu",
+        "zh": "輕鐵－天耀"
+      },
+      "entranceRecordIds": []
+    },
+    "448": {
+      "stationRecordId": "547287",
+      "sourceName": {
+        "en": "LR-Locwood",
+        "zh": "輕鐵－樂湖"
+      },
+      "entranceRecordIds": []
+    },
+    "450": {
+      "stationRecordId": "562623",
+      "sourceName": {
+        "en": "LR-Tin Wu",
+        "zh": "輕鐵－天湖"
+      },
+      "entranceRecordIds": []
+    },
+    "455": {
+      "stationRecordId": "543681",
+      "sourceName": {
+        "en": "LR-Ginza",
+        "zh": "輕鐵－銀座"
+      },
+      "entranceRecordIds": []
+    },
+    "460": {
+      "stationRecordId": "544474",
+      "sourceName": {
+        "en": "LR-Tin Shui",
+        "zh": "輕鐵－天瑞"
+      },
+      "entranceRecordIds": []
+    },
+    "468": {
+      "stationRecordId": "538008",
+      "sourceName": {
+        "en": "LR-Chung Fu",
+        "zh": "輕鐵－頌富"
+      },
+      "entranceRecordIds": []
+    },
+    "480": {
+      "stationRecordId": "536755",
+      "sourceName": {
+        "en": "LR-Tin Fu",
+        "zh": "輕鐵－天富"
+      },
+      "entranceRecordIds": []
+    },
+    "490": {
+      "stationRecordId": "552801",
+      "sourceName": {
+        "en": "LR-Chestwood",
+        "zh": "輕鐵－翠湖"
+      },
+      "entranceRecordIds": []
+    },
+    "50": {
+      "stationRecordId": "544162",
+      "sourceName": {
+        "en": "LR-Tsing Wun",
+        "zh": "輕鐵－青雲"
+      },
+      "entranceRecordIds": []
+    },
+    "500": {
+      "stationRecordId": "529048",
+      "sourceName": {
+        "en": "LR-Tin Wing",
+        "zh": "輕鐵－天榮"
+      },
+      "entranceRecordIds": []
+    },
+    "510": {
+      "stationRecordId": "537142",
+      "sourceName": {
+        "en": "LR-Tin Yuet",
+        "zh": "輕鐵－天悅"
+      },
+      "entranceRecordIds": []
+    },
+    "520": {
+      "stationRecordId": "537747",
+      "sourceName": {
+        "en": "LR-Tin Sau",
+        "zh": "輕鐵－天秀"
+      },
+      "entranceRecordIds": []
+    },
+    "530": {
+      "stationRecordId": "543680",
+      "sourceName": {
+        "en": "LR-Wetland Park",
+        "zh": "輕鐵－濕地公園"
+      },
+      "entranceRecordIds": []
+    },
+    "540": {
+      "stationRecordId": "537746",
+      "sourceName": {
+        "en": "LR-Tin Heng",
+        "zh": "輕鐵－天恒"
+      },
+      "entranceRecordIds": []
+    },
+    "550": {
+      "stationRecordId": "537636",
+      "sourceName": {
+        "en": "LR-Tin Yat",
+        "zh": "輕鐵－天逸"
+      },
+      "entranceRecordIds": []
+    },
+    "560": {
+      "stationRecordId": "540034",
+      "sourceName": {
+        "en": "LR-Shui Pin Wai",
+        "zh": "輕鐵－水邊圍"
+      },
+      "entranceRecordIds": []
+    },
+    "570": {
+      "stationRecordId": "544426",
+      "sourceName": {
+        "en": "LR-Fung Nin Road",
+        "zh": "輕鐵－豐年路"
+      },
+      "entranceRecordIds": []
+    },
+    "580": {
+      "stationRecordId": "540035",
+      "sourceName": {
+        "en": "LR-Hong Lok Road",
+        "zh": "輕鐵－康樂路"
+      },
+      "entranceRecordIds": []
+    },
+    "590": {
+      "stationRecordId": "552802",
+      "sourceName": {
+        "en": "LR-Tai Tong Road",
+        "zh": "輕鐵－大棠路"
+      },
+      "entranceRecordIds": []
+    },
+    "60": {
+      "stationRecordId": "540032",
+      "sourceName": {
+        "en": "LR-Kin On",
+        "zh": "輕鐵－建安"
+      },
+      "entranceRecordIds": []
+    },
+    "600": {
+      "stationRecordId": "556168",
+      "sourceName": {
+        "en": "LR-Yuen Long",
+        "zh": "輕鐵－元朗"
+      },
+      "entranceRecordIds": []
+    },
+    "70": {
+      "stationRecordId": "550031",
+      "sourceName": {
+        "en": "LR-Ho Tin",
+        "zh": "輕鐵－河田"
+      },
+      "entranceRecordIds": []
+    },
+    "75": {
+      "stationRecordId": "528974",
+      "sourceName": {
+        "en": "LR-Choy Yee Bridge",
+        "zh": "輕鐵－蔡意橋"
+      },
+      "entranceRecordIds": []
+    },
+    "80": {
+      "stationRecordId": "547240",
+      "sourceName": {
+        "en": "LR-Affluence",
+        "zh": "輕鐵－澤豐"
+      },
+      "entranceRecordIds": []
+    },
+    "90": {
+      "stationRecordId": "529009",
+      "sourceName": {
+        "en": "LR-Tuen Mun Hospital",
+        "zh": "輕鐵－屯門醫院"
+      },
+      "entranceRecordIds": []
+    },
+    "920": {
+      "stationRecordId": "528973",
+      "sourceName": {
+        "en": "LR-Sam Shing",
+        "zh": "輕鐵－三聖"
+      },
+      "entranceRecordIds": []
+    }
+  }
+}
