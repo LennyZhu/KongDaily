@@ -493,8 +493,7 @@ const zhHK = {
   },
   nearby: {
     title: '附近生活設施',
-    intro: '尋找附近的公廁、公園和寵物公園。',
-    categories: { all: '全部', toilets: '公廁', pets: '寵物公園', parks: '公園', bus: '巴士' },
+    categories: { all: '全部', toilets: '公廁', pets: '寵物公園', parks: '公園' },
     searchPlaces: '搜尋地點或設施',
     landmarks: '常用地標',
     useLocation: '使用我的位置',
@@ -1206,8 +1205,7 @@ const en: typeof zhHK = {
   },
   nearby: {
     title: 'Nearby Facilities',
-    intro: 'Find public toilets, parks and pet gardens nearby.',
-    categories: { all: 'All', toilets: 'Toilets', pets: 'Pet gardens', parks: 'Parks', bus: 'Buses' },
+    categories: { all: 'All', toilets: 'Toilets', pets: 'Pet gardens', parks: 'Parks' },
     searchPlaces: 'Search places or facilities',
     landmarks: 'Common landmarks',
     useLocation: 'Use my location',

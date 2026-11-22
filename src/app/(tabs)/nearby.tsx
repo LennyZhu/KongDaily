@@ -30,7 +30,7 @@ type NearbyParams = {
   savedFacilityRequest?: string;
 };
 const defaultCenter = { kind: 'default', point: nearbyBusLandmarks.central } satisfies SearchCenter;
-const categories = ['all', ...facilityCategories, 'bus'] as const;
+const categories = ['all', ...facilityCategories] as const;
 const modes = [{ key: 'map', icon: 'map' }, { key: 'list', icon: 'list.bullet' }] as const;
 
 export default function NearbyScreen() {
@@ -242,14 +242,11 @@ export default function NearbyScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
           {categories.map((key) => {
             const active = category === key;
-            const icon = key === 'all' ? undefined : key === 'bus' ? 'bus' : facilityVisuals[key].icon;
+            const icon = key === 'all' ? undefined : facilityVisuals[key].icon;
             return (
-              <Pressable key={key} accessibilityRole="button" accessibilityState={key === 'bus' ? undefined : { selected: active }}
+              <Pressable key={key} accessibilityRole="button" accessibilityState={{ selected: active }}
                 onPress={() => {
-                  if (key === 'bus') {
-                    cancelLocation();
-                    router.push('/bus/nearby');
-                  } else if (key !== category) {
+                  if (key !== category) {
                     cancelLocation();
                     if (selected && key !== 'all' && selected.facility.category !== key) setSelectedFacilityKey(undefined);
                     router.setParams({ category: key });
@@ -329,7 +326,6 @@ function NearbyHeading() {
       <Icon name="map" size={27} />
       <View style={styles.grow}>
         <AppText variant="moduleTitle" accessibilityRole="header">{labels.title}</AppText>
-        <AppText variant="detail" tone="muted">{labels.intro}</AppText>
       </View>
       <FacilitySourceInfo />
     </View>

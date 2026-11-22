@@ -606,7 +606,10 @@ async function testSavedFacilityIntegration() {
     },
     'expo-router': {
       Link: 'Link',
-      useRouter: () => ({ navigate }),
+      useRouter: () => ({
+        navigate,
+        setParams(params) { navigation.dispatch({ type: 'SET_PARAMS', source: nearbyKey, payload: { params } }); },
+      }),
       useLocalSearchParams: () => navigationState.routes[navigationState.index].params ?? {},
       useRoute: nearbyRoute,
       useNavigation: () => navigation,
@@ -628,7 +631,7 @@ async function testSavedFacilityIntegration() {
       NearbyFacilitiesMap: 'NearbyFacilitiesMap',
       facilityVisuals: { toilets: { icon: 'toilet' }, pets: { icon: 'pawprint' }, parks: { icon: 'tree' } },
     },
-    '@/components/nearby-search-sheet': {},
+    '@/components/nearby-search-sheet': { NearbySearchSheet: 'NearbySearchSheet' },
     '@/nearby-bus-location': {
       locateNearbyBusStops(signal) {
         locationCalls += 1;
@@ -670,6 +673,15 @@ async function testSavedFacilityIntegration() {
   const saved = (screen = SavedFacilities) => effectsOf('saved', screen);
   const nearby = () => effectsOf('nearby', NearbyScreen, true);
   const map = (tree) => tree.find(({ type }) => type === 'NearbyFacilitiesMap')?.props;
+  const list = (tree) => tree.find(({ type }) => typeof type === 'function' && type.name === 'NearbyFacilitiesList')?.props;
+  const filters = (tree) => tree.filter(({ type, props }) => type === 'Pressable'
+    && props.accessibilityRole === 'button' && typeof props.accessibilityState?.selected === 'boolean');
+  const tapLabel = (tree, label) => {
+    const button = tree.find(({ type, props }) => type === 'Pressable'
+      && elements(props.children).some(({ type, props }) => type === 'AppText' && props.children === label));
+    assert.ok(button, `Missing Nearby action: ${label}`);
+    button.props.onPress();
+  };
   const entries = (tree) => tree.filter(({ props }) => props?.accessibilityHint === copy().saved.facilities.locateHint);
   const name = (facility) => facilityText(facility.name, locale);
   const entry = (facility) => entries(saved()).find((row) =>
@@ -714,6 +726,47 @@ async function testSavedFacilityIntegration() {
     await tick();
     const original = map(nearby());
     assert.deepEqual(original.devicePoint, devicePoint);
+
+    // Phase 1: exercise both languages and real filter / Map–List handlers.
+    for (const language of ['zh-HK', 'en']) {
+      locale = language;
+      let tree = nearby();
+      const heading = tree.find(({ type }) => typeof type === 'function' && type.name === 'NearbyHeading');
+      const headingContent = elements(heading.type(heading.props));
+      assert.deepEqual(headingContent.filter(({ type }) => type === 'AppText').map(({ props }) => props.children),
+        [language === 'zh-HK' ? '附近生活設施' : 'Nearby Facilities'], 'Only the title remains in the heading');
+      assert.ok(headingContent.some(({ type }) => typeof type === 'function' && type.name === 'FacilitySourceInfo'));
+      assert.deepEqual(filters(tree).map(({ props }) => elements(props.children).find(({ type }) => type === 'AppText').props.children),
+        language === 'zh-HK' ? ['全部', '公廁', '寵物公園', '公園'] : ['All', 'Toilets', 'Pet gardens', 'Parks']);
+
+      for (const category of ['toilets', 'pets', 'parks', 'all']) {
+        tapLabel(tree, copy().nearby.categories[category]);
+        tree = nearby();
+        const filtered = map(tree).items;
+        assert.ok(filtered.length > 0);
+        assert.ok(filtered.every(({ facility }) => category === 'all' || facility.category === category));
+        assert.equal(filters(tree).filter(({ props }) => props.accessibilityState.selected).length, 1);
+        tapLabel(tree, copy().nearby.list);
+        tree = nearby();
+        assert.equal(map(tree), undefined);
+        assert.equal(list(tree).category, category);
+        assert.deepEqual(list(tree).items, filtered, 'Map and List use the same filtered facilities and distances');
+        tapLabel(tree, copy().nearby.map);
+        tree = nearby();
+        assert.equal(list(tree), undefined);
+        assert.deepEqual(map(tree).items, filtered);
+        assert.deepEqual(map(tree).devicePoint, devicePoint);
+      }
+
+      for (const view of ['map', 'list']) {
+        selectTab('nearby', { category: 'bus', view });
+        tree = nearby();
+        assert.equal(filters(tree)[0].props.accessibilityState.selected, true, 'Legacy bus selection falls back to All');
+        assert.deepEqual((map(tree) ?? list(tree)).items, original.items);
+      }
+      selectTab('nearby', { category: 'all', view: 'map' });
+    }
+
     original.onAreaBrowsed();
     void original.onLocate();
     const oldSignal = locationSignal;
@@ -745,6 +798,26 @@ async function testSavedFacilityIntegration() {
       .some((marker) => marker.kind === 'facility' && marker.item.id === focused.selectedId), true);
     assert.equal(useFacilityFavorite(afcd).saved, true);
     assert.equal(locationCalls, 2);
+
+    // Manual place selection still changes the shared Map / List search center.
+    nearby().find(({ type, props }) => type === 'Pressable'
+      && props.accessibilityHint === copy().nearby.searchPlaces).props.onPress();
+    const searchSheet = nearby().find(({ type }) => type === 'NearbySearchSheet');
+    assert.ok(searchSheet);
+    searchSheet.props.onChoose({ kind: 'landmark', landmark: 'central' });
+    let manualTree = nearby();
+    const central = app.load('nearby-bus-landmarks').nearbyBusLandmarks.central;
+    assert.equal(manualTree.some(({ type }) => type === 'NearbySearchSheet'), false);
+    assert.deepEqual(map(manualTree).placePin.point, central);
+    assert.equal(map(manualTree).initialRegion.latitude, central.latitude);
+    assert.equal(map(manualTree).initialRegion.longitude, central.longitude);
+    assert.deepEqual(map(manualTree).devicePoint, devicePoint);
+    const manualItems = map(manualTree).items;
+    tapLabel(manualTree, copy().nearby.list);
+    manualTree = nearby();
+    assert.equal(list(manualTree).centerName, copy().nearbyBus.landmarks.central);
+    assert.deepEqual(list(manualTree).items, manualItems);
+    assert.equal(locationCalls, 2, 'Manual place selection does not start another GPS request');
 
     // Two official facilities share a Chinese name but remain different categories and identities.
     assert.equal(park.name['zh-HK'], garden.name['zh-HK']);
@@ -996,6 +1069,6 @@ async function testRouteStopQuickFavorite() {
 }
 
 test().then(testNearbyFavoriteButtons).then(testSavedFacilityIntegration).then(testRouteStopQuickFavorite)
-  .then(() => console.log('PASS: registry, SQLite v8, facility favorites, bus pins and route stop quick favorites'))
+  .then(() => console.log('PASS: registry, SQLite v8, facility favorites, nearby bilingual filters / Map–List / legacy bus / manual location, bus pins and route stop quick favorites'))
   .catch((error) => { console.error(error); process.exitCode = 1; })
   .finally(() => rmSync(scratch, { recursive: true, force: true }));
