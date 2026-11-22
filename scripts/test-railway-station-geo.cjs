@@ -211,3 +211,38 @@ test('real geographic samples cover Hong Kong regions and mode filters remain se
   assert(both.some(({ station }) => station.mode === 'lightRail' && station.stationId === '295'));
   assert(both.some(({ station }) => station.mode === 'mtr' && station.stationId === 'TUM'));
 });
+
+test('nearby railway route recommendations deduplicate lines and choose the closest verified boarding station', () => {
+  const { nearbyRailwayRows } = load('nearby-railway');
+  const point = geo.getMtrStationPositions('CEN').find(({ kind }) => kind === 'entrance').coordinate;
+  for (const radius of [500, 1000, 2000]) {
+    const stops = geo.findNearbyRailwayStations(point, radius, 'mtr');
+    const routes = nearbyRailwayRows(point, radius, 'routes', 'mtr');
+    assert.equal(new Set(routes.map(({ entry }) => entry.id)).size, routes.length);
+    assert.equal(routes.find(({ entry }) => entry.id === 'TWL').boarding.id, 'CEN');
+    for (const row of routes) {
+      const candidates = stops.filter(({ station }) => findMtrStation(station.stationId).memberships.some(({ lineCode }) => lineCode === row.entry.id));
+      assert.equal(row.location.distance, Math.min(...candidates.map(({ distance }) => distance)));
+      assert.equal(row.boarding.id, row.location.station.stationId);
+      assert.equal(row.entry, load('mtr-static').findMtrLine(row.entry.id));
+    }
+    assert(!routes.some(({ entry }) => entry.id === 'DRL'), 'A remote line must not become a nearby service');
+  }
+});
+
+test('nearby Light Rail uses reference points and preserves actual circular/asymmetric route objects', () => {
+  const { nearbyRailwayRows } = load('nearby-railway');
+  const point = geo.getLightRailStopPositions('430')[0].coordinate;
+  for (const radius of [500, 1000, 2000]) {
+    const stations = nearbyRailwayRows(point, radius, 'stops', 'lightRail');
+    assert(stations.every(({ location }) => location.position.kind === 'station-reference' && location.distance <= radius));
+    assert.equal(new Set(stations.map(({ entry }) => entry.id)).size, stations.length);
+    const routes = nearbyRailwayRows(point, radius, 'routes', 'lightRail');
+    for (const id of ['705', '706']) assert.equal(routes.find(({ entry }) => entry.id === id).entry, findLightRailRoute(id));
+    for (const row of routes) {
+      assert.equal(row.entry, findLightRailRoute(row.entry.id));
+      assert(row.boarding.routes.includes(row.entry.id));
+    }
+  }
+  assert.deepEqual(nearbyRailwayRows({ latitude: 22.28, longitude: 114.16 }, 500, 'routes', 'lightRail'), []);
+});

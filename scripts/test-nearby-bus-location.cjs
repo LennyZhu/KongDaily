@@ -54,6 +54,9 @@ function mount(t, {
   let dismissals = 0;
   let catalogueReads = 0;
   let finishCatalogue;
+  let stopSearchTask;
+  let holdNearby = false;
+  const pendingNearby = [];
   const slots = [];
   const frames = new Map();
   let frameId = 0;
@@ -148,7 +151,8 @@ function mount(t, {
     },
     '@/database': { getDatabase: async () => ({
       async getAllAsync(sql, ...params) {
-        queries.push(params);
+        if (sql.includes('latitude BETWEEN')) queries.push(params);
+        if (holdNearby && sql.includes('latitude BETWEEN')) await new Promise((resolve) => pendingNearby.push(resolve));
         return db.prepare(sql).all(...params);
       },
     }) },
@@ -197,6 +201,7 @@ function mount(t, {
       if (Object.hasOwn(mocks, id)) return mocks[id];
       if (id === '@/nearby-bus-data') return {
         ...source('nearby-bus-data'), prepareNearbyBusIndex: async () => [], kmbNearbyNeedsRefresh: () => false,
+        readBusStopsForSearch: async () => db.prepare('SELECT source, stop_id, name_zh, name_en, street_zh, street_en FROM nearby_bus_stops ORDER BY source, stop_id').all(),
       };
       return id.startsWith('@/') ? source(id.slice(2)) : localRequire(id);
     }, (callback) => { frames.set(++frameId, callback); return frameId; }, (id) => frames.delete(id));
@@ -223,6 +228,9 @@ function mount(t, {
   const pendingCatalogue = delayCatalogue && new Promise((resolve) => { finishCatalogue = resolve; });
 
   const busScreen = source('app/bus/nearby').default;
+  const searchAdapter = source('global-search');
+  const loadStops = searchAdapter.loadGlobalBusStops;
+  searchAdapter.loadGlobalBusStops = () => stopSearchTask = loadStops();
   const transportEntry = transport && source('app/transport').default();
   if (transportEntry) assert.equal(transportEntry.type, busScreen);
   const screen = mtrDetail ? source('app/mtr/[kind]').default
@@ -270,7 +278,7 @@ function mount(t, {
       else if (name === 'TransportSearch') children = searchTree;
       else if (name === 'MtrLineStations' || name === 'LightRailRouteStops') children = lineStationsTree;
       else if (name?.startsWith('Transport')
-        || ['Loading', 'MtrEntryRow', 'MtrSources', 'LightRailEntryRow', 'LightRailSources'].includes(name)) children = node.type(node.props);
+        || ['Loading', 'ListAction', 'MtrEntryRow', 'MtrSources', 'LightRailEntryRow', 'LightRailSources', 'GlobalSearchResultRow'].includes(name)) children = node.type(node.props);
     }
     return [node, ...elements(children, expand)];
   }
@@ -335,6 +343,12 @@ function mount(t, {
     catalogueRoutes, theme: source('theme'),
     mtr: () => source('mtr-static'),
     lightRail: () => source('light-rail-static'),
+    geo: () => source('railway-station-geo'),
+    nearbyRail: () => source('nearby-railway'),
+    async waitStopSearch() { await stopSearchTask; await settle(); },
+    holdNearby() { holdNearby = true; },
+    releaseNearby() { holdNearby = false; pendingNearby.splice(0).forEach((resolve) => resolve()); },
+    rowElements: (index) => elements(tree.props.renderItem({ item: tree.props.data[index] })),
     mtrForecastProps: () => visibleElements().find(({ type }) => type.name === 'MtrNextTrains')?.props,
     lightRailForecastProps: () => visibleElements().find(({ type }) => type.name === 'LightRailNextTrains')?.props,
     detailRows: () => visibleElements().filter(({ type }) => ['MtrEntryRow', 'LightRailEntryRow'].includes(type.name)).map(({ props }) => props),
@@ -597,8 +611,8 @@ for (const locale of ['zh-HK', 'en']) {
     assert.deepEqual(Object.values(copy.modes), expected);
     await page.settle();
     assert.ok(!page.shows(locale === 'en' ? 'Find transport services near you' : '查看附近可用的交通服務'));
-    assert.equal(copy.searchAll, locale === 'en' ? 'Search transport routes' : '搜尋交通路線');
-    assert.equal(copy.searchBuses, locale === 'en' ? 'Search bus routes' : '搜尋巴士路線');
+    assert.equal(copy.searchAll, locale === 'en' ? 'Search transport routes or stations' : '搜尋交通路線或車站');
+    assert.equal(copy.searchBuses, locale === 'en' ? 'Search bus routes or stops' : '搜尋巴士路線或車站');
     assert.equal(page.searchInput().placeholder, copy.searchAll);
     page.searchInput().onFocus();
     await page.settle();
@@ -614,7 +628,7 @@ for (const locale of ['zh-HK', 'en']) {
     await page.settle();
     const allRoutes = page.rows();
     assert.ok(allRoutes.length > 1);
-    assert.equal(page.etaRoutes().length, allRoutes.length);
+    assert.equal(page.etaRoutes().length, allRoutes.filter((row) => 'route' in row).length);
     page.searchInput().onChangeText('B2');
     await page.settle();
     assert.deepEqual(page.rows().map((route) => route.number), ['B2', 'B2P']);
@@ -639,7 +653,7 @@ for (const locale of ['zh-HK', 'en']) {
     }
     page.press(copy.modes.bus);
     await page.settle();
-    assert.deepEqual(page.rows(), allRoutes);
+    assert.deepEqual(page.rows(), allRoutes.filter((row) => 'route' in row));
     assert.equal(page.requests.length, 3);
     assert.equal(page.searchInput().placeholder, copy.searchBuses);
     page.press(labels.byStop);
@@ -660,7 +674,7 @@ for (const locale of ['zh-HK', 'en']) {
     await page.settle();
     page.press(copy.modes.all);
     await page.settle();
-    assert.deepEqual(page.rows(), allStops);
+    assert.deepEqual(page.rows().filter((row) => 'stops' in row), allStops);
     assert.equal(page.searchInput().placeholder, copy.searchAll);
     assert.ok(!page.shows(labels.distanceNote));
     assert.ok(!page.shows(labels.currentLocation));
@@ -739,8 +753,8 @@ for (const locale of ['zh-HK', 'en']) {
     await page.settle();
     page.press(copy.modes.mtr);
     await page.settle();
-    assert.ok(!page.shows(range1000) && !page.shows(labels.distanceNote) && !page.shows(labels.partialCoverage));
-    assert.throws(() => page.findAction(copy.distanceInfo), /Missing action/);
+    assert.ok(page.shows(range1000) && page.shows(copy.railDistanceNote));
+    assert.ok(page.findAction(copy.distanceInfo));
     assert.equal(page.requests.length, 1);
     page.press(copy.modes.all);
     await page.settle();
@@ -750,7 +764,7 @@ for (const locale of ['zh-HK', 'en']) {
     await page.settle();
     assert.ok(page.shows(labels.landmarkReference(labels.landmarks.shaTin)));
     assert.equal(page.findAction(copy.changeReference).props.accessibilityState.expanded, false);
-    assert.equal(page.requests.length, 2);
+    assert.equal(page.requests.length, 1);
   });
 }
 
@@ -786,7 +800,7 @@ test('inline search reuses catalogue identities, ranks results, and restores the
   page.press(labels.kilometres(1));
   await page.settle();
   const nearby = page.rows();
-  assert.ok(nearby.length > 1 && nearby.every((row) => 'stops' in row));
+  assert.ok(nearby.length > 1 && nearby.some((row) => 'stops' in row) && nearby.some((row) => row.kind === 'nearby-railway'));
   assert.equal(page.catalogueReads(), 0);
   const gpsRequests = page.requests.length;
 
@@ -847,7 +861,7 @@ test('inline search reuses catalogue identities, ranks results, and restores the
   assert.ok(page.shows(copy.noMatches));
   page.press(copy.modes.bus);
   await page.settle();
-  assert.ok(page.shows(bus.noResults));
+  assert.ok(page.shows(copy.noBusMatches));
   page.press(copy.modes.all);
   await page.settle();
   assert.deepEqual(page.rows(), []);
@@ -1120,7 +1134,7 @@ test('a transport filter change does not let a pending GPS fix replace a selecte
 });
 
 for (const [railMode, busMode] of [['mtr', 'bus'], ['lightRail', 'all']]) {
-  test(`${railMode} skips bus location on return and foreground, then resumes nearby ${busMode}`, async (t) => {
+  test(`${railMode} View all skips location on return and foreground, then resumes nearby ${busMode}`, async (t) => {
     const page = mount(t, { transport: true });
     const { labels, landmarks, transportCopy: copy } = page;
     await page.settle();
@@ -1140,6 +1154,8 @@ for (const [railMode, busMode] of [['mtr', 'bus'], ['lightRail', 'all']]) {
     const locationCalls = { ...page.calls };
     const queryCount = page.queries.length;
     page.press(copy.modes[railMode]);
+    await page.settle();
+    page.press(copy.viewAll);
     await page.settle();
     page.fix(1, landmarks.shaTin);
     page.press(labels.byStop);
@@ -1167,11 +1183,11 @@ for (const [railMode, busMode] of [['mtr', 'bus'], ['lightRail', 'all']]) {
     page.press(copy.modes[busMode]);
     await page.settle();
     assert.equal(page.requests.length, 3);
-    assert.deepEqual(page.rows(), nearby);
+    assert.deepEqual(new Set(page.rows().map(page.list().props.keyExtractor)), new Set((busMode === 'bus' ? nearby.filter((row) => 'route' in row) : nearby).map(page.list().props.keyExtractor)));
     assert.ok(page.findAction(copy.straightLineRadius(labels.kilometres(1))));
     page.fix(2, landmarks.central);
     await page.settle();
-    assert.deepEqual(page.rows(), nearby);
+    assert.deepEqual(new Set(page.rows().map(page.list().props.keyExtractor)), new Set((busMode === 'bus' ? nearby.filter((row) => 'route' in row) : nearby).map(page.list().props.keyExtractor)));
     assert.equal(page.queries.length, queryCount + 1);
     assert.equal(page.calls.prompt, 0);
   });
@@ -1248,6 +1264,8 @@ for (const locale of ['zh-HK', 'en']) {
     await page.settle();
     page.press(copy.modes.mtr);
     await page.settle();
+    page.press(copy.viewAll);
+    await page.settle();
     assert.ok(page.shows(mtrCopy.lines));
     assert.equal(page.searchInput().placeholder, mtrCopy.search);
     assert.equal(page.rows().length, 10);
@@ -1285,6 +1303,10 @@ for (const locale of ['zh-HK', 'en']) {
     page.openResult(0);
     assert.deepEqual(page.routes.at(-1), { pathname: '/mtr/[kind]', params: { kind: 'station', code: 'ADM' } });
     page.press(page.busCopy.clearInput);
+    await page.settle();
+    assert.ok(page.shows(copy.nearbyStops));
+    assert.equal(page.rows().length, 0);
+    page.press(copy.viewAll);
     await page.settle();
     assert.ok(page.shows(mtrCopy.stations));
     assert.equal(page.rows().length, 98);
@@ -1377,7 +1399,7 @@ test('All search separates Bus, MTR and Light Rail identities and restores nearb
   page.fix(0, page.landmarks.central);
   await page.settle();
   const nearby = page.rows();
-  assert.ok(nearby.length > 0 && nearby.every((row) => 'route' in row));
+  assert.ok(nearby.length > 0 && nearby.some((row) => 'route' in row) && nearby.some((row) => row.kind === 'nearby-railway'));
   page.searchInput().onChangeText('Yuen Long');
   await page.settle();
   assert.ok(page.shows(page.busCopy.loading));
@@ -1490,6 +1512,8 @@ for (const locale of ['zh-HK', 'en']) {
     await page.settle();
     page.press(copy.modes.lightRail);
     await page.settle();
+    page.press(copy.viewAll);
+    await page.settle();
     assert.ok(page.shows(rail.lines));
     assert.equal(page.searchInput().placeholder, rail.search);
     assert.equal(page.rows().length, 11);
@@ -1534,6 +1558,10 @@ for (const locale of ['zh-HK', 'en']) {
     assert.deepEqual(page.rows().map(({ kind, id }) => [kind, id]), [['light-rail-stop', '250']]);
     page.press(page.busCopy.clearInput);
     await page.settle();
+    assert.ok(page.shows(copy.nearbyStops));
+    assert.equal(page.rows().length, 0);
+    page.press(copy.viewAll);
+    await page.settle();
     assert.ok(page.shows(rail.stations));
     assert.equal(page.list().key, directoryScope);
     assert.equal(page.rows(), directoryRows);
@@ -1543,7 +1571,7 @@ for (const locale of ['zh-HK', 'en']) {
     assert.deepEqual(page.etaRoutes(), []);
     page.press(copy.modes.mtr);
     await page.settle();
-    assert.ok(page.shows(page.mtrCopy.lines));
+    assert.ok(page.shows(copy.nearbyRoutes));
   });
 }
 
@@ -1597,4 +1625,194 @@ test('Light Rail details switch official visits, open stable stop IDs and link t
   await invalid.settle();
   assert.ok(invalid.shows(invalid.lightRailCopy.unavailable));
   assert.deepEqual(invalid.detailRows(), []);
+});
+
+for (const locale of ['zh-HK', 'en']) {
+  for (const railMode of ['mtr', 'lightRail']) {
+    test(`nearby ${railMode} defaults to local routes and stations with correct distance semantics (${locale})`, async (t) => {
+      const page = mount(t, { transport: true, locale });
+      const { transportCopy: copy, labels } = page;
+      await page.settle();
+      const point = railMode === 'mtr'
+        ? page.geo().getMtrStationPositions('CEN').find(({ kind }) => kind === 'entrance').coordinate
+        : page.geo().getLightRailStopPositions('250')[0].coordinate;
+      page.fix(0, point);
+      await page.settle();
+      page.press(copy.modes[railMode]);
+      await page.settle();
+      assert.equal(page.requests.length, 1, 'Switching nearby transport types reuses the active location lifecycle');
+      assert.ok(page.shows(copy.nearbyRoutes));
+      assert.deepEqual(page.rows(), page.nearbyRail().nearbyRailwayRows(point, 500, 'routes', railMode));
+      assert(page.rows().length > 0 && page.rows().every(({ location }) => location.distance <= 500));
+      assert.equal(new Set(page.rows().map(({ entry }) => entry.id)).size, page.rows().length);
+      assert.deepEqual(page.etaRoutes(), [], 'No batch rail forecasts are requested');
+      const first = page.rows()[0];
+      const wording = (railMode === 'mtr' ? copy.entranceDistance : copy.referenceDistance)(labels.metres(0));
+      assert(page.rowElements(0).some(({ props }) => props.children === wording));
+      page.openResult(0);
+      assert.deepEqual(page.routes.at(-1), railMode === 'mtr'
+        ? { pathname: '/mtr/[kind]', params: { kind: 'line', code: first.entry.id } }
+        : { pathname: '/light-rail/[kind]', params: { kind: 'route', id: first.entry.id } });
+
+      for (const radius of [500, 1000, 2000]) {
+        if (radius !== 500) {
+          page.press(copy.straightLineRadius(radius === 1000 ? labels.metres(500) : labels.kilometres(1)));
+          await page.settle();
+          page.press(labels.kilometres(radius / 1000));
+          await page.settle();
+        }
+        assert.deepEqual(page.rows(), page.nearbyRail().nearbyRailwayRows(point, radius, 'routes', railMode));
+      }
+      page.press(labels.byStop);
+      await page.settle();
+      assert.deepEqual(page.rows(), page.nearbyRail().nearbyRailwayRows(point, 2000, 'stops', railMode));
+      assert.equal(new Set(page.rows().map(({ entry }) => entry.id)).size, page.rows().length);
+      const station = page.rows()[0];
+      assert(page.rowElements(0).some(({ props }) => props.children === station.boarding.zh));
+      assert(page.rowElements(0).some(({ props }) => props.children === station.boarding.en));
+      page.openResult(0);
+      assert.deepEqual(page.routes.at(-1), railMode === 'mtr'
+        ? { pathname: '/mtr/[kind]', params: { kind: 'station', code: station.entry.id } }
+        : { pathname: '/light-rail/[kind]', params: { kind: 'stop', id: station.entry.id } });
+    });
+  }
+}
+
+test('All merges three actual transport types with one point/radius, stable IDs and ascending distances', async (t) => {
+  const page = mount(t, { transport: true });
+  const { labels, transportCopy: copy } = page;
+  await page.settle();
+  const point = page.geo().getLightRailStopPositions('430')[0].coordinate;
+  page.fix(0, point);
+  await page.settle();
+  for (const view of ['routes', 'stops']) {
+    if (view === 'stops') { page.press(labels.byStop); await page.settle(); }
+    const rows = page.rows();
+    assert(rows.some((row) => view === 'routes' ? 'route' in row : 'stops' in row));
+    for (const railMode of ['mtr', 'lightRail']) assert(rows.some((row) => row.kind === 'nearby-railway' && row.location.station.mode === railMode));
+    const distances = rows.map((row) => row.kind === 'nearby-railway' ? row.location.distance
+      : 'route' in row ? row.stop.distance : row.stops[0].distance);
+    assert(distances.every((distance, index) => distance <= 500 && (!index || distance >= distances[index - 1])));
+    assert.equal(new Set(rows.map(page.list().props.keyExtractor)).size, rows.length);
+    const railRows = rows.filter(({ kind }) => kind === 'nearby-railway');
+    assert.deepEqual(railRows, page.nearbyRail().nearbyRailwayRows(point, 500, view));
+    const busIndex = rows.findIndex((row) => view === 'routes' ? 'route' in row : 'stops' in row);
+    assert.equal(page.renderRow(busIndex).props.modeLabel, copy.modes.bus);
+    assert.equal(page.etaRoutes().length, view === 'routes' ? rows.filter((row) => 'route' in row).length : 0);
+  }
+  assert.equal(page.requests.length, 1);
+});
+
+test('rail zero results and denied location remain distinct; manual landmarks and full-region search stay available', async (t) => {
+  const page = mount(t, { transport: true, permission: blocked, locale: 'en' });
+  const { labels, landmarks, transportCopy: copy } = page;
+  await page.settle();
+  page.press(copy.modes.lightRail);
+  await page.settle();
+  assert(page.shows(labels.issues.blocked));
+  assert.equal(page.unavailableTitle(), undefined, 'No position is not a zero-result area');
+  page.press(copy.chooseLandmark);
+  await page.settle();
+  page.press(labels.landmarks.central);
+  await page.settle();
+  assert.equal(page.unavailableTitle(), copy.noNearbyRoutes(labels.metres(500)));
+  assert(page.findAction(copy.straightLineRadius(labels.metres(500))));
+  assert(page.findAction(labels.expand(labels.kilometres(1))));
+  page.searchInput().onChangeText('250');
+  await page.settle();
+  assert.equal(page.rows()[0].id, '250', 'Search includes a station far outside the current radius');
+  page.press(page.busCopy.clearInput);
+  await page.settle();
+  assert.equal(page.unavailableTitle(), copy.noNearbyRoutes(labels.metres(500)));
+  page.press(copy.changeReference);
+  await page.settle();
+  page.press(labels.landmarks.yuenLong);
+  await page.settle();
+  assert.deepEqual(page.rows(), page.nearbyRail().nearbyRailwayRows(landmarks.yuenLong, 500, 'routes', 'lightRail'));
+  assert(page.rows().length > 0);
+  page.appState('background'); page.appState('active');
+  await page.settle();
+  assert.equal(page.requests.length, 0);
+  assert.equal(page.calls.prompt, 0);
+});
+
+for (const railMode of ['mtr', 'lightRail']) {
+  test(`nearby ${railMode} preserves mounted rows/scroll on detail return and passive foreground location refresh`, async (t) => {
+    const page = mount(t, { transport: true });
+    const { labels, transportCopy: copy } = page;
+    await page.settle();
+    const point = railMode === 'mtr' ? page.landmarks.central : page.landmarks.yuenLong;
+    page.fix(0, point); await page.settle();
+    page.press(copy.modes[railMode]); await page.settle();
+    page.press(copy.straightLineRadius(labels.metres(500))); await page.settle();
+    page.press(labels.kilometres(2)); await page.settle();
+    page.press(labels.byStop); await page.settle();
+    const before = page.rows(); const key = page.list().key;
+    const scrolls = page.attachList();
+    page.showRows([1], 220); page.openResult(1);
+    page.focus(false); page.focus(true); await page.settle();
+    assert.equal(page.requests.length, 2);
+    assert.equal(page.list().key, key); assert.equal(page.rows(), before);
+    page.appState('background'); page.appState('active'); await page.settle();
+    assert.equal(page.requests.length, 3);
+    page.fix(1, page.landmarks.shaTin); await page.settle();
+    assert.equal(page.rows(), before, 'An aborted native fix cannot replace visible rail rows');
+    page.fix(2, point); await page.settle(); page.paint();
+    assert.equal(page.list().key, key); assert.deepEqual(page.rows(), before);
+    assert.deepEqual(scrolls, []);
+    assert.deepEqual(page.etaRoutes(), []);
+    page.press(copy.modes.all); page.press(copy.modes.mtr); page.press(copy.modes.lightRail); await page.settle();
+    assert.equal(page.requests.length, 3, 'Nearby category switches do not restart GPS');
+  });
+}
+
+test('rail text search and View all cancel nearby GPS and stay idle on refocus/foreground', async (t) => {
+  const page = mount(t, { transport: true });
+  const { transportCopy: copy } = page;
+  await page.settle();
+  page.press(copy.modes.mtr); await page.settle();
+  page.searchInput().onChangeText('RAC'); await page.settle();
+  page.fix(0, page.landmarks.shaTin); await page.settle();
+  assert.equal(page.rows()[0].id, 'RAC');
+  page.openResult(0); page.focus(false); page.focus(true);
+  page.appState('background'); page.appState('active'); await page.settle();
+  assert.equal(page.requests.length, 1);
+  page.press(page.busCopy.clearInput); await page.settle();
+  assert.equal(page.requests.length, 2);
+  assert.equal(page.rows().length, 0, 'A cancelled fix did not establish a guessed nearby location');
+  page.press(copy.viewAll); await page.settle();
+  page.fix(1, page.landmarks.central); await page.settle();
+  assert.equal(page.rows().length, 10);
+  page.focus(false); page.focus(true); page.appState('background'); page.appState('active'); await page.settle();
+  assert.equal(page.requests.length, 2);
+});
+
+test('All holds a common bus/rail reference during delayed bus refresh and stale async bus results cannot replace a rail category', async (t) => {
+  const page = mount(t, { transport: true });
+  await page.settle(); page.fix(0, page.landmarks.central); await page.settle();
+  const old = page.rows();
+  page.holdNearby(); page.focus(false); page.focus(true); await page.settle();
+  page.fix(1, page.landmarks.yuenLong); await page.settle();
+  assert.equal(page.rows(), old, 'Bus and rail retain the same old point until the next bus query completes');
+  page.press(page.transportCopy.modes.lightRail); await page.settle();
+  const rail = page.rows();
+  assert(rail.length > 0);
+  page.releaseNearby(); await page.settle();
+  assert.equal(page.rows(), rail);
+  assert(rail.every(({ location }) => location.station.mode === 'lightRail'));
+});
+
+test('transport reuses the existing offline bus-stop search adapter and existing detail route without a nearby radius', async (t) => {
+  const page = mount(t, { transport: true, permission: blocked });
+  await page.settle();
+  page.searchInput().onChangeText('北角碼頭'); await page.settle(); await page.waitStopSearch();
+  assert(page.rows().some((row) => 'number' in row), 'Existing route search remains available');
+  const index = page.rows().findIndex(({ kind }) => kind === 'bus_stop');
+  assert(index >= 0);
+  const stop = page.rows()[index];
+  page.openResult(index);
+  assert.deepEqual(page.routes.at(-1), { pathname: '/bus/nearby/stop', params: { source: stop.source, stopId: stop.stopId } });
+  assert.equal(page.requests.length, 0);
+  page.focus(false); page.focus(true); page.appState('background'); page.appState('active'); await page.settle();
+  assert.equal(page.requests.length, 0);
 });

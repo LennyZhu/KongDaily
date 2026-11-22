@@ -3,7 +3,7 @@ import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Icon } from '@/components/ui';
 import { useLanguage } from '@/language';
-import { findLightRailStop, type LightRailEntry, type LightRailPattern } from '@/light-rail-static';
+import { findLightRailStop, type LightRailEntry, type LightRailPattern, type LightRailStop } from '@/light-rail-static';
 import { colors, radius, space, touchTarget } from '@/theme';
 
 export function lightRailEndpoints(pattern: LightRailPattern, locale: 'zh-HK' | 'en') {
@@ -12,7 +12,9 @@ export function lightRailEndpoints(pattern: LightRailPattern, locale: 'zh-HK' | 
   if (first && last) return locale === 'en' ? `${first.en} → ${last.en}` : `${first.zh} → ${last.zh}`;
 }
 
-export function LightRailEntryRow({ entry, sequence }: { entry: LightRailEntry; sequence?: number }) {
+export function LightRailEntryRow({ entry, sequence, nearby }: {
+  entry: LightRailEntry; sequence?: number; nearby?: { boarding: LightRailStop; distance: string };
+}) {
   const { copy, locale } = useLanguage();
   const router = useRouter();
   const labels = copy.lightRail;
@@ -34,6 +36,10 @@ export function LightRailEntryRow({ entry, sequence }: { entry: LightRailEntry; 
         <AppText variant="homeCardTitle">{title}</AppText>
         {!!detail && <AppText variant="detail" tone="muted">{detail}</AppText>}
         {!isRoute && <AppText variant="detail" tone="muted">{labels.servedBy(entry.routes.join(' · '))}</AppText>}
+        {nearby && isRoute && <AppText variant="detail" tone="muted">
+          {copy.transport.boardingAt(locale === 'en' ? nearby.boarding.en : nearby.boarding.zh)}
+        </AppText>}
+        {nearby && <AppText variant="caption" tone="primary">{nearby.distance}</AppText>}
       </View>
       <Icon name="chevron.right" color={colors.muted} size={13} />
     </Pressable>
