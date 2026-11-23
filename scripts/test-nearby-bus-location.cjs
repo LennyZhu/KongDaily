@@ -9,6 +9,7 @@ const ts = require('typescript');
 
 const root = join(__dirname, '..');
 const gmbFixture = require('./fixtures/gmb-api.json');
+const hkkfFixture = require('./fixtures/hkkf-api.json');
 const { stops } = require('../assets/data/nearby-stops.json');
 const db = new DatabaseSync(':memory:');
 db.exec(`CREATE TABLE nearby_bus_stops (
@@ -30,6 +31,7 @@ const blocked = { granted: false, canAskAgain: false };
 function mount(t, {
   permission = granted, servicesEnabled = true, appState = 'active', locale = 'zh-HK', transport = false,
   intent, delayCatalogue = false, offlineCatalogue = false, mtrDetail, lightRailDetail, gmbDetail,
+  ferryPreview = false, development = ferryPreview, ferryDetail, ferryNow = Date.parse('2026-11-23T00:01:00+08:00'), ferryResponse,
 } = {}) {
   const events = new EventEmitter();
   const requests = [];
@@ -62,7 +64,7 @@ function mount(t, {
   const pendingNearby = [];
   const rootSlots = [];
   let slots = rootSlots;
-  const gmbComponents = new Map();
+  const detailComponents = new Map();
   const frames = new Map();
   let frameId = 0;
 
@@ -124,6 +126,7 @@ function mount(t, {
   const mocks = {
     react,
     'expo-linear-gradient': { LinearGradient: 'LinearGradient' },
+    'expo-symbols': { SymbolView: 'SymbolView' },
     'react-native': {
       ...native, AppState, StyleSheet: { create: (styles) => styles }, useWindowDimensions: () => ({ width: 320 }),
       Keyboard: { dismiss: () => { dismissals++; } },
@@ -146,7 +149,7 @@ function mount(t, {
     },
     'expo-router': {
       useRouter: () => ({ push: (href) => routes.push(href) }),
-      useLocalSearchParams: () => mtrDetail ?? lightRailDetail ?? gmbDetail ?? { intent },
+      useLocalSearchParams: () => mtrDetail ?? lightRailDetail ?? gmbDetail ?? ferryDetail ?? { intent },
       useFocusEffect: (effect) => load(require.resolve('expo-router/build/useFocusEffect')).useFocusEffect(effect),
     },
     './link/useLoadedNavigation': { useOptionalNavigation: () => navigation },
@@ -202,7 +205,7 @@ function mount(t, {
       const code = filename.endsWith('.js') ? text : ts.transpileModule(text, { compilerOptions: {
         target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,
       } }).outputText;
-      transpiled.set(filename, new Function('module', 'exports', 'require', 'requestAnimationFrame', 'cancelAnimationFrame', code));
+      transpiled.set(filename, new Function('module', 'exports', 'require', 'requestAnimationFrame', 'cancelAnimationFrame', '__DEV__', code));
     }
     const localRequire = createRequire(filename);
     transpiled.get(filename)(module, module.exports, (id) => {
@@ -212,7 +215,7 @@ function mount(t, {
         readBusStopsForSearch: async () => db.prepare('SELECT source, stop_id, name_zh, name_en, street_zh, street_en FROM nearby_bus_stops ORDER BY source, stop_id').all(),
       };
       return id.startsWith('@/') ? source(id.slice(2)) : localRequire(id);
-    }, (callback) => { frames.set(++frameId, callback); return frameId; }, (id) => frames.delete(id));
+    }, (callback) => { frames.set(++frameId, callback); return frameId; }, (id) => frames.delete(id), development);
     return module.exports;
   }
 
@@ -245,6 +248,24 @@ function mount(t, {
     return new Response(JSON.stringify(gmbResponses[pathname]), { status: gmbResponses[pathname] ? 200 : 500 });
   } }) };
 
+  const ferryPaths = [];
+  if (ferryPreview) {
+    const clock = () => ({ wall: ferryNow, monotonic: 100 });
+    mocks['@/next-train-time'] = { ...source('next-train-time'), nextTrainClock: clock };
+    mocks['@/hkkf-preview'] = {
+      hkkfPreviewEnabled: true,
+      hkkfPreviewClient: source('hkkf-client').createHkkfClient({ enabled: true, clock, request: async (address) => {
+        const path = new URL(address).pathname.replace('/opendata/', '');
+        ferryPaths.push(path);
+        const alternate = ferryResponse?.(path);
+        if (alternate) return alternate;
+        if (path === 'route') return new Response(JSON.stringify(hkkfFixture.routes));
+        assert.ok(path.startsWith('time_table/'), 'Unexpected Ferry API call: ' + path);
+        return new Response(hkkfFixture.schedules[path.slice(11)].csv);
+      } }),
+    };
+  }
+
   const { parseBusCatalogue } = source('bus-routes');
   const catalogueRoutes = {
     kmbLwb: parseBusCatalogue('kmbLwb', { data: [1, 3].map((variant) => ({
@@ -270,7 +291,7 @@ function mount(t, {
   searchAdapter.loadGlobalBusStops = () => stopSearchTask = loadStops();
   const transportEntry = transport && source('app/transport').default();
   if (transportEntry) assert.equal(transportEntry.type, busScreen);
-  const screen = gmbDetail ? source('app/minibus/[id]').default : mtrDetail ? source('app/mtr/[kind]').default
+  const screen = ferryDetail ? source('app/ferry/[id]').default : gmbDetail ? source('app/minibus/[id]').default : mtrDetail ? source('app/mtr/[kind]').default
     : lightRailDetail ? source('app/light-rail/[kind]').default
     : transportEntry ? () => transportEntry.type(transportEntry.props) : busScreen;
   const copy = source('i18n').messages[locale];
@@ -284,13 +305,13 @@ function mount(t, {
         cursor = 0;
         effects = [];
         screenTree = screen();
-        if (gmbDetail) {
+        if (gmbDetail || ferryDetail) {
           const rendered = new Set();
-          screenTree = renderGmb(screenTree, 'gmb', rendered);
-          for (const [key, owner] of gmbComponents) {
+          screenTree = renderDetail(screenTree, 'detail', rendered);
+          for (const [key, owner] of detailComponents) {
             if (!rendered.has(key)) {
               owner.forEach((slot) => slot?.cleanup?.());
-              gmbComponents.delete(key);
+              detailComponents.delete(key);
             }
           }
         }
@@ -319,21 +340,21 @@ function mount(t, {
     assert.fail('Nearby bus screen did not settle');
   }
 
-  function renderGmb(node, key, rendered) {
-    if (Array.isArray(node)) return node.map((child, index) => renderGmb(child, key + '/' + (child?.key ?? index), rendered));
+  function renderDetail(node, key, rendered) {
+    if (Array.isArray(node)) return node.map((child, index) => renderDetail(child, key + '/' + (child?.key ?? index), rendered));
     if (!node?.props) return node;
     if (typeof node.type === 'function') {
       const identity = key + '/' + node.type.name + (node.key ?? '');
       rendered.add(identity);
-      if (!gmbComponents.has(identity)) gmbComponents.set(identity, []);
+      if (!detailComponents.has(identity)) detailComponents.set(identity, []);
       const parent = [slots, cursor];
-      slots = gmbComponents.get(identity);
+      slots = detailComponents.get(identity);
       cursor = 0;
       const children = node.type(node.props);
       [slots, cursor] = parent;
-      return renderGmb(children, identity, rendered);
+      return renderDetail(children, identity, rendered);
     }
-    return { ...node, props: { ...node.props, children: renderGmb(node.props.children, key, rendered) } };
+    return { ...node, props: { ...node.props, children: renderDetail(node.props.children, key, rendered) } };
   }
 
   function elements(node, expand = true) {
@@ -348,7 +369,7 @@ function mount(t, {
       else if (name === 'LightRailStationServices') children = stationServicesTree;
       else if (name === 'MtrNextTrains') children = mtrServicesTree;
       else if (name?.startsWith('Transport')
-        || ['Loading', 'ListAction', 'MtrEntryRow', 'MtrSources', 'LightRailEntryRow', 'LightRailSources', 'GlobalSearchResultRow', 'GmbSearchNotice', 'GmbFeedback', 'GmbNearbyRouteCard', 'GmbNearbyStopCard', 'RailwayStationHeading'].includes(name)) children = node.type(node.props);
+        || ['Loading', 'ListAction', 'MtrEntryRow', 'MtrSources', 'LightRailEntryRow', 'LightRailSources', 'GlobalSearchResultRow', 'GmbSearchNotice', 'HkkfSearchNotice', 'HkkfNearbyRouteCard', 'HkkfNearbyPierCard', 'GmbFeedback', 'GmbNearbyRouteCard', 'GmbNearbyStopCard', 'RailwayStationHeading'].includes(name)) children = node.type(node.props);
     }
     return [node, ...elements(children, expand)];
   }
@@ -374,7 +395,7 @@ function mount(t, {
   function unmount() {
     if (!mounted) return;
     rootSlots.forEach((slot) => slot?.cleanup?.());
-    gmbComponents.forEach((owner) => owner.forEach((slot) => slot?.cleanup?.()));
+    detailComponents.forEach((owner) => owner.forEach((slot) => slot?.cleanup?.()));
     mounted = false;
   }
 
@@ -409,14 +430,16 @@ function mount(t, {
   t.after(unmount);
   return {
     calls, labels, landmarks, requests, queries, routes, settings, alerts, openedLinks, settle, press, shows, unmount, findAction,
-    visibleElements,
+    visibleElements, renderFilters: (props) => source('components/ui').Filters(props),
     transportCopy: copy.transport, busCopy: copy.bus, mtrCopy: copy.mtr, lightRailCopy: copy.lightRail,
-    gmbPaths, gmbCopy: copy.minibus, catalogueRoutes, theme: source('theme'),
+    ferryPaths, ferryCopy: copy.ferry, gmbPaths, gmbCopy: copy.minibus, catalogueRoutes, theme: source('theme'),
     mtr: () => source('mtr-static'),
     lightRail: () => source('light-rail-static'),
     geo: () => source('railway-station-geo'),
     nearbyRail: () => source('nearby-railway'),
     nearbyGmb: () => source('nearby-gmb'),
+    nearbyFerry: () => source('nearby-hkkf'),
+    ferryNearbyCopy: () => source('hkkf-nearby-copy').hkkfNearbyCopy[locale],
     async waitStopSearch() { await stopSearchTask; await settle(); },
     holdNearby() { holdNearby = true; },
     releaseNearby() { holdNearby = false; pendingNearby.splice(0).forEach((resolve) => resolve()); },
@@ -2114,4 +2137,261 @@ test('minibus nearby deep link can open a matching stop, while a retired directi
   await retired.settle();
   assert.ok(retired.shows(retired.gmbCopy.directionChanged));
   assert.deepEqual(retired.gmbPaths, ['/route/2006474', '/route-stop/2006474/1']);
+});
+
+for (const locale of ['zh-HK', 'en']) {
+  test(`Ferry search separates citywide routes and piers from nearby distances (${locale})`, async (t) => {
+    const page = mount(t, { transport: true, locale, permission: blocked, ferryPreview: true });
+    const copy = page.ferryNearbyCopy();
+    await page.settle();
+    page.press(page.transportCopy.modes.ferry);
+    await page.settle();
+    assert.equal(page.searchInput().placeholder, page.ferryCopy.search);
+    assert.ok(page.findAction(page.transportCopy.openSettings));
+    assert.deepEqual(page.rows(), []);
+    page.press(page.transportCopy.chooseLandmark);
+    await page.settle();
+    page.press(page.labels.landmarks.central);
+    await page.settle();
+    assert.equal(page.rows().length, 3);
+    page.press(page.transportCopy.straightLineRadius(page.labels.metres(500)));
+    await page.settle();
+    page.press(page.labels.kilometres(2));
+    await page.settle();
+    const search = locale === 'en' ? 'Central Pier 6' : '中環６號碼頭';
+    page.searchInput().onChangeText(search);
+    await page.settle();
+    assert.ok(page.shows(copy.searchRoutes));
+    assert.deepEqual(page.rows().map(({ id, distance }) => [id, distance]),
+      [['hkkf:route:3:outbound', undefined], ['hkkf:route:3:inbound', undefined]]);
+    page.press(copy.byPier);
+    await page.settle();
+    assert.ok(page.shows(copy.searchPiers));
+    assert.deepEqual(page.rows().map(({ id, distance }) => [id, distance]), [['hkkf:pier:2', undefined]]);
+    page.openResult(0);
+    await page.settle();
+    const directions = page.rowElements(0).filter(({ type }) => type === 'Pressable');
+    assert.equal(directions.length, 2);
+    directions[1].props.onPress();
+    assert.deepEqual(page.routes.at(-1), { pathname: '/ferry/[id]', params: { id: '3', operatorId: 'hkkf', direction: 'outbound' } });
+    page.focus(false);
+    page.focus(true);
+    await page.settle();
+    assert.equal(page.searchInput().value, search);
+    assert.ok(page.shows(copy.searchPiers));
+    assert.equal(page.rowElements(0).filter(({ type }) => type === 'Pressable').length, 2);
+    page.searchInput().onChangeText('xxxxxxxx');
+    await page.settle();
+    assert.ok(page.shows(copy.noPierMatches));
+    page.press(page.busCopy.clearInput);
+    await page.settle();
+    assert.ok(page.shows(copy.nearbyPiers));
+    assert.ok(page.shows(page.transportCopy.straightLineRadius(page.labels.kilometres(2))));
+    assert.deepEqual(new Set(page.rows().map(({ id }) => id)), new Set(['hkkf:pier:1', 'hkkf:pier:2']));
+    assert.ok(page.rows().every(({ distance }) => Number.isFinite(distance)));
+    assert.equal(page.requests.length, 0);
+    assert.deepEqual(page.ferryPaths, []);
+  });
+}
+
+test('Ferry nearby uses the current fix, sorts departures by boarding distance and prefills the exact inbound direction', async (t) => {
+  const page = mount(t, { transport: true, ferryPreview: true, locale: 'en' });
+  await page.settle();
+  page.press(page.transportCopy.modes.ferry);
+  await page.settle();
+  assert.ok(page.shows(page.transportCopy.locating));
+  const point = { latitude: 22.284587, longitude: 114.037164 };
+  page.fix(page.requests.length - 1, point);
+  await page.settle();
+  assert.deepEqual(page.rows().map(({ id }) => id), ['hkkf:route:3:inbound', 'hkkf:route:4:outbound']);
+  assert.ok(page.rowElements(0).some(({ props }) => props.children === 'From Peng Chau Pier'));
+  assert.ok(page.rowElements(0).some(({ props }) => props.children === 'To Central Pier 6 (West Berth)'));
+  page.openResult(0);
+  const { params } = page.routes.at(-1);
+  assert.deepEqual(params, { id: '3', operatorId: 'hkkf', direction: 'inbound' });
+  const detail = mount(t, { ferryPreview: true, ferryDetail: params, locale: 'en' });
+  await detail.settle();
+  assert.equal(detail.directionFilters().selected, 'inbound');
+  assert.deepEqual(detail.ferryPaths, ['time_table/3/inbound']);
+  assert.deepEqual(page.ferryPaths, []);
+});
+
+test('Ferry nearby distinguishes a failed fix from an empty radius and supports the next radius', async (t) => {
+  const page = mount(t, { transport: true, ferryPreview: true, locale: 'en' });
+  const copy = page.ferryNearbyCopy();
+  await page.settle();
+  page.press(page.transportCopy.modes.ferry);
+  await page.settle();
+  page.failFix(page.requests.length - 1);
+  await page.settle();
+  assert.ok(page.findAction(page.labels.useLocation));
+  assert.ok(!page.shows(copy.noNearbyRoutes(page.labels.metres(500))));
+  page.press(page.labels.useLocation);
+  await page.settle();
+  page.fix(page.requests.length - 1, { latitude: 22.292, longitude: 114.161 });
+  await page.settle();
+  assert.ok(page.shows(copy.noNearbyRoutes(page.labels.metres(500))));
+  page.press(page.labels.expand(page.labels.kilometres(1)));
+  await page.settle();
+  assert.equal(page.rows().length, 3);
+});
+
+test('Ferry nearby snapshot matches all six source records and eight audited departure directions', (t) => {
+  const { hkkfNearbyPiers, searchHkkfNearbyCatalogue } = mount(t).nearbyFerry();
+  const expected = {
+    1: ['1:outbound', '2:outbound'], 2: ['3:outbound'], 3: ['2:inbound'],
+    4: ['3:inbound', '4:outbound'], 5: ['1:inbound'], 6: ['4:inbound'],
+  };
+  assert.equal(hkkfNearbyPiers.length, 6);
+  for (const [index, pier] of hkkfNearbyPiers.entries()) {
+    const id = index + 1;
+    assert.equal(pier.id, 'hkkf:pier:' + id);
+    const { lat, long } = hkkfFixture.piers[id].data;
+    assert.deepEqual(pier.point, { latitude: lat, longitude: long });
+    assert.deepEqual(pier.sailings.map((item) => item.id.replace('hkkf:route:', '')), expected[id]);
+    assert.ok(pier.sailings.every(({ direction }) => direction.originPierId === pier.id && direction.destinationPierId !== pier.id));
+  }
+  assert.equal(searchHkkfNearbyCatalogue('Central ↔ Yung Shue Wan', 'routes').length, 2);
+  assert.equal(searchHkkfNearbyCatalogue('坪洲往來喜靈洲', 'routes').length, 2);
+  assert.equal(searchHkkfNearbyCatalogue('喜靈洲碼頭', 'stops')[0].id, 'hkkf:pier:6');
+});
+
+test('Ferry nearby radius boundaries and deduplication use metres and official identities', (t) => {
+  const { hkkfNearbyPiers, nearbyHkkfRows } = mount(t).nearbyFerry();
+  const center = { latitude: 22.28, longitude: 114.16 };
+  const pointAt = (metres) => ({ ...center, latitude: center.latitude + (metres / 6371008.8) * 180 / Math.PI });
+  for (const radius of [500, 1000, 2000]) {
+    const [first, second] = hkkfNearbyPiers;
+    const inside = { ...first, point: pointAt(radius - 0.001), sailings: [...first.sailings, first.sailings[0]] };
+    const outside = { ...second, point: pointAt(radius + 0.001) };
+    assert.deepEqual(nearbyHkkfRows(center, radius, 'stops', [outside, inside, inside]).map(({ id }) => id), [first.id]);
+    assert.deepEqual(nearbyHkkfRows(center, radius, 'routes', [outside, inside, inside]).map(({ id }) => id),
+      first.sailings.map(({ id }) => id));
+    const collocated = { ...second, point: inside.point };
+    assert.equal(nearbyHkkfRows(center, radius, 'stops', [inside, collocated]).length, 2);
+  }
+});
+
+test('Ferry production placeholder and direct link stay closed', async (t) => {
+  const page = mount(t, { transport: true, permission: blocked, ferryPreview: true, development: false });
+  await page.settle();
+  page.press(page.transportCopy.modes.ferry);
+  await page.settle();
+  assert.ok(page.shows(page.transportCopy.unavailable(page.transportCopy.modes.ferry)));
+  assert.equal(page.searchInput(), undefined);
+  assert.deepEqual(page.ferryPaths, []);
+  const detail = mount(t, { ferryDetail: { id: '3', operatorId: 'hkkf' } });
+  await detail.settle();
+  assert.ok(detail.shows(detail.ferryCopy.unavailable));
+  assert.deepEqual(detail.ferryPaths, []);
+});
+
+function chooseFerryFilter(page, value) {
+  const selector = page.visibleElements().find(({ type, props }) => type === 'Filters'
+    && props.options.some(([key]) => key === value));
+  assert.ok(selector, value);
+  selector.props.onSelect(value);
+}
+
+test('Ferry direction buttons keep bilingual destination labels to one line and stay accessible', async (t) => {
+  for (const [locale, labels, fullPier] of [
+    ['zh-HK', ['往索罟灣', '往中環 4 號碼頭'], '中環4號渡輪碼頭'],
+    ['en', ['To Sok Kwu Wan', 'To Central Pier 4'], 'Central Pier 4'],
+  ]) {
+    const page = mount(t, { ferryPreview: true, ferryDetail: { id: '1', operatorId: 'hkkf' }, locale });
+    await page.settle();
+    const directions = () => page.visibleElements().find(({ type, props }) => type === 'Filters'
+      && props.options[0][0] === 'outbound').props;
+    const filters = page.renderFilters(directions());
+    assert.equal(filters.props.style.flexWrap, 'wrap');
+    for (const [index, button] of filters.props.children.entries()) {
+      const label = button.props.children.props;
+      assert.equal(label.children, labels[index]);
+      assert.equal(button.props.accessibilityLabel, labels[index]);
+      assert.equal(label.numberOfLines, 1);
+      assert.equal(label.ellipsizeMode, 'tail');
+      assert.equal(label.style.maxWidth, '100%');
+      assert.equal(label.allowFontScaling, undefined);
+      const buttonStyle = Object.assign({}, ...button.props.style({ pressed: false }));
+      assert.equal(buttonStyle.minHeight, 44);
+      assert.equal(buttonStyle.minWidth, 44);
+      assert.equal(buttonStyle.maxWidth, '100%');
+    }
+    assert.ok(page.shows(fullPier), 'Full pier name remains in the information card');
+    filters.props.children[1].props.onPress();
+    await page.settle();
+    assert.equal(directions().selected, 'inbound');
+    const selected = page.renderFilters(directions()).props.children[1];
+    assert.equal(selected.props.accessibilityState.selected, true);
+    assert.equal(selected.props.children.props.tone, 'onPrimary');
+    assert.deepEqual(page.ferryPaths, ['time_table/1/outbound', 'time_table/1/inbound']);
+  }
+});
+
+test('Ferry detail shows verified harbour berths, Hong Kong midnight and selected directions', async (t) => {
+  const page = mount(t, { ferryPreview: true, ferryDetail: { id: '3', operatorId: 'hkkf' }, locale: 'en' });
+  await page.settle();
+  assert.ok(page.shows('Central Pier 6 (West Berth)'));
+  assert.ok(page.shows('Peng Chau Pier'));
+  assert.ok(page.shows(page.ferryCopy.scheduled));
+  assert.ok(page.shows(page.ferryCopy.next));
+  assert.ok(page.shows('00:30'));
+  assert.ok(page.visibleElements().some(({ props }) => String(props.children).includes(page.ferryCopy.previousServiceDay)));
+  chooseFerryFilter(page, 'mondayToSaturday');
+  await page.settle();
+  assert.ok(page.visibleElements().some(({ props }) => String(props.children).includes(page.ferryCopy.nextDay)));
+  assert.deepEqual(page.ferryPaths, ['time_table/3/outbound'], 'Changing the day type is local');
+  chooseFerryFilter(page, 'inbound');
+  await page.settle();
+  assert.deepEqual(page.ferryPaths, ['time_table/3/outbound', 'time_table/3/inbound']);
+  assert.ok(page.shows('03:40'));
+  assert.ok(!page.shows('00:30'));
+  page.press(page.ferryCopy.calendarSource);
+  assert.match(page.openedLinks.at(-1), /^https:\/\/data.gov.hk\//);
+});
+
+test('Ferry detail surfaces optional service, failed fetch, empty timetable and unconfirmed holiday calendar', async (t) => {
+  const fixture = hkkfFixture.schedules['1/inbound'].csv;
+  const page = mount(t, { ferryPreview: true, ferryDetail: { id: '1', operatorId: 'hkkf' },
+    ferryNow: Date.parse('2028-01-03T23:55:00+08:00'),
+    ferryResponse: (path) => path === 'time_table/1/outbound' ? new Response('unavailable', { status: 500 }) : undefined });
+  await page.settle();
+  assert.ok(page.shows(page.ferryCopy.scheduleFailed));
+  assert.ok(page.findAction(page.busCopy.retry));
+  chooseFerryFilter(page, 'inbound');
+  await page.settle();
+  assert.ok(page.shows(page.ferryCopy.calendarUnknown));
+  assert.ok(!page.shows(page.ferryCopy.next));
+  chooseFerryFilter(page, 'sundayOrPublicHoliday');
+  await page.settle();
+  assert.ok(page.shows(page.ferryCopy.notes));
+  assert.ok(page.visibleElements().some(({ props }) => String(props.children).includes(page.ferryCopy.optional)));
+
+  const empty = mount(t, { ferryPreview: true, ferryDetail: { id: '1', operatorId: 'hkkf' },
+    ferryResponse: () => new Response(fixture.split(/\r?\n/)[0] + '\n') });
+  await empty.settle();
+  assert.ok(empty.shows(empty.ferryCopy.noDepartures));
+
+  const ended = mount(t, { ferryPreview: true, ferryDetail: { id: '1', operatorId: 'hkkf' },
+    ferryNow: Date.parse('2026-11-23T23:59:00+08:00') });
+  await ended.settle();
+  assert.ok(ended.shows(ended.ferryCopy.ended));
+  assert.ok(!ended.shows(ended.ferryCopy.next));
+});
+
+test('Ferry catalogue treats pending and failed requests separately from no matches', async (t) => {
+  let finish;
+  const response = new Promise((resolve) => { finish = resolve; });
+  const page = mount(t, { transport: true, ferryPreview: true, permission: blocked, ferryResponse: () => response });
+  await page.settle();
+  page.searchInput().onChangeText('Central Pier 6');
+  await page.settle();
+  assert.ok(page.shows(page.ferryCopy.loading));
+  assert.ok(!page.shows(page.ferryCopy.noMatches));
+  finish(new Response('unavailable', { status: 500 }));
+  await page.settle();
+  assert.ok(page.shows(page.ferryCopy.searchFailed));
+  assert.ok(!page.shows(page.ferryCopy.loading));
+  assert.ok(!page.shows(page.ferryCopy.noMatches));
+  assert.ok(page.findAction(page.busCopy.retry));
 });

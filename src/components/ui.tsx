@@ -72,11 +72,12 @@ export function EmptyState({ icon, title, detail }: { icon: IconName; title: str
   );
 }
 
-export function Filters<Category extends string>({ options, selected, onSelect, horizontal = false }: {
+export function Filters<Category extends string>({ options, selected, onSelect, horizontal = false, singleLine = false }: {
   options: ReadonlyArray<readonly [Category, string]>;
   selected: Category;
   onSelect: (category: Category) => void;
   horizontal?: boolean;
+  singleLine?: boolean;
 }) {
   const buttons = options.map(([key, label]) => {
     const active = selected === key;
@@ -85,11 +86,13 @@ export function Filters<Category extends string>({ options, selected, onSelect, 
         key={key}
         accessibilityRole="button"
         accessibilityState={{ selected: active }}
+        accessibilityLabel={singleLine ? label : undefined}
         onPress={() => onSelect(key)}
         style={({ pressed }) => [styles.filter, horizontal ? styles.horizontalFilter : styles.boundedFilter,
-          active && styles.activeFilter, pressed && styles.pressedFilter]}
+          singleLine && styles.compactFilter, active && styles.activeFilter, pressed && styles.pressedFilter]}
       >
-        <AppText variant="detail" tone={active ? 'onPrimary' : 'text'} numberOfLines={horizontal ? 1 : undefined}>{label}</AppText>
+        <AppText variant="detail" tone={active ? 'onPrimary' : 'text'} numberOfLines={horizontal || singleLine ? 1 : undefined}
+          ellipsizeMode={singleLine ? 'tail' : undefined} style={singleLine && styles.singleLineLabel}>{label}</AppText>
       </Pressable>
     );
   });
@@ -102,6 +105,8 @@ const styles = StyleSheet.create({
   horizontalFilters: { flexDirection: 'row', flexWrap: 'nowrap', gap: space.sm },
   horizontalFilter: { flexShrink: 0, minWidth: touchTarget },
   boundedFilter: { maxWidth: '100%' },
+  compactFilter: { minWidth: touchTarget, paddingHorizontal: space.sm },
+  singleLineLabel: { maxWidth: '100%' },
   screen: { flex: 1, backgroundColor: colors.background },
   scroll: { backgroundColor: colors.background },
   screenContent: { paddingHorizontal: space.xl, paddingTop: space.lg, paddingBottom: space.section, gap: space.xxl },

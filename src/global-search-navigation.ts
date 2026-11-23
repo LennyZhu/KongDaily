@@ -5,6 +5,8 @@ import { getExplorePlace } from '@/explore-places';
 import { resolveStableFacilityIdentity } from '@/facility-identity';
 import { gmbPositiveId, type GmbRouteSeq, type GmbVisitKey } from '@/gmb-data';
 import type { GlobalSearchResult } from '@/global-search';
+import { hkkfRouteParams, type HkkfDirectionId } from '@/hkkf-data';
+import { hkkfPreviewEnabled } from '@/hkkf-preview';
 import { findLightRailRoute, findLightRailStop } from '@/light-rail-static';
 import { findMtrLine, findMtrStation } from '@/mtr-static';
 
@@ -33,6 +35,11 @@ export function gmbRouteHref(routeId: number, routeSeq?: GmbRouteSeq, visit?: Pi
   } };
 }
 
+export function hkkfRouteHref(operatorId: string, id: string, direction?: HkkfDirectionId): Href | undefined {
+  if (!hkkfPreviewEnabled || !hkkfRouteParams(operatorId, id)) return;
+  return { pathname: '/ferry/[id]', params: { id, operatorId, ...(direction ? { direction } : {}) } };
+}
+
 export function searchResultDestination(result: GlobalSearchResult): SearchDestination {
   switch (result.kind) {
     case 'mtr_line':
@@ -55,6 +62,13 @@ export function searchResultDestination(result: GlobalSearchResult): SearchDesti
         return { href: { pathname: '/light-rail/[kind]', params: { kind: 'stop', id: result.entry.id } } };
       }
       break;
+    case 'ferry_route': {
+      const { operatorId, operatorRouteId, routeId } = result.service;
+      if (routeId !== `hkkf:route:${operatorRouteId}`) break;
+      const href = hkkfRouteHref(operatorId, operatorRouteId);
+      if (href) return { href };
+      break;
+    }
     case 'gmb_route':
       if (gmbPositiveId(result.service.routeId)) {
         return { href: gmbRouteHref(result.service.routeId) };

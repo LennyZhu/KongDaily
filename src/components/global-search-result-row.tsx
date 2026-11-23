@@ -5,6 +5,7 @@ import { AppText, Icon, type IconName } from '@/components/ui';
 import { facilityText } from '@/facilities';
 import type { GlobalSearchKind, GlobalSearchResult } from '@/global-search';
 import { gmbText } from '@/gmb-search';
+import { hkkfSource } from '@/hkkf-data';
 import { useLanguage } from '@/language';
 import { findMtrLine, mtrName } from '@/mtr-static';
 import { colors, radius, space } from '@/theme';
@@ -39,6 +40,10 @@ function resultCopy(result: GlobalSearchResult, { copy, locale }: ReturnType<typ
         note: copy.bus.service(route.serviceType),
       };
     }
+    case 'ferry_route':
+      return { title: result.service.name[locale].replace(/\s*<=>\s*/g, ' ↔ '),
+        detail: [copy.transport.modes.ferry, hkkfSource.owner[locale]],
+        note: result.service.directions.find(({ directionId }) => directionId === 'outbound')?.name[locale] };
     case 'gmb_route': {
       const { service } = result;
       const direction = service.directions.find(({ routeSeq }) => routeSeq === 1) ?? service.directions[0];
@@ -87,7 +92,7 @@ export function GlobalSearchResultRow({ result, first, last, onPress }: {
     : result.kind === 'explore_place' ? placeIcons[result.place.category]
       : result.kind === 'mtr_line' || result.kind === 'mtr_station' ? 'tram.fill.tunnel'
         : result.kind === 'light_rail_route' || result.kind === 'light_rail_stop' ? 'train.side.front.car'
-          : result.kind === 'gmb_route' ? 'bus.fill' : result.kind === 'bus_route' ? 'bus' : 'mappin';
+          : result.kind === 'ferry_route' ? 'ferry' : result.kind === 'gmb_route' ? 'bus.fill' : result.kind === 'bus_route' ? 'bus' : 'mappin';
   const { title, detail, note } = resultCopy(result, language);
   const subtitle = detail.filter(Boolean).join(' · ');
 

@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useBusCatalogue } from '@/bus-hooks';
 import { GmbSearchNotice } from '@/components/gmb-status';
+import { HkkfSearchNotice } from '@/components/hkkf-search-notice';
 import { GlobalSearchResultRow, searchGroupIcons } from '@/components/global-search-result-row';
 import { SearchHarbourIllustration } from '@/components/search-harbour-illustration';
 import { AppText, EmptyState, Icon } from '@/components/ui';
@@ -14,6 +15,7 @@ import {
 } from '@/global-search';
 import { searchResultDestination } from '@/global-search-navigation';
 import { useGmbSearch } from '@/gmb-query-hooks';
+import { useHkkfRoutes } from '@/hkkf-query-hooks';
 import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
 import { colors, radius, space, touchTarget, typography } from '@/theme';
@@ -53,6 +55,7 @@ export default function SearchScreen() {
   const canSearchNames = canSearch && prepared.terms.matchNames;
   const needsCatalogue = canSearch && (category === 'all' || category === 'transport_route');
   const gmb = useGmbSearch(draft.text, needsCatalogue);
+  const ferry = useHkkfRoutes(needsCatalogue);
   const needsStops = canSearchNames && (category === 'all' || category === 'transport_stop');
 
   useEffect(() => {
@@ -77,13 +80,13 @@ export default function SearchScreen() {
   }, [busStops.status]);
 
   const result = useMemo(() => canSearch ? searchGlobal(draft.text, {
-    category, busStops, gmb: gmb.state, requestId: draft.id,
+    category, busStops, gmb: gmb.state, ferry: ferry.state, requestId: draft.id,
     busCatalogue: catalogueRequested ? { feeds, failed, loading: catalogueLoading } : undefined,
-  }) : undefined, [canSearch, draft, category, busStops, gmb.state, catalogueRequested, feeds, failed, catalogueLoading]);
+  }) : undefined, [canSearch, draft, category, busStops, gmb.state, ferry.state, catalogueRequested, feeds, failed, catalogueLoading]);
   const groups = result?.queryStatus === 'ready'
     ? result.groups.filter(({ kind }) => kind === 'transport_route' || canSearchNames) : [];
   const rows = resultRows(groups, category);
-  const pendingSources = gmb.state?.status === 'loading' || groups.some((group) => group.status === 'loading' || group.status === 'not_loaded'
+  const pendingSources = ferry.state?.status === 'loading' || gmb.state?.status === 'loading' || groups.some((group) => group.status === 'loading' || group.status === 'not_loaded'
     || ((group.kind === 'transport_route' || group.kind === 'transport_stop')
       && (group.bus?.status === 'loading' || group.bus?.status === 'not_loaded'))
     || (group.kind === 'transport_route' && group.bus?.status === 'partial' && catalogueLoading));
@@ -199,6 +202,7 @@ export default function SearchScreen() {
         ListHeaderComponent={(
           <>
             <GmbSearchNotice state={gmb.state} retry={gmb.retry} />
+            <HkkfSearchNotice state={ferry.state} retry={ferry.retry} />
             {groups.map((group) => (
               <SourceNotice key={group.kind} group={group} labels={labels} retryLabel={copy.bus.retry}
                 catalogueLoading={catalogueLoading} retryCatalogue={retryCatalogue}

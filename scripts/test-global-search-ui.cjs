@@ -3,6 +3,7 @@ const { existsSync, readFileSync } = require('node:fs');
 const { dirname, join, resolve } = require('node:path');
 const ts = require('typescript');
 const gmbFixture = require('./fixtures/gmb-api.json');
+const hkkfFixture = require('./fixtures/hkkf-api.json');
 
 const root = join(__dirname, '..');
 let slots = [];
@@ -138,6 +139,9 @@ stubs['@/gmb-client'] = { gmbClient: load('gmb-client').createGmbClient({ reques
   const body = gmbResponses[new URL(address).pathname];
   return new Response(JSON.stringify(body), { status: body ? 200 : 500 });
 } }) };
+const ferryPaths = [];
+const ferryPreview = { hkkfPreviewEnabled: false, hkkfPreviewClient: undefined };
+stubs['@/hkkf-preview'] = ferryPreview;
 const SearchScreen = load('app/search').default;
 function render(runEffects = true) {
   if (!runEffects) {
@@ -594,7 +598,50 @@ async function verify() {
   assert(displayed(screen, 'mtr_station').some(({ key }) => key === 'mtr_station:ADM'));
   assert(hasCopy(list(screen).ListHeaderComponent, labels().search.stopsFailed));
 
-  console.log('PASS: four interactive bilingual entry cards; four transport sources, scoped categories, detail navigation, debounce/return and offline rail under bus failures; facilities and places unchanged');
+  reset(); cached = liveFeeds; operatorFailures = new Set(); stopsTask = undefined; stopsFail = false;
+  screen = render(); input(screen).onChangeText('Central Pier 4'); screen = await complete();
+  assert(!resultItems(screen).some(({ kind }) => kind === 'ferry_route'), 'Release search has no ferry rows');
+
+  Object.assign(ferryPreview, {
+    hkkfPreviewEnabled: true,
+    hkkfPreviewClient: load('hkkf-client').createHkkfClient({ enabled: true, async request(url) {
+      const path = new URL(url).pathname;
+      ferryPaths.push(path);
+      assert.equal(path, '/opendata/route');
+      return new Response(JSON.stringify(hkkfFixture.routes));
+    } }),
+  });
+  for (locale of ['zh-HK', 'en']) {
+    reset();
+    screen = render();
+    tapText(empty(screen), labels().search.groups.transport_route);
+    screen = render();
+    input(screen).onChangeText(locale === 'en' ? 'Central Pier 4' : '中環4號渡輪碼頭');
+    screen = await complete();
+    assert.deepEqual(resultItems(screen).filter(({ kind }) => kind === 'ferry_route').map(({ key }) => key),
+      ['ferry_route:hkkf:route:1', 'ferry_route:hkkf:route:2']);
+    const query = locale === 'en' ? 'Peng Chau Pier' : '坪洲渡輪碼頭';
+    input(screen).onChangeText(query);
+    screen = await complete();
+    assert.deepEqual(resultItems(screen).filter(({ kind }) => kind === 'ferry_route').map(({ key }) => key),
+      ['ferry_route:hkkf:route:3', 'ferry_route:hkkf:route:4']);
+    const row = list(screen).data.find(({ result }) => result?.key === 'ferry_route:hkkf:route:4');
+    const scrolls = [];
+    find(screen, 'FlatList').props.ref.current = { scrollToOffset: ({ offset }) => scrolls.push(offset) };
+    list(screen).onScroll({ nativeEvent: { contentOffset: { y: 100 } } });
+    pressRow(row).props.onPress();
+    assert.deepEqual(pushed.at(-1), { pathname: '/ferry/[id]', params: { id: '4', operatorId: 'hkkf' } });
+    blur(); blur = focusEffect(); advance(16); screen = render();
+    assert.equal(input(screen).value, query);
+    assert.deepEqual(scrolls, [100]);
+    input(screen).onChangeText(locale === 'en' ? 'Central ↔ Yung Shue Wan' : '中環往來榕樹灣');
+    screen = await complete();
+    assert.deepEqual(resultItems(screen).filter(({ kind }) => kind === 'ferry_route').map(({ key }) => key),
+      ['ferry_route:hkkf:route:2']);
+  }
+  assert.deepEqual(ferryPaths, ['/opendata/route'], 'Keywords and screens reuse the catalogue without ETA requests');
+
+  console.log('PASS: four interactive bilingual entry cards; five transport sources including gated HKKF, scoped categories, detail navigation, debounce/return and offline rail under bus failures; facilities and places unchanged');
 }
 
 verify().catch((error) => { console.error(error); process.exitCode = 1; }).finally(reset);
