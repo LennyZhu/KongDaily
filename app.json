@@ -2,7 +2,7 @@
   "expo": {
     "name": "KongDaily",
     "slug": "kongdaily",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "platforms": [
       "ios"
     ],
@@ -59,7 +59,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Used to find nearby facilities and bus stops and show their distance from your location.",
+          "locationWhenInUsePermission": "Your location helps KongDaily find nearby public transport stops and facilities and show their distance from you.",
           "locationAlwaysPermission": false,
           "locationAlwaysAndWhenInUsePermission": false,
           "motionUsagePermission": "KongDaily's location library includes optional motion activity detection. KongDaily does not use your Motion & Fitness data."

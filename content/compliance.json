@@ -1,9 +1,9 @@
 {
-  "reviewedOn": "2026-11-20",
+  "reviewedOn": "2026-11-23",
   "publication": {
-    "version": "1.0",
+    "version": "1.1",
     "effectiveOn": "2026-11-20",
-    "updatedOn": "2026-11-20",
+    "updatedOn": "2026-11-23",
     "siteAndSupportPrivacy": {
       "zh-HK": "KongDaily 的公開網站由 Vercel 託管。瀏覽網站時，託管商可處理 IP 位址等連線資料，以傳送網頁、營運及保護服務。網站本身沒有帳戶、聯絡表格或分析追蹤程式。",
       "en": "KongDaily uses Vercel to host its public website. When you visit, the hosting provider may process connection information such as your IP address to serve pages and operate and protect the service. The site itself has no accounts, contact forms or analytics trackers."
@@ -23,7 +23,7 @@
   "locales": {
     "zh-HK": {
       "reviewStatus": "審閱版",
-      "reviewNotice": "此內容供審閱。正式政策仍待發佈。",
+      "reviewNotice": "此版本供審閱，更新內容仍待發佈。",
       "draftReviewDate": "審閱日期",
       "reviewDate": "更新日期",
       "effectiveDate": "生效日期",
@@ -33,7 +33,7 @@
       "languagesLabel": "語言",
       "home": {
         "title": "關於 KongDaily",
-        "intro": "港日常（KongDaily）是由個人開發者以 Lenny Studio 品牌提供的獨立 App，提供香港巴士、天氣、附近設施及探索資料。"
+        "intro": "港日常（KongDaily）是由個人開發者以 Lenny Studio 品牌提供的獨立 App，提供香港巴士、港鐵、輕鐵及專線小巴資料，以及天氣、附近設施和探索資訊。"
       },
       "privacy": {
         "title": "私隱政策",
@@ -43,14 +43,14 @@
           {
             "id": "scope",
             "title": "適用範圍",
-            "paragraphs": ["本說明涵蓋 KongDaily 的 iOS 版本、公開網站及支援電郵。KongDaily 由個人開發者 {operatorName} 以 Lenny Studio 品牌提供。查看巴士、天氣、附近設施或精選地點，以及使用收藏，均毋須建立帳戶。"]
+            "paragraphs": ["本說明涵蓋 KongDaily 的 iOS 版本、公開網站及支援電郵。KongDaily 由個人開發者 {operatorName} 以 Lenny Studio 品牌提供。查看公共交通、天氣、附近設施或精選地點，以及使用收藏，均毋須建立帳戶。"]
           },
           {
             "id": "location",
             "title": "定位與權限",
             "paragraphs": [
-              "前台定位用於計算你與設施或巴士站的距離、建議附近站點，以及在附近地圖標示及聚焦位置。已有授權時，進入相關畫面可能單次讀取位置。App 沒有背景定位或位置歷史。",
-              "你可在 iOS 設定管理定位授權及「精確位置」。位置精度不足或拒絕授權時，仍可選地標、移動地圖或搜尋地點。iOS 定位服務及 Apple 地圖有各自的資料處理方式。"
+              "首次開啟需要定位的「附近生活設施」或「附近交通」時，如你尚未作出選擇，iOS 會要求前台定位授權。授權後，App 在使用相關功能時讀取位置，以尋找附近設施及巴士、港鐵、輕鐵和專線小巴站點、計算直線距離，以及在設施地圖標示位置。App 不會在背景定位或保存位置歷史。",
+              "你可在 iOS 設定管理定位授權及「精確位置」。拒絕授權或位置精度不足時，仍可手動選擇地標或搜尋地點。你也可在設施地圖選用地圖中心。iOS 定位服務及 Apple 地圖有各自的資料處理方式。"
             ],
             "links": [
               { "label": "Apple 定位服務與私隱", "url": "https://www.apple.com/legal/privacy/data/zh-hk/location-services/" },
@@ -61,7 +61,7 @@
             "id": "local-data",
             "title": "本機儲存與搜尋",
             "paragraphs": [
-              "App 在裝置的 SQLite 資料庫保存巴士與設施收藏、首頁置頂、語言偏好、最多八筆巴士最近搜尋，以及官方巴士及天氣資料的快取。首頁全域搜尋在裝置上比對字詞；需要更新巴士路線目錄時，目錄請求不包含搜尋字詞。",
+              "App 在裝置的 SQLite 資料庫保存巴士、港鐵、輕鐵、專線小巴及設施收藏、首頁交通置頂與排序、語言偏好、最多八筆巴士最近搜尋，以及官方巴士及天氣資料的快取。App 沒有帳戶或收藏同步服務。搜尋可比對本機資料。巴士目錄刷新不包含搜尋字詞。符合格式的專線小巴路線編號查詢會向運輸署發送編號和地區。",
               "目前位置與附近搜尋結果可暫存在 App 記憶體。若你啟用了 iOS 備份，App 的本機資料可能隨裝置備份及還原。"
             ]
           },
@@ -69,7 +69,8 @@
             "id": "online-services",
             "title": "線上查詢與外部服務",
             "paragraphs": [
-              "App 向九巴／龍運、城巴及嶼巴的官方服務查詢路線、站點及到站時間，按需要傳送公開路線或站點編號等查詢欄位。天氣查詢向香港天文台傳送資料類型和語言。",
+              "App 向九巴／龍運、城巴及嶼巴的官方服務查詢路線、站點及到站時間，向港鐵公司的資料服務查詢港鐵和輕鐵預報，並向運輸署查詢綠色專線小巴路線、站序及到站預報。交通請求按服務需要包含公開路線、方向、站點或停靠序號，以及小巴路線查詢的地區和編號。交通預報請求不附送裝置 GPS 座標或收藏清單。天氣查詢向香港天文台傳送資料類型和語言。",
+              "服務供應者可接收 IP 位址等網絡連線資料，以及處理請求所需的查詢欄位。各交通或天氣服務的日誌及留存期以其各自安排為準。",
               "在「附近」搜尋地點時，符合條件的文字會自動透過 HTTPS 送往地政總署地點搜尋服務，可能包括你輸入的地址。App 不會在該請求附送裝置 GPS 座標。服務端可接收 IP 位址等連線資訊，並可能按其適用政策處理查詢及連線資料。地政總署公開的 API 文件沒有說明查詢是否記入日誌或日誌會保留多久。",
               "App 內地圖由 Apple MapKit 提供。Apple 的定位和地圖服務可依你的設定及其私隱政策處理位置及連線資料。你選擇開啟 Apple 地圖或 Google Maps 導航時，App 會交付選定目的地和步行模式。外部地圖或網站依其政策及權限處理資料。",
               "如你主動發送支援或私隱查詢電郵，營運者會透過郵件服務接收你提供的姓名、電郵地址、問題描述及附件，以處理和回覆查詢。"
@@ -104,13 +105,13 @@
       },
       "support": {
         "title": "支援",
-        "intro": "查閱巴士、天氣、定位及離線功能的常見問題。",
+        "intro": "查閱公共交通預報、天氣、定位及離線功能的常見問題。",
         "contactSection": "contact",
         "sections": [
-          { "id": "bus", "title": "巴士到站時間為何沒有更新？", "paragraphs": ["到站時間由營辦商提供。請確認網絡、路線方向和所選站點，再試重新整理。資料過期、服務中斷或沒有班次時，App 會顯示相應狀態。你可收藏站點，並將常用站點置頂到首頁。"] },
+          { "id": "bus", "title": "公共交通預報為何沒有更新？", "paragraphs": ["預報來自相關營辦商或香港運輸署。請確認網絡、路線方向和所選站點，再試重新整理。資料過期、服務中斷或沒有班次時，App 會顯示相應狀態。你可收藏乘車服務，並在首頁共用最多三個置頂位置。"] },
           { "id": "weather", "title": "天氣及警告如何更新？", "paragraphs": ["天氣觀測、預報和警告來自香港天文台。檢查資料時間及過期提示；如需最新官方消息，請查閱天文台。"] },
-          { "id": "location", "title": "定位不可用時怎樣瀏覽附近？", "paragraphs": ["在 iOS 設定查看「定位服務」及 KongDaily 的位置權限。如果你不想授權，仍可選擇地標、搜尋地點，或移動地圖後選用地圖中心瀏覽。"] },
-          { "id": "offline", "title": "沒有網絡時可以使用甚麼？", "paragraphs": ["隨 App 提供的探索內容、設施、巴士站點及本機收藏可離線使用。部分巴士目錄需先下載。即時到站時間、最新天氣及警告、地政總署線上搜尋、地圖底圖更新及外部導航通常需要網絡。"] },
+          { "id": "location", "title": "定位不可用時怎樣瀏覽附近？", "paragraphs": ["首次進入需要定位的附近畫面時，如尚未作出選擇，iOS 會要求前台定位授權。你可在 iOS 設定管理位置權限。你也可手動選擇地標、搜尋地點，或在設施地圖選用地圖中心。"] },
+          { "id": "offline", "title": "沒有網絡時可以使用甚麼？", "paragraphs": ["隨 App 提供的探索內容、設施、巴士站點、港鐵與輕鐵路線及站點、專線小巴附近索引和本機收藏可離線使用。按編號查詢最新小巴路線、載入部分交通詳情、即時預報、最新天氣及警告，以及線上地點搜尋需要網絡。地圖底圖更新及外部導航一般也需要網絡。"] },
           { "id": "saved", "title": "如何移除本機資料？", "paragraphs": ["在「收藏」移除相應項目，在巴士頁清除最近搜尋。要移除裝置上的 App 資料，請在 iOS 選擇「刪除 App」；「卸載 App」會保留文件和資料。"] },
           { "id": "contact", "title": "聯絡及回報問題", "paragraphs": ["回報問題時，可提供 App 版本、iOS 版本、介面語言、相關路線或地點和重現步驟。分享截圖前，請先遮蓋精確位置、聯絡資料等個人資訊。"] }
         ]
@@ -118,7 +119,7 @@
     },
     "en": {
       "reviewStatus": "Review draft",
-      "reviewNotice": "For review. The official policy has yet to be published.",
+      "reviewNotice": "This revision is for review and has yet to be published.",
       "draftReviewDate": "Review date",
       "reviewDate": "Last updated",
       "effectiveDate": "Effective date",
@@ -128,7 +129,7 @@
       "languagesLabel": "Language",
       "home": {
         "title": "About KongDaily",
-        "intro": "KongDaily is a standalone app offered by an individual developer under the Lenny Studio brand. It covers Hong Kong bus arrivals, weather, nearby facilities and curated places."
+        "intro": "KongDaily is an independent app from an individual developer under the Lenny Studio brand. It covers Hong Kong buses, MTR, Light Rail, green minibuses, weather, nearby facilities and Explore guides."
       },
       "privacy": {
         "title": "Privacy Policy",
@@ -144,8 +145,8 @@
             "id": "location",
             "title": "Location and permissions",
             "paragraphs": [
-              "The app uses foreground location to calculate distances, suggest nearby bus stops, and show and centre your location on the Nearby map. Opening a relevant screen may request a single location reading if you have already granted access. The app has no background location or location history.",
-              "You can manage access and Precise Location in iOS Settings. If you deny access or your position is not accurate enough, you can still select a landmark, move the map or search for a place. Apple’s Location Services and Apple Maps explain their own data handling."
+              "When you first open a Nearby Facilities or Nearby Transport screen that needs your location, iOS asks for foreground location permission if you have not made a choice. If you allow access, the app uses your location while you use those features to find nearby facilities and bus, MTR, Light Rail and green minibus stops, calculate straight-line distances and show your position on the facilities map. The app does not track your location in the background or keep a location history.",
+              "You can manage access and Precise Location in iOS Settings. If you deny access or your position is not accurate enough, you can still choose a landmark or search for a place. In Nearby Facilities you can also use the centre of the map. Apple’s Location Services and Apple Maps explain their own data handling."
             ],
             "links": [
               { "label": "Apple Location Services & Privacy", "url": "https://www.apple.com/legal/privacy/data/en/location-services/" },
@@ -156,7 +157,7 @@
             "id": "local-data",
             "title": "Local storage and search",
             "paragraphs": [
-              "The app uses an on-device SQLite database for bus and facility bookmarks, pinned stops, your language preference, up to eight recent bus searches, and cached public bus and weather data. Global Search matches text on your device. If the bus route catalogue needs to be updated, the catalogue request does not include your search text.",
+              "The app uses an on-device SQLite database for bus, MTR, Light Rail, green minibus and facility favourites, Home transport pins and their order, your language preference, up to eight recent bus searches, and cached public bus and weather data. The app has no account or favourite sync service. Search can match on-device data. A bus catalogue refresh does not include search text. For supported green minibus route-number searches, the app sends the route number and region to the Transport Department.",
               "Your current location and Nearby results may be kept temporarily in app memory. If you use iOS backups, local app data may be included in a device backup and restored later."
             ]
           },
@@ -164,7 +165,8 @@
             "id": "online-services",
             "title": "Online requests and external services",
             "paragraphs": [
-              "The app requests route, stop and arrival information from official KMB and Long Win, Citybus and New Lantao Bus services. Requests can include public route or stop identifiers. Hong Kong Observatory weather requests include the data type and language.",
+              "The app requests route, stop and arrival information from official KMB and Long Win, Citybus and New Lantao Bus services, MTR and Light Rail predictions from MTR Corporation’s data services, and green minibus routes, stops and predictions from the Transport Department. Depending on the service, requests may include public route, direction, stop or stop sequence identifiers, or the region and route number for green minibus lookups. The app does not attach device GPS coordinates or your list of favourites to transport prediction requests. Hong Kong Observatory weather requests include the data type and language.",
+              "Service providers can receive network connection information such as your IP address and the fields needed to answer a request. Each transport or weather provider handles its service logs and retention under its own arrangements.",
               "In Nearby place search, eligible text is sent automatically over HTTPS to the Lands Department’s Location Search API. This may include an address you type. The app does not attach your device’s GPS coordinates to this request. The service can receive connection information such as an IP address and may handle the query and connection data under its applicable policies. The published API documentation does not say whether queries are logged or how long any logs are kept.",
               "Apple MapKit supplies the maps in the app. Apple’s Location Services and Apple Maps may process location and connection data according to your settings and Apple’s privacy policies. If you open directions in Apple Maps or Google Maps, the app passes the chosen destination and walking mode. External map services and websites handle data under their own policies and permissions.",
               "If you choose to send a support or privacy email, the operator receives the name, email address, description of the issue and any attachments you provide through the mail service to handle and respond to your request."
@@ -199,13 +201,13 @@
       },
       "support": {
         "title": "Support",
-        "intro": "Answers about bus arrivals, weather, location and offline access.",
+        "intro": "Answers about transport predictions, weather, location and offline access.",
         "contactSection": "contact",
         "sections": [
-          { "id": "bus", "title": "Why are bus arrival times not updating?", "paragraphs": ["Arrival estimates come from the operators. Check your connection, travel direction and selected stop, then try refreshing. The app indicates stale data, service problems or when no arrivals are available. You can save a stop and pin it to Home."] },
+          { "id": "bus", "title": "Why are transport predictions not updating?", "paragraphs": ["Predictions come from the relevant operators or the Hong Kong Transport Department. Check your connection, direction and stop, then try refreshing. The app indicates stale data, service problems or when no arrivals are available. You can save a transport service and pin up to three services to Home."] },
           { "id": "weather", "title": "How are weather and warnings updated?", "paragraphs": ["Observations, forecasts and warnings come from the Hong Kong Observatory. Check the timestamp and any stale-data notice. Consult the Observatory for the latest official information."] },
-          { "id": "location", "title": "How can I browse Nearby without location?", "paragraphs": ["Check Location Services and KongDaily’s location permission in iOS Settings. You can also choose a landmark, search for a place, or pan the map and browse around its centre."] },
-          { "id": "offline", "title": "What works offline?", "paragraphs": ["Bundled Explore content, facilities, bus stops and local bookmarks are available offline. Some bus route catalogues must be downloaded first. Live arrivals, current weather and warnings, Lands Department search, refreshed map tiles and external directions generally need a connection."] },
+          { "id": "location", "title": "How can I browse Nearby without location?", "paragraphs": ["If you have not made a choice, iOS asks for foreground location permission when you first open a Nearby screen that needs it. You can manage access in iOS Settings. You can also choose a landmark, search for a place, or use the centre of the facilities map."] },
+          { "id": "offline", "title": "What works offline?", "paragraphs": ["Bundled Explore guides, facilities, bus stops, MTR and Light Rail routes and stops, the green minibus nearby index, and local favourites are available offline. Current minibus route-number lookups, some transport details, live predictions, current weather and warnings, and online place search need a connection. Refreshed map tiles and external directions generally do too."] },
           { "id": "saved", "title": "How can I remove local data?", "paragraphs": ["Remove items in Saved and clear recent searches on the Bus page. To remove local app data from your device, choose Delete App in iOS. Offload App keeps documents and data."] },
           { "id": "contact", "title": "Contact and reporting an issue", "paragraphs": ["When reporting an issue you can include the app version, iOS version, language, the affected route or place, and steps to reproduce it. Cover any precise locations, contact details or other personal information before sharing screenshots."] }
         ]

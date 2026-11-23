@@ -1,6 +1,6 @@
 {
   "ios": {
-    "NSLocationWhenInUseUsageDescription": "Used to find nearby facilities and bus stops and show their distance from your location.",
+    "NSLocationWhenInUseUsageDescription": "Your location helps KongDaily find nearby public transport stops and facilities and show their distance from you.",
     "NSMotionUsageDescription": "KongDaily's location library includes optional motion activity detection. KongDaily does not use your Motion & Fitness data."
   }
 }

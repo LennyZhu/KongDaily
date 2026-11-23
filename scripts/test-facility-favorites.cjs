@@ -1859,7 +1859,71 @@ async function testMinibusV11Migration() {
   console.log('PASS: v10→v11 rollback, orphan audit for all legacy modes, unchanged favorites, cross-mode cap/order, minibus visit identities and restored copy');
 }
 
+async function testPublishedV8Upgrade() {
+  const published = execFileSync('git', ['show', 'v1.1.0:src/database.ts'], { cwd: root, encoding: 'utf8' });
+  const schema = [...published.matchAll(/transaction\.execAsync\(`([^\x60]+)`\)/g)].map(match => match[1]);
+  assert.equal(schema.length, 8);
+  assert.deepEqual(sqlFromSource.slice(0, 8), schema);
+  const source = join(scratch, 'released-v8.db');
+  const working = join(scratch, 'restore-v8.db');
+  const raw = new DatabaseSync(source);
+  raw.exec(schema.join('\n'));
+  assert.equal(version(raw), 8);
+  raw.exec(`
+    INSERT INTO user_settings VALUES (1, 'en');
+    INSERT INTO bus_search_history VALUES ('B2', 'B2', NULL, 4);
+    INSERT INTO facility_favorites VALUES ('lcsd-parks', 'park-035', '香港公園', 'Hong Kong Park', 'parks', 11, 11);
+  `);
+  raw.close();
+  const v8Source = readFileSync(source);
+  const v8App = loadApp(working);
+  copyFileSync(source, working);
+  const fixtureDb = new DatabaseSync(working);
+  const put = fixtureDb.prepare(`INSERT INTO bus_favorites (id, source, route_number, nlb_route_id, stop_id,
+    stop_seq, repeated_stop, station_zh, station_en, destination_zh, destination_en, created_at, updated_at, pin_order)
+    VALUES (?, 'nlb', 'B2', '413', ?, ?, 0, '站', 'Stop', '總站', 'Terminus', ?, ?, ?)`);
+  const bus = v8App.load('bus-favorites');
+  v8App.close();
+  const identity = (stopId, stopSeq) => bus.busFavoriteId({ source: 'nlb', number: 'B2', routeId: '413', stopId, stopSeq });
+  const oldPins = [identity('214', 4), identity('215', 5)];
+  put.run(oldPins[0], '214', 4, 2, 2, 1);
+  put.run(oldPins[1], '215', 5, 1, 1, 3);
+  put.run(identity('216', 6), '216', 6, 3, 3, null);
+  const tables = ['user_settings','bus_search_history','bus_favorites','facility_favorites'];
+  const select = (db) => tables.map((table) => db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all());
+  const before = select(fixtureDb);
+  fixtureDb.close();
+  const stagedV8 = join(scratch, 'v8-backup.db');
+  copyFileSync(working, stagedV8);
+
+  const injected = loadApp(working, { failAfterV11: true });
+  await assert.rejects(injected.load('database').getDatabase(), /v11 DDL/);
+  const rollback = new DatabaseSync(working);
+  assert.equal(version(rollback), 8);
+  assert.deepEqual(select(rollback), before);
+  assert.equal(rollback.prepare("SELECT name FROM sqlite_schema WHERE name='gmb_favorites'").get(), undefined);
+  rollback.close();
+
+  for (const file of [working, stagedV8, working]) {
+    const app = loadApp(file);
+    await app.load('database').getDatabase();
+    try {
+      assert.deepEqual((await app.load('home-transport-pins').readHomePins()).map(pin => pin.id), oldPins);
+      assert.equal((await app.load('bus-favorites').readBusFavorites()).length, 3);
+      assert.deepEqual(await app.load('gmb-favorites').listGmbFavorites(), []);
+      const after = new DatabaseSync(file);
+      assert.equal(version(after), 11);
+      assert.deepEqual(select(after), before);
+      assert.equal(after.prepare('PRAGMA integrity_check').get().integrity_check, 'ok');
+      after.close();
+    } finally { app.close(); }
+  }
+  assert.deepEqual(readFileSync(source), v8Source);
+  console.log('PASS: exact v1.1.0 tagged v8 SQL fixture, v8 → v11, rollback, clean retry, repeat reopen and closed backup restore');
+}
+
 test().then(testNearbyFavoriteButtons).then(testSavedFacilityIntegration).then(testRouteStopQuickFavorite).then(testRailwayFavorites).then(testHomePinMigration).then(testMinibusV11Migration)
+  .then(testPublishedV8Upgrade)
   .then(() => console.log('PASS: registry, SQLite v11, facility favorites, nearby bilingual filters, bus and railway favorites and shared Home pins'))
   .catch((error) => { console.error(error); process.exitCode = 1; })
   .finally(() => rmSync(scratch, { recursive: true, force: true }));

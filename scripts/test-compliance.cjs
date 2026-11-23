@@ -13,6 +13,7 @@ const content = require('../content/compliance-policy');
 const photoCredits = require('../assets/explore/photos/attribution.json');
 const { source: mtrSource } = require('../assets/data/mtr-static.json');
 const { source: lightRailSource } = require('../assets/data/light-rail-static.json');
+const { source: gmbSource } = require('../assets/data/gmb-nearby.json');
 const confirmedEmail = 'lenny996@163.com';
 const contactHref = `mailto:${confirmedEmail}`;
 const brand = 'KongDaily by Lenny Studio';
@@ -115,7 +116,7 @@ function checkRailwayCredits(sections, language) {
     'light-rail-realtime': ['mtr-lrnt_data-light-rail-nexttrain-data/resource/d26e774b-b5ef-409f-8d4d-e61a3d323f9d', lightRail.nextTrains.dataset],
   };
   const byId = new Map(sections.map((section) => [section.id, section]));
-  assert.deepEqual([...byId.keys()], ['bus', ...Object.keys(railwayResources), 'weather', 'facilities', 'geometry', 'explore', 'terms',
+  assert.deepEqual([...byId.keys()], ['bus', 'green-minibus', ...Object.keys(railwayResources), 'weather', 'facilities', 'geometry', 'explore', 'terms',
     ...Object.keys(photoCredits), 'other-photos']);
   const attribution = language === 'en' ? /MTR Corporation Limited.*provides.*owns its intellectual property rights.*DATA\.GOV\.HK.*HKSAR Government/
     : /香港鐵路有限公司提供.*知識產權屬香港鐵路有限公司.*香港特別行政區政府.*DATA\.GOV\.HK/;
@@ -155,6 +156,14 @@ async function checkApp() {
       if (page === 'credits') {
         assert.equal(doc.props.title, messages[locale].compliance.credits);
         checkRailwayCredits(doc.props.sections, locale);
+        const minibus = doc.props.sections.find(({ id }) => id === 'green-minibus');
+        assert.ok(minibus.paragraphs.some((line) => line.includes(gmbSource.capturedOn)
+          && (locale === 'en' ? /intellectual property rights.*does not imply endorsement/ : /知識產權.*不代表運輸署認可/).test(line)));
+        assert.deepEqual(minibus.links.map(({ url }) => url), [
+          'https://data.gov.hk/en-data/dataset/hk-td-sm_7-real-time-arrival-data-of-gmb',
+          'https://data.gov.hk/en-data/dataset/hk-td-tis_23-routes-fares-geojson/resource/ede023b4-f470-4edf-b1a0-dc6713e6021e',
+          'https://portal.csdi.gov.hk/server/rest/services/common/td_rcd_1697082463580_57453/FeatureServer/0',
+        ]);
         assert.ok(doc.props.sections.some(({ id, paragraphs }) => id === 'other-photos'
           && paragraphs.some((line) => line.includes('Kevin Huynh') && line.includes('Jeanne Rose Gomez'))));
       } else {
@@ -248,6 +257,18 @@ async function checkWebsite() {
   assert.match(JSON.stringify(content.locales.en.privacy), /name, email address, description of the issue and any attachments/);
   assert.match(JSON.stringify(content.locales['zh-HK'].privacy), /不會在該請求附送裝置 GPS 座標.*沒有說明查詢是否記入日誌或日誌會保留多久/);
   assert.match(JSON.stringify(content.locales.en.privacy), /does not attach your device’s GPS coordinates.*does not say whether queries are logged or how long any logs are kept/);
+  for (const language of ['zh-HK', 'en']) {
+    const sections = content.getPrivacyDocument(language, null).sections;
+    const paragraphs = (id) => sections.find((section) => section.id === id).paragraphs.join(' ');
+    const english = language === 'en';
+    assert.match(paragraphs('location'), english ? /foreground location permission.*choose a landmark/ : /前台定位授權.*手動選擇地標/);
+    assert.match(paragraphs('local-data'), english ? /SQLite.*green minibus.*Home transport pins.*route number and region/ : /SQLite.*專線小巴.*首頁交通置頂與排序.*編號和地區/);
+    assert.match(paragraphs('online-services'), english ? /MTR and Light Rail.*Transport Department.*IP address/ : /港鐵和輕鐵.*運輸署.*IP 位址/);
+    const plist = require(`../assets/locales/${language}.json`).ios;
+    assert.match(plist.NSLocationWhenInUseUsageDescription, english ? /transport stops and facilities/ : /公共交通站點及生活設施/);
+    if (english) assert.equal(plist.NSLocationWhenInUseUsageDescription,
+      require('../app.json').expo.plugins.find((plugin) => Array.isArray(plugin) && plugin[0] === 'expo-location')[1].locationWhenInUsePermission);
+  }
   assert.deepEqual([vercelConfig.buildCommand, vercelConfig.outputDirectory, vercelConfig.trailingSlash],
     ['node website/build.cjs --release', 'website/dist/release', true]);
   assert.equal(vercelConfig.git.deploymentEnabled, false);

@@ -57,6 +57,24 @@ const sourceGroups = [
     ],
   },
   {
+    id: 'green-minibus',
+    title: text('綠色專線小巴路線、站點及到站預報', 'Green minibus routes, stops and arrivals'),
+    get paragraphs() {
+      const { source: { capturedOn } } = require('../assets/data/gmb-nearby.json') as typeof import('../assets/data/gmb-nearby.json');
+      return [
+        text('運輸署經 DATA.GOV.HK 提供路線目錄及到站預報。KongDaily 的離線附近索引源自運輸署公共交通路線及收費 GeoJSON，並以官方到站預報路線目錄及空間數據共享平台的路線方向圖層核對。',
+          'The Transport Department provides the route catalogue and arrival predictions via DATA.GOV.HK. KongDaily derives its offline Nearby index from the department’s public transport routes and fares GeoJSON and checks it against the official ETA route catalogue and CSDI Portal direction layer.'),
+        text(`離線索引擷取日期：${capturedOn}（香港時間）。資料知識產權屬香港特別行政區政府及相關機構。KongDaily 為獨立應用程式，資料署名不代表運輸署認可。`,
+          `Offline snapshot captured on ${capturedOn} (Hong Kong time). The Hong Kong SAR Government and relevant organisations own the intellectual property rights in the data. KongDaily is an independent app. Attribution does not imply endorsement by the Transport Department.`),
+      ];
+    },
+    links: [
+      source('https://data.gov.hk/en-data/dataset/hk-td-sm_7-real-time-arrival-data-of-gmb', '運輸署小巴目錄及到站預報 · DATA.GOV.HK', 'Transport Department minibus catalogue and ETA · DATA.GOV.HK'),
+      source('https://data.gov.hk/en-data/dataset/hk-td-tis_23-routes-fares-geojson/resource/ede023b4-f470-4edf-b1a0-dc6713e6021e', '小巴站點及站序 GeoJSON · DATA.GOV.HK', 'Minibus stops and stop sequences (GeoJSON) · DATA.GOV.HK'),
+      source('https://portal.csdi.gov.hk/server/rest/services/common/td_rcd_1697082463580_57453/FeatureServer/0', '運輸署小巴路線方向 · 空間數據共享平台', 'Transport Department minibus route directions · CSDI Portal'),
+    ],
+  },
+  {
     id: 'mtr-offline',
     title: text('港鐵離線綫路及車站', 'Offline MTR lines and stations'),
     paragraphs: [
