@@ -25,7 +25,8 @@ db.exec('COMMIT');
 
 const transpiled = new Map();
 const granted = { granted: true, canAskAgain: true };
-const promptable = { granted: false, canAskAgain: true };
+const promptable = { granted: false, canAskAgain: true, status: 'denied' };
+const undetermined = { granted: false, canAskAgain: true, status: 'undetermined' };
 const blocked = { granted: false, canAskAgain: false };
 
 function mount(t, {
@@ -599,7 +600,7 @@ test('blur and background discard late fixes; each genuine resume requests only 
   assert.equal(page.queries.length, 1);
 });
 
-test('ungranted access never prompts automatically; explicit permission and a later retry work', async (t) => {
+test('the legacy bus screen never prompts automatically for denied access; explicit permission and a later retry work', async (t) => {
   const page = mount(t, { permission: promptable, locale: 'en' });
   const { labels } = page;
   await page.settle();
@@ -721,8 +722,8 @@ for (const locale of ['zh-HK', 'en']) {
     const page = mount(t, { transport: true, locale });
     const { labels, landmarks, transportCopy: copy } = page;
     const expected = locale === 'en'
-      ? ['All', 'Bus', 'MTR', 'Light Rail', 'Ferry', 'Minibus']
-      : ['全部', '巴士', '港鐵', '輕鐵', '渡輪', '專線小巴'];
+      ? ['All', 'Bus', 'MTR', 'Light Rail', 'Minibus', 'Ferry']
+      : ['全部', '巴士', '港鐵', '輕鐵', '專線小巴', '渡輪'];
     await page.settle();
     assert.deepEqual(page.modeScroller().children.map(({ props }) => props.children[1].props.children), expected);
     assert.ok(!page.shows(locale === 'en' ? 'Find transport services near you' : '查看附近可用的交通服務'));
@@ -849,8 +850,18 @@ for (const locale of ['zh-HK', 'en']) {
 
     const range500 = locale === 'en' ? 'Straight-line 500 m' : '直線 500 米';
     const range1000 = locale === 'en' ? 'Straight-line 1 km' : '直線 1 公里';
+    const radius = page.findAction(range500);
+    assert.equal(radius.props.children[0].props.children, labels.metres(500));
+    assert.equal(radius.props.children[1].props.name, 'chevron.down');
+    assert.equal(radius.props.style[0].minHeight, 44);
+    assert.equal(radius.props.style[1].minWidth, 44);
+    assert.ok(!page.shows(range500), 'Straight-line wording is announced but is not a toolbar label');
     page.press(range500);
     await page.settle();
+    assert.ok(page.shows(copy.straightLineDistance));
+    for (const label of [labels.metres(500), labels.kilometres(1), labels.kilometres(2)]) {
+      assert.ok(page.findAction(label));
+    }
     page.press(labels.kilometres(1));
     await page.settle();
     assert.ok(page.findAction(range1000));
@@ -868,7 +879,7 @@ for (const locale of ['zh-HK', 'en']) {
     await page.settle();
     page.press(copy.modes.mtr);
     await page.settle();
-    assert.ok(page.shows(range1000) && page.shows(copy.railDistanceNote));
+    assert.ok(page.shows(labels.kilometres(1)) && page.shows(copy.railDistanceNote));
     assert.ok(page.findAction(copy.distanceInfo));
     assert.equal(page.requests.length, 1);
     page.press(copy.modes.all);
@@ -999,6 +1010,85 @@ test('inline search reuses catalogue identities, ranks results, and restores the
   assert.equal(page.catalogueReads(), 1);
   assert.equal(page.requests.length, gpsRequests);
   assert.equal(page.calls.prompt, 0);
+});
+
+test('first transport entry prompts once, then loads nearby results automatically after permission is granted', async (t) => {
+  const page = mount(t, { transport: true, permission: undetermined, appState: 'background' });
+  let answer;
+  page.answerPrompt(new Promise((resolve) => { answer = resolve; }));
+  await page.settle();
+  assert.equal(page.calls.prompt, 0);
+  page.appState('active');
+  await page.settle();
+  assert.equal(page.calls.prompt, 1);
+  page.appState('inactive');
+  page.appState('active');
+  page.focus(false);
+  page.focus(true);
+  await page.settle();
+  assert.equal(page.calls.prompt, 1, 'Refocus while iOS is asking joins the same native prompt');
+  assert.equal(page.requests.length, 0);
+  answer(granted);
+  await page.settle();
+  assert.equal(page.requests.length, 1);
+  page.fix(0, page.landmarks.central);
+  await page.settle();
+  assert.ok(page.rows().length > 0);
+});
+
+test('refusing the initial transport prompt keeps the landmark and Settings paths without re-prompting', async (t) => {
+  const page = mount(t, { transport: true, permission: undetermined, locale: 'en' });
+  page.answerPrompt(blocked);
+  await page.settle();
+  const { transportCopy: copy } = page;
+  assert.equal(page.calls.prompt, 1);
+  assert.equal(page.requests.length, 0);
+  page.focus(false);
+  page.focus(true);
+  await page.settle();
+  assert.equal(page.calls.prompt, 1);
+  assert.ok(page.findAction(copy.openSettings));
+  page.press(copy.chooseLandmark);
+  await page.settle();
+  page.press(page.labels.landmarks.central);
+  await page.settle();
+  assert.ok(page.rows().length > 0);
+});
+
+test('English nearby headings and controls share a flexible toolbar across all supported transport modes', async (t) => {
+  const page = mount(t, { transport: true, locale: 'en', permission: blocked, ferryPreview: true });
+  await page.settle();
+  const copy = page.transportCopy;
+  page.press(copy.chooseLandmark);
+  await page.settle();
+  page.press(page.labels.landmarks.central);
+  await page.settle();
+  function checkToolbar(text) {
+    const toolbar = page.visibleElements().find(({ type, props }) => type === 'View' && Array.isArray(props.children)
+      && props.children[0]?.props?.children === text);
+    assert.ok(toolbar, text);
+    const [title, controls] = toolbar.props.children;
+    const [distance, info, more] = controls.props.children;
+    assert.equal(toolbar.props.style[0].flexDirection, 'row');
+    assert.equal(toolbar.props.style[1].flexWrap, 'wrap', 'Large text can move the controls to a second line');
+    assert.equal(title.props.style.flexBasis, undefined, 'No fixed title width forces a second row');
+    assert.equal(title.props.variant, 'homeHeading');
+    assert.equal(title.props.numberOfLines, undefined);
+    assert.equal(title.props.maxFontSizeMultiplier, undefined);
+    assert.equal(distance.props.children[0].props.children, '500 m');
+    assert.equal(info.props.accessibilityLabel, copy.distanceInfo);
+    assert.equal(more.props.accessibilityLabel, copy.changeReference);
+  }
+  for (const mode of ['all', 'bus', 'mtr', 'lightRail', 'minibus', 'ferry']) {
+    page.press(copy.modes[mode]);
+    await page.settle();
+    page.press(mode === 'ferry' ? 'By Route' : page.labels.byRoute);
+    await page.settle();
+    checkToolbar('Nearby routes');
+    page.press(mode === 'ferry' ? 'By Pier' : page.labels.byStop);
+    await page.settle();
+    checkToolbar(mode === 'ferry' ? 'Nearby piers' : 'Nearby stops');
+  }
 });
 
 test('transport keeps search available before permission and offers Settings when permission is blocked', async (t) => {
@@ -2244,7 +2334,7 @@ for (const locale of ['zh-HK', 'en']) {
     page.press(page.busCopy.clearInput);
     await page.settle();
     assert.ok(page.shows(copy.nearbyPiers));
-    assert.ok(page.shows(page.transportCopy.straightLineRadius(page.labels.kilometres(2))));
+    assert.ok(page.shows(page.labels.kilometres(2)));
     assert.deepEqual(new Set(page.rows().map(({ id }) => id)), new Set(['hkkf:pier:1', 'hkkf:pier:2']));
     assert.ok(page.rows().every(({ distance }) => Number.isFinite(distance)));
     assert.equal(page.requests.length, 0);
@@ -2460,7 +2550,7 @@ for (const locale of ['zh-HK', 'en']) {
     await page.settle();
     const copy = page.transportCopy;
     assert.deepEqual(page.modeScroller().children.map(({ props }) => props.children[1].props.children),
-      ['all', 'bus', 'mtr', 'lightRail', 'ferry', 'minibus'].map((mode) => copy.modes[mode]));
+      ['all', 'bus', 'mtr', 'lightRail', 'minibus', 'ferry'].map((mode) => copy.modes[mode]));
     page.controls()[1].props.onSelect('tram');
     await page.settle();
     assert.equal(page.controls()[1].props.selected, 'all');
@@ -2539,7 +2629,7 @@ for (const locale of ['zh-HK', 'en']) {
     await page.settle();
     assert.deepEqual(page.rows(), rows);
     assert.ok(page.shows(page.labels.landmarkReference(page.labels.landmarks.central)));
-    assert.ok(page.shows(page.transportCopy.straightLineRadius(page.labels.kilometres(2))));
+    assert.ok(page.shows(page.labels.kilometres(2)));
     assert.equal(actions()[0].props.accessibilityState.expanded, true);
 
     const query = locale === 'en' ? 'Western Market Terminus' : '上環街市(西港城)總站';

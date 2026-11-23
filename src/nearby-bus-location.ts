@@ -41,7 +41,11 @@ function onePosition(signal: AbortSignal): Promise<LocationResult> {
   });
 }
 
-export async function locateNearbyBusStops(signal: AbortSignal, allowPermissionPrompt = true): Promise<LocationResult> {
+// Both Nearby screens share one native prompt, even if a pending screen loses focus.
+let foregroundPrompt: ReturnType<typeof Location.requestForegroundPermissionsAsync> | undefined;
+let requestedUndeterminedPermission = false;
+
+export async function locateNearbyBusStops(signal: AbortSignal, allowPermissionPrompt: boolean | 'undetermined' = true): Promise<LocationResult> {
   try {
     const servicesEnabled = await Location.hasServicesEnabledAsync();
     if (signal.aborted) return { kind: 'cancelled' };
@@ -51,10 +55,15 @@ export async function locateNearbyBusStops(signal: AbortSignal, allowPermissionP
     if (signal.aborted) return { kind: 'cancelled' };
     if (!permission.granted) {
       if (!permission.canAskAgain) return { kind: 'blocked' };
-      if (!allowPermissionPrompt) return { kind: 'denied' };
-      permission = await Location.requestForegroundPermissionsAsync();
+      const initialPrompt = allowPermissionPrompt === 'undetermined';
+      if (!allowPermissionPrompt || (initialPrompt && (permission.status !== 'undetermined'
+          || (requestedUndeterminedPermission && !foregroundPrompt)))) return { kind: 'denied' };
+
+      if (permission.status === 'undetermined') requestedUndeterminedPermission = true;
+      foregroundPrompt ??= Location.requestForegroundPermissionsAsync().finally(() => { foregroundPrompt = undefined; });
+      permission = await foregroundPrompt;
       if (signal.aborted) return { kind: 'cancelled' };
-      if (!permission.granted) return { kind: 'denied' };
+      if (!permission.granted) return { kind: initialPrompt && !permission.canAskAgain ? 'blocked' : 'denied' };
     }
 
     return await onePosition(signal);

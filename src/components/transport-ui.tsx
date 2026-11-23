@@ -12,7 +12,7 @@ export type TransportMode = keyof TransportCopy['modes'];
 
 const modeIcons = {
   all: 'square.grid.2x2', bus: 'bus', mtr: 'tram.fill.tunnel', lightRail: 'train.side.front.car',
-  ferry: 'ferry', tram: 'tram', minibus: 'bus.fill',
+  minibus: 'bus.fill', tram: 'tram', ferry: 'ferry',
 } satisfies Record<TransportMode, IconName>;
 const modes = (Object.keys(modeIcons) as TransportMode[]).filter((mode) => mode !== 'tram' || tramFeatureEnabled);
 

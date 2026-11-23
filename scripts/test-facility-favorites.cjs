@@ -650,7 +650,8 @@ async function testSavedFacilityIntegration() {
     },
     '@/components/nearby-search-sheet': { NearbySearchSheet: 'NearbySearchSheet' },
     '@/nearby-bus-location': {
-      locateNearbyBusStops(signal) {
+      locateNearbyBusStops(signal, promptMode) {
+        assert.equal(promptMode, locationCalls ? true : 'undetermined');
         locationCalls += 1;
         locationSignal = signal;
         return new Promise((resolve) => { completeLocation = resolve; });

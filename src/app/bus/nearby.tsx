@@ -269,7 +269,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
       setReference((previous) => previous?.kind === 'current' ? undefined : previous);
     }
 
-    const location = await locateNearbyBusStops(controller.signal, allowPermissionPrompt);
+    const location = await locateNearbyBusStops(controller.signal, !allowPermissionPrompt && transport ? 'undetermined' : allowPermissionPrompt);
     if (locationRequest.current !== controller) return;
     locationRequest.current = null;
     setLocating(false);
@@ -423,10 +423,11 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   );
   const radiusControl = reference && (
     <Pressable accessibilityRole="button" accessibilityState={{ expanded: pickingRadius }}
+      accessibilityLabel={transport ? copy.transport.straightLineRadius(range) : undefined}
       onPress={() => setPickingRadius((open) => !open)}
       style={[styles.radiusControl, transport && styles.transportRadiusControl]}>
       <AppText variant="caption" tone="primary" style={styles.shrink}>
-        {transport ? copy.transport.straightLineRadius(range) : labels.radius(range)}
+        {transport ? range : labels.radius(range)}
       </AppText>
       <Icon name={pickingRadius ? 'chevron.up' : 'chevron.down'} size={11} />
     </Pressable>
@@ -634,10 +635,10 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
           {showBuses && !transport && distanceNote}
           {viewPicker}
           {showingNearby && <View style={[styles.heading, transport && styles.transportHeading]}>
-            <AppText variant="homeHeading" accessibilityRole="header" style={[styles.copy, transport && styles.transportHeadingTitle]}>
+            <AppText variant="homeHeading" accessibilityRole="header" style={transport ? styles.transportHeadingTitle : styles.copy}>
               {tramMode ? (view === 'routes' ? copy.tram.nearbyRoutes : copy.tram.nearbyStops)
                 : ferryMode ? (view === 'routes' ? ferryLabels.nearbyRoutes : ferryLabels.nearbyPiers)
-                : transport && transportMode !== 'bus' ? (view === 'routes' ? copy.transport.nearbyRoutes : copy.transport.nearbyStops)
+                : transport && (transportMode !== 'bus' || locale === 'en') ? (view === 'routes' ? copy.transport.nearbyRoutes : copy.transport.nearbyStops)
                 : mode === 'routes' ? labels.routes : labels.stops}
             </AppText>
             {transport ? (
@@ -661,14 +662,17 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
           {tramMode && reference && <AppText variant="detail" tone="muted">{copy.tram.nearbyHint}</AppText>}
           {showingNearby && transport && showDistanceInfo && distanceNote}
           {showingNearby && pickingRadius && (
-            <View style={styles.segment}>
-              {radii.map((value) => (
-                <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: value === radiusMeters }}
-                  onPress={() => updateRadius(value)}
-                  style={({ pressed }) => [styles.segmentOption, value === radiusMeters && styles.segmentSelected, pressed && styles.pressed]}>
-                  <AppText variant="caption" tone={value === radiusMeters ? 'onPrimary' : 'primary'}>{formatDistance(value)}</AppText>
-                </Pressable>
-              ))}
+            <View style={styles.radiusMenu}>
+              {transport && <AppText variant="caption" tone="muted" accessibilityRole="header">{copy.transport.straightLineDistance}</AppText>}
+              <View style={styles.segment}>
+                {radii.map((value) => (
+                  <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: value === radiusMeters }}
+                    onPress={() => updateRadius(value)}
+                    style={({ pressed }) => [styles.segmentOption, value === radiusMeters && styles.segmentSelected, pressed && styles.pressed]}>
+                    <AppText variant="caption" tone={value === radiusMeters ? 'onPrimary' : 'primary'}>{formatDistance(value)}</AppText>
+                  </Pressable>
+                ))}
+              </View>
             </View>
           )}
           {showingNearby && transport && (
@@ -999,8 +1003,10 @@ const styles = StyleSheet.create({
   note: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },
   heading: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingTop: space.xs },
   transportHeading: { flexWrap: 'wrap', columnGap: space.sm, rowGap: space.xs },
-  transportHeadingTitle: { flexBasis: 112 },
-  headingActions: { marginLeft: 'auto', maxWidth: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.sm },
+  transportHeadingTitle: { flexGrow: 1, flexShrink: 1, minWidth: 0 },
+  headingActions: { marginStart: 'auto', maxWidth: '100%', flexDirection: 'row', flexWrap: 'wrap',
+    alignItems: 'center', justifyContent: 'flex-end', columnGap: space.xs },
+  radiusMenu: { gap: space.xs },
   infoButton: { minHeight: touchTarget, minWidth: touchTarget, alignItems: 'center', justifyContent: 'center' },
   segment: { flexDirection: 'row', gap: space.xs, borderRadius: radius.pill, padding: space.xs, backgroundColor: colors.tint },
   segmentOption: {
@@ -1011,7 +1017,7 @@ const styles = StyleSheet.create({
   transportSegment: { backgroundColor: floatingTab.background },
   transportSegmentSelected: { backgroundColor: floatingTab.selected },
   radiusControl: { minHeight: touchTarget, maxWidth: '45%', flexDirection: 'row', alignItems: 'center', gap: space.xs },
-  transportRadiusControl: { maxWidth: '100%' },
+  transportRadiusControl: { minWidth: touchTarget, maxWidth: '100%', justifyContent: 'center' },
   routeCard: { padding: space.md, gap: space.sm },
   routeMain: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   routeBadge: {

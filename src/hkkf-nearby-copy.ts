@@ -16,8 +16,8 @@ export const hkkfNearbyCopy = {
   en: {
     byRoute: 'By Route',
     byPier: 'By Pier',
-    nearbyRoutes: 'Nearby ferry routes',
-    nearbyPiers: 'Nearby ferry piers',
+    nearbyRoutes: 'Nearby routes',
+    nearbyPiers: 'Nearby piers',
     searchRoutes: 'Hong Kong-wide search · HKKF routes',
     searchPiers: 'Hong Kong-wide search · HKKF piers',
     noPierMatches: 'No matching Hong Kong & Kowloon Ferry piers',

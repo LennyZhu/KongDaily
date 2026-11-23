@@ -106,10 +106,11 @@ export default function NearbyScreen() {
     const request = { controller: new AbortController(), manual };
     locationRequest.current = request;
     if (manual) {
+      triedInitialLocation.current = true;
       setLocating(true);
       setLocationIssue(undefined);
     }
-    const result = await locateNearbyBusStops(request.controller.signal, manual);
+    const result = await locateNearbyBusStops(request.controller.signal, manual ? true : 'undetermined');
     if (locationRequest.current !== request) return;
     locationRequest.current = null;
     if (manual) setLocating(false);
@@ -118,7 +119,7 @@ export default function NearbyScreen() {
       confirmCenter({ kind: 'device', point: result.point });
       moveCamera(result.point);
       if (fromSearch) setPicking(false);
-    } else if (manual && result.kind !== 'cancelled') {
+    } else if (result.kind !== 'cancelled' && (manual || result.kind === 'denied' || result.kind === 'blocked')) {
       setLocationIssue(result.kind);
     }
   }, [confirmCenter, moveCamera]);
@@ -152,13 +153,20 @@ export default function NearbyScreen() {
   useFocusEffect(useCallback(() => {
     focusSavedFacility();
     void loadFacilityFavorites();
-    if (!triedInitialLocation.current) {
+    function locateInitially() {
+      if (triedInitialLocation.current || locationRequest.current) return;
       triedInitialLocation.current = true;
-      if (AppState.currentState !== 'background') void requestLocation(false);
+      void requestLocation(false);
     }
+    if (AppState.currentState === 'active' || AppState.currentState == null) locateInitially();
     const subscription = AppState.addEventListener('change', (state) => {
-      if (state === 'background') cancelLocation();
-      if (state === 'active') void loadFacilityFavorites();
+      if (state === 'background') {
+        if (locationRequest.current && !locationRequest.current.manual) triedInitialLocation.current = false;
+        cancelLocation();
+      } else if (state === 'active') {
+        locateInitially();
+        void loadFacilityFavorites();
+      }
     });
     return () => {
       subscription.remove();
