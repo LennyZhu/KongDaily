@@ -9,6 +9,7 @@ import { hkkfRouteParams, type HkkfDirectionId } from '@/hkkf-data';
 import { hkkfPreviewEnabled } from '@/hkkf-preview';
 import { findLightRailRoute, findLightRailStop } from '@/light-rail-static';
 import { findMtrLine, findMtrStation } from '@/mtr-static';
+import { getTramRoute, getTramStop, type TramVisit } from '@/tram-static';
 
 type SearchDestination = { href: Href } | { issue: 'resultUnavailable' | 'facilityUnavailable' | 'facilityNeedsReview' };
 
@@ -40,8 +41,25 @@ export function hkkfRouteHref(operatorId: string, id: string, direction?: HkkfDi
   return { pathname: '/ferry/[id]', params: { id, operatorId, ...(direction ? { direction } : {}) } };
 }
 
+export function tramRouteHref(id: number, visit?: Pick<TramVisit, 'directionId' | 'stopId' | 'stopSequence'>): Href {
+  return { pathname: '/tram/[kind]', params: {
+    kind: 'route', id: String(id),
+    ...(visit ? { directionId: String(visit.directionId), stopId: String(visit.stopId), stopSequence: String(visit.stopSequence) } : {}),
+  } };
+}
+
+export function tramStopHref(id: number): Href {
+  return { pathname: '/tram/[kind]', params: { kind: 'stop', id: String(id) } };
+}
+
 export function searchResultDestination(result: GlobalSearchResult): SearchDestination {
   switch (result.kind) {
+    case 'tram_route':
+      if (getTramRoute(result.service.routeId)?.key === result.key) return { href: tramRouteHref(result.service.routeId) };
+      break;
+    case 'tram_stop':
+      if (getTramStop(result.stop.stopId)?.key === result.key) return { href: tramStopHref(result.stop.stopId) };
+      break;
     case 'mtr_line':
       if (result.entry.kind === 'mtr-line' && findMtrLine(result.entry.id)) {
         return { href: { pathname: '/mtr/[kind]', params: { kind: 'line', code: result.entry.id } } };

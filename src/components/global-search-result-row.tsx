@@ -8,6 +8,7 @@ import { gmbText } from '@/gmb-search';
 import { hkkfSource } from '@/hkkf-data';
 import { useLanguage } from '@/language';
 import { findMtrLine, mtrName } from '@/mtr-static';
+import { getTramStopServiceStatus } from '@/tram-static';
 import { colors, radius, space } from '@/theme';
 
 export const searchGroupIcons: Record<GlobalSearchKind, IconName> = {
@@ -65,6 +66,14 @@ function resultCopy(result: GlobalSearchResult, { copy, locale }: ReturnType<typ
       return { title: mtrName(result.entry, locale), detail: [copy.mtr.stationType, result.entry.id,
         mtrName(result.entry, locale === 'en' ? 'zh-HK' : 'en')],
       note: result.entry.memberships.flatMap(({ lineCode }) => { const line = findMtrLine(lineCode); return line ? [mtrName(line, locale)] : []; }).join(' · ') };
+    case 'tram_route':
+      return { title: result.service.localizedRouteNames[locale], detail: [copy.transport.modes.tram, copy.tram.route] };
+    case 'tram_stop': {
+      const state = getTramStopServiceStatus(result.stop.stopId)?.serviceStatus;
+      return { title: result.stop.localizedStopNames[locale],
+        detail: [copy.transport.modes.tram, copy.tram.stop, copy.tram.stopId(result.stop.stopId)],
+        note: state === 'temporarily_closed' ? copy.tram.status.temporarily_closed : undefined };
+    }
     case 'light_rail_route':
       return { title: copy.lightRail.route(result.entry.id), detail: [copy.lightRail.routeType],
         note: result.entry.circular ? copy.lightRail.circular : undefined };
@@ -92,7 +101,7 @@ export function GlobalSearchResultRow({ result, first, last, onPress }: {
     : result.kind === 'explore_place' ? placeIcons[result.place.category]
       : result.kind === 'mtr_line' || result.kind === 'mtr_station' ? 'tram.fill.tunnel'
         : result.kind === 'light_rail_route' || result.kind === 'light_rail_stop' ? 'train.side.front.car'
-          : result.kind === 'ferry_route' ? 'ferry' : result.kind === 'gmb_route' ? 'bus.fill' : result.kind === 'bus_route' ? 'bus' : 'mappin';
+          : result.kind === 'tram_route' ? 'tram' : result.kind === 'ferry_route' ? 'ferry' : result.kind === 'gmb_route' ? 'bus.fill' : result.kind === 'bus_route' ? 'bus' : 'mappin';
   const { title, detail, note } = resultCopy(result, language);
   const subtitle = detail.filter(Boolean).join(' · ');
 

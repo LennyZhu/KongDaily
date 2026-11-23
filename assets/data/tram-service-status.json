@@ -1,0 +1,15 @@
+[
+  {
+    "stopId": 99313,
+    "serviceStatus": "temporarily_closed",
+    "notice": {
+      "url": "https://www.hktramways.com/en/service-updates-detail/141/en/press-releases",
+      "publishedOn": "2026-09-09",
+      "checkedOn": "2026-11-23",
+      "description": {
+        "zh-HK": "石塘咀總站關閉，直至另行通知。往銅鑼灣或北角的東行乘客請到 07E 山道。原以石塘咀總站為終點的西行電車改在 94W 屈地街電車廠終止。",
+        "en": "Shek Tong Tsui Terminus is closed until further notice. For eastbound trams to Causeway Bay or North Point, board at 07E Hill Road. Westbound trams previously terminating at Shek Tong Tsui now terminate at 94W Whitty Street Depot."
+      }
+    }
+  }
+]

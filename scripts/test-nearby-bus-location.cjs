@@ -31,7 +31,7 @@ const blocked = { granted: false, canAskAgain: false };
 function mount(t, {
   permission = granted, servicesEnabled = true, appState = 'active', locale = 'zh-HK', transport = false,
   intent, delayCatalogue = false, offlineCatalogue = false, mtrDetail, lightRailDetail, gmbDetail,
-  ferryPreview = false, development = ferryPreview, ferryDetail, ferryNow = Date.parse('2026-11-23T00:01:00+08:00'), ferryResponse,
+  ferryPreview = false, development = ferryPreview, ferryDetail, ferryNow = Date.parse('2026-11-23T00:01:00+08:00'), ferryResponse, tramDetail, unavailableTram = false, tramStatuses,
 } = {}) {
   const events = new EventEmitter();
   const requests = [];
@@ -149,7 +149,7 @@ function mount(t, {
     },
     'expo-router': {
       useRouter: () => ({ push: (href) => routes.push(href) }),
-      useLocalSearchParams: () => mtrDetail ?? lightRailDetail ?? gmbDetail ?? ferryDetail ?? { intent },
+      useLocalSearchParams: () => mtrDetail ?? lightRailDetail ?? gmbDetail ?? ferryDetail ?? tramDetail ?? { intent },
       useFocusEffect: (effect) => load(require.resolve('expo-router/build/useFocusEffect')).useFocusEffect(effect),
     },
     './link/useLoadedNavigation': { useOptionalNavigation: () => navigation },
@@ -285,13 +285,18 @@ function mount(t, {
   ]));
   const pendingCatalogue = delayCatalogue && new Promise((resolve) => { finishCatalogue = resolve; });
 
+  if (unavailableTram) mocks['@/tram-search'] = { readTramCatalogue: () => ({ status: 'failed' }) };
+  if (tramStatuses) {
+    const tram = source('tram-static');
+    mocks['@/tram-static'] = { ...tram, ...tram.createTramServiceIndex(tramStatuses) };
+  }
   const busScreen = source('app/bus/nearby').default;
   const searchAdapter = source('global-search');
   const loadStops = searchAdapter.loadGlobalBusStops;
   searchAdapter.loadGlobalBusStops = () => stopSearchTask = loadStops();
   const transportEntry = transport && source('app/transport').default();
   if (transportEntry) assert.equal(transportEntry.type, busScreen);
-  const screen = ferryDetail ? source('app/ferry/[id]').default : gmbDetail ? source('app/minibus/[id]').default : mtrDetail ? source('app/mtr/[kind]').default
+  const screen = tramDetail ? source('app/tram/[kind]').default : ferryDetail ? source('app/ferry/[id]').default : gmbDetail ? source('app/minibus/[id]').default : mtrDetail ? source('app/mtr/[kind]').default
     : lightRailDetail ? source('app/light-rail/[kind]').default
     : transportEntry ? () => transportEntry.type(transportEntry.props) : busScreen;
   const copy = source('i18n').messages[locale];
@@ -305,7 +310,7 @@ function mount(t, {
         cursor = 0;
         effects = [];
         screenTree = screen();
-        if (gmbDetail || ferryDetail) {
+        if (gmbDetail || ferryDetail || tramDetail) {
           const rendered = new Set();
           screenTree = renderDetail(screenTree, 'detail', rendered);
           for (const [key, owner] of detailComponents) {
@@ -369,7 +374,7 @@ function mount(t, {
       else if (name === 'LightRailStationServices') children = stationServicesTree;
       else if (name === 'MtrNextTrains') children = mtrServicesTree;
       else if (name?.startsWith('Transport')
-        || ['Loading', 'ListAction', 'MtrEntryRow', 'MtrSources', 'LightRailEntryRow', 'LightRailSources', 'GlobalSearchResultRow', 'GmbSearchNotice', 'HkkfSearchNotice', 'HkkfNearbyRouteCard', 'HkkfNearbyPierCard', 'GmbFeedback', 'GmbNearbyRouteCard', 'GmbNearbyStopCard', 'RailwayStationHeading'].includes(name)) children = node.type(node.props);
+        || ['Loading', 'ListAction', 'MtrEntryRow', 'MtrSources', 'LightRailEntryRow', 'LightRailSources', 'GlobalSearchResultRow', 'GmbSearchNotice', 'HkkfSearchNotice', 'HkkfNearbyRouteCard', 'HkkfNearbyPierCard', 'TramNearbyRouteCard', 'TramNearbyStopCard', 'GmbFeedback', 'GmbNearbyRouteCard', 'GmbNearbyStopCard', 'RailwayStationHeading'].includes(name)) children = node.type(node.props);
     }
     return [node, ...elements(children, expand)];
   }
@@ -431,7 +436,7 @@ function mount(t, {
   return {
     calls, labels, landmarks, requests, queries, routes, settings, alerts, openedLinks, settle, press, shows, unmount, findAction,
     visibleElements, renderFilters: (props) => source('components/ui').Filters(props),
-    transportCopy: copy.transport, busCopy: copy.bus, mtrCopy: copy.mtr, lightRailCopy: copy.lightRail,
+    transportCopy: copy.transport, tramCopy: copy.tram, busCopy: copy.bus, mtrCopy: copy.mtr, lightRailCopy: copy.lightRail,
     ferryPaths, ferryCopy: copy.ferry, gmbPaths, gmbCopy: copy.minibus, catalogueRoutes, theme: source('theme'),
     mtr: () => source('mtr-static'),
     lightRail: () => source('light-rail-static'),
@@ -734,7 +739,7 @@ for (const locale of ['zh-HK', 'en']) {
     await page.settle();
     assert.deepEqual(page.rows(), allRoutes);
     assert.equal(page.requests.length, 2);
-    for (const mode of ['ferry', 'tram']) {
+    for (const mode of ['ferry']) {
       page.press(copy.modes[mode]);
       await page.settle();
       assert.ok(page.findAction(copy.modes[mode]).props.accessibilityState.selected);
@@ -2395,3 +2400,196 @@ test('Ferry catalogue treats pending and failed requests separately from no matc
   assert.ok(!page.shows(page.ferryCopy.noMatches));
   assert.ok(page.findAction(page.busCopy.retry));
 });
+
+for (const locale of ['zh-HK', 'en']) {
+  test(`Tram nearby preserves manual position, radius, expanded stop and citywide search (${locale})`, async (t) => {
+    const page = mount(t, { transport: true, locale, permission: blocked });
+    await page.settle();
+    page.press(page.transportCopy.modes.tram);
+    await page.settle();
+    assert.equal(page.searchInput().placeholder, page.tramCopy.search);
+    assert.ok(page.findAction(page.transportCopy.openSettings));
+    assert.deepEqual(page.rows(), []);
+    page.searchInput().onChangeText(locale === 'en' ? 'Kennedy Town Happy Valley' : '堅尼地城 跑馬地');
+    await page.settle();
+    assert.ok(page.shows(page.tramCopy.cityRoutes));
+    assert.deepEqual(page.rows().map(({ key }) => key), ['td:tram:route:4003']);
+    page.press(page.busCopy.clearInput);
+    await page.settle();
+    page.press(page.transportCopy.chooseLandmark);
+    await page.settle();
+    page.press(page.labels.landmarks.central);
+    await page.settle();
+    assert.ok(page.shows(page.tramCopy.nearbyRoutes));
+    assert.ok(page.shows(page.tramCopy.noNearbyRoutes(page.labels.metres(500))));
+    page.press(page.labels.expand(page.labels.kilometres(1)));
+    await page.settle();
+    assert.ok(page.rows().length > 0);
+    page.press(page.labels.byStop);
+    await page.settle();
+    const within1000 = page.rows().map(({ key }) => key);
+    assert.ok(within1000.length > 0);
+    page.press(page.transportCopy.straightLineRadius(page.labels.kilometres(1)));
+    await page.settle();
+    page.press(page.labels.kilometres(2));
+    await page.settle();
+    assert.ok(within1000.every((key) => page.rows().some((row) => row.key === key)));
+    const rows = page.rows();
+    const index = rows.findIndex(({ station }) => station.stop.stopId === 99212);
+    assert.ok(index >= 0);
+    page.openResult(index);
+    await page.settle();
+    const actions = () => page.rowElements(index).filter(({ type }) => type === 'Pressable');
+    assert.equal(actions()[0].props.accessibilityState.expanded, true);
+    assert.match(actions()[0].props.accessibilityLabel, locale === 'en' ? /status unverified/ : /營運狀態未核實/);
+    assert.match(actions()[1].props.accessibilityLabel, locale === 'en' ? /Eastbound/ : /東行/);
+    assert.equal(actions()[0].props.style({ pressed: false })[0].minWidth, 44);
+    assert.equal(actions()[1].props.style({ pressed: false })[0].minHeight, 44);
+    actions()[1].props.onPress();
+    const exact = { kind: 'route', id: '4001', directionId: '2', stopId: '99212', stopSequence: '1' };
+    assert.deepEqual(page.routes.at(-1), { pathname: '/tram/[kind]', params: exact });
+    page.focus(false);
+    page.focus(true);
+    await page.settle();
+    assert.deepEqual(page.rows(), rows);
+    assert.ok(page.shows(page.labels.landmarkReference(page.labels.landmarks.central)));
+    assert.ok(page.shows(page.transportCopy.straightLineRadius(page.labels.kilometres(2))));
+    assert.equal(actions()[0].props.accessibilityState.expanded, true);
+
+    const query = locale === 'en' ? 'Western Market Terminus' : '上環街市(西港城)總站';
+    page.searchInput().onChangeText(query);
+    await page.settle();
+    assert.ok(page.shows(page.tramCopy.cityStops));
+    assert.deepEqual(page.rows().map(({ key }) => key), ['td:tram:stop:99140', 'td:tram:stop:99212']);
+    assert.ok(page.rows().every((row) => row.kind === 'tram_stop'));
+    page.openResult(1);
+    assert.deepEqual(page.routes.at(-1), { pathname: '/tram/[kind]', params: { kind: 'stop', id: '99212' } });
+    page.focus(false);
+    page.focus(true);
+    await page.settle();
+    assert.equal(page.searchInput().value, query);
+    assert.ok(page.findAction(page.labels.byStop).props.accessibilityState.selected);
+    page.searchInput().onChangeText('No matching stop 123');
+    await page.settle();
+    assert.ok(page.shows(page.tramCopy.noMatches));
+    page.press(page.busCopy.clearInput);
+    await page.settle();
+    assert.deepEqual(page.rows(), rows);
+    assert.equal(page.requests.length, 0);
+    assert.deepEqual(page.ferryPaths, []);
+    assert.deepEqual(page.gmbPaths, []);
+  });
+}
+
+test('Tram GPS failure offers recovery and a GPS fix at Happy Valley highlights the exact visit', async (t) => {
+  const page = mount(t, { transport: true, locale: 'en' });
+  await page.settle();
+  page.press(page.transportCopy.modes.tram);
+  await page.settle();
+  assert.ok(page.shows(page.transportCopy.locating));
+  page.failFix(page.requests.length - 1);
+  await page.settle();
+  assert.ok(page.shows(page.labels.issues.failed));
+  assert.ok(!page.shows(page.tramCopy.noNearbyRoutes(page.labels.metres(500))));
+  page.press(page.labels.useLocation);
+  await page.settle();
+  page.fix(page.requests.length - 1, { latitude: 22.269822, longitude: 114.184151 });
+  await page.settle();
+  assert.ok(page.shows(page.tramCopy.nearbyHint));
+  const index = page.rows().findIndex((row) => row.choice.visit.routeId === 4002 && row.choice.visit.stopId === 99304);
+  assert.ok(index >= 0);
+  assert.equal(page.rows()[index].choice.visit.directionId, 2);
+  page.openResult(index);
+  const params = page.routes.at(-1).params;
+  assert.deepEqual(params, { kind: 'route', id: '4002', directionId: '2', stopId: '99304', stopSequence: '1' });
+  const detail = mount(t, { tramDetail: params, locale: 'en' });
+  await detail.settle();
+  assert.equal(detail.directionFilters().selected, '2');
+  assert.ok(detail.visibleElements().some(({ props }) => Array.isArray(props.children)
+    && props.children.join('') === detail.tramCopy.chosenStop + ' · 1'));
+});
+
+test('Tram unavailable catalogue is distinct from empty search', async (t) => {
+  const page = mount(t, { transport: true, permission: blocked, unavailableTram: true });
+  await page.settle();
+  page.press(page.transportCopy.modes.tram);
+  await page.settle();
+  assert.ok(page.shows(page.tramCopy.unavailable));
+  assert.ok(!page.shows(page.tramCopy.noMatches));
+});
+
+test('Tram route keeps every stop in official order and switches to the actual Happy Valley exit', async (t) => {
+  const page = mount(t, { tramDetail: { kind: 'route', id: '4002' }, locale: 'en' });
+  await page.settle();
+  assert.deepEqual(page.directionFilters().options, [['1', 'Westbound on main line'], ['2', 'Eastbound on main line']]);
+  const stationRows = () => page.visibleElements().filter(({ type, props }) => type === 'Pressable'
+    && props.accessibilityRole === 'button');
+  assert.equal(stationRows().length, 30);
+  assert.ok(page.shows('Happy Valley Terminus'));
+  page.directionFilters().onSelect('2');
+  await page.settle();
+  const rows = stationRows();
+  assert.equal(rows.length, 31);
+  const textRows = rows.slice(0, 5).map(({ props }) => props.children[1].props.children[0].props.children[0].props.children);
+  assert.deepEqual(textRows, ['Happy Valley Terminus', 'Colonial Cemetery', "Queen's Road East", 'Leighton Road', 'Hennessy Road']);
+  for (const row of rows) assert.equal(row.props.style({ pressed: false })[0].minHeight, 44);
+});
+
+test('Tram closed and unverified stops have distinct copy and official links; stop route choices preserve the exact visit', async (t) => {
+  const closed = mount(t, { tramDetail: { kind: 'stop', id: '99313' }, locale: 'en' });
+  await closed.settle();
+  assert.ok(closed.visibleElements().some(({ props }) => props.accessibilityRole === 'alert'
+    && props.children === closed.tramCopy.status.temporarily_closed));
+  assert.ok(closed.visibleElements().some(({ props }) => typeof props.children === 'string' && /07E.*94W/.test(props.children)));
+  assert.ok(!closed.shows(closed.tramCopy.status.unknown));
+  assert.ok(!closed.shows(closed.tramCopy.pickDrop[2]));
+  closed.press(closed.tramCopy.officialNotice);
+  assert.match(closed.openedLinks.at(-1), /hktramways\.com\/en\/service-updates-detail\/141/);
+  const unknown = mount(t, { tramDetail: { kind: 'stop', id: '99304' }, locale: 'zh-HK' });
+  await unknown.settle();
+  assert.ok(!unknown.shows(unknown.tramCopy.status.unknown));
+  assert.ok(unknown.shows(unknown.tramCopy.staticStopNote));
+  assert.ok(!unknown.shows(unknown.tramCopy.status.temporarily_closed));
+  const routes = unknown.visibleElements().filter(({ type, props }) => type === 'Pressable' && props.accessibilityRole === 'button');
+  assert.equal(routes.length, 4);
+  routes[1].props.onPress();
+  const params = unknown.routes.at(-1).params;
+  assert.deepEqual(params, { kind: 'route', id: '4002', directionId: '2', stopId: '99304', stopSequence: '1' });
+  const route = mount(t, { tramDetail: params });
+  await route.settle();
+  assert.equal(route.directionFilters().selected, '2');
+  assert.ok(route.visibleElements().some(({ type, props }) => type === 'Pressable' && props.accessibilityState?.selected === true));
+  const closedRoute = mount(t, { tramDetail: { kind: 'route', id: '4004' }, locale: 'en' });
+  await closedRoute.settle();
+  assert.ok(closedRoute.shows(closed.tramCopy.status.temporarily_closed));
+  assert.ok(closedRoute.findAction(closedRoute.tramCopy.officialNotice));
+  assert.ok(!closedRoute.shows(closedRoute.tramCopy.pickDrop[2]));
+});
+
+for (const locale of ['zh-HK', 'en']) {
+  test(`Tram stop shows one source note and reserves status cards for evidence (${locale})`, async (t) => {
+    const tramDetail = { kind: 'stop', id: '99304' };
+    const unknown = mount(t, { tramDetail, locale });
+    await unknown.settle();
+    const note = unknown.tramCopy.staticStopNote;
+    const elements = unknown.visibleElements();
+    assert.equal(elements.filter(({ props }) => props.children === note).length, 1);
+    assert.ok(elements.some(({ props }) => Array.isArray(props.children)
+      && props.children.some((child) => child?.props?.children === unknown.tramCopy.source)
+      && props.children.some((child) => child?.props?.children === note)));
+    assert.ok(!unknown.shows(unknown.tramCopy.status.unknown));
+    assert.ok(!unknown.shows(unknown.tramCopy.status.active));
+    assert.equal(elements.find(({ props }) => props.children === note).props.numberOfLines, undefined);
+
+    const active = mount(t, { tramDetail, locale, tramStatuses: [{
+      stopId: 99304, serviceStatus: 'active',
+      notice: { url: 'https://www.hktramways.com/en/test-only',
+        publishedOn: '2026-11-01', checkedOn: '2026-11-23',
+        description: { 'zh-HK': '已核實營運（測試樣本）', en: 'Verified operating (test fixture)' } },
+    }] });
+    await active.settle();
+    assert.ok(active.shows(active.tramCopy.status.active));
+    assert.ok(active.findAction(active.tramCopy.officialNotice));
+    assert.ok(active.shows(note));
+  });
+}

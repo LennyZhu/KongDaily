@@ -1,0 +1,22 @@
+{
+  "ROUTE_TRAM.xml": {
+    "sha256": "311dc3f492d181c5d20eb99cbc90baa1d83e7a166ab4c90275b23a1af1e2d36d",
+    "fetchedAt": "Mon, 23 Nov 2026 02:29:23 GMT",
+    "lastModified": "Wed, 18 Nov 2026 11:03:21 GMT"
+  },
+  "RSTOP_TRAM.xml": {
+    "sha256": "eba013a05842725038afea0092d671a893142e81b0316377a0f9ec78491066d5",
+    "fetchedAt": "Mon, 23 Nov 2026 02:29:24 GMT",
+    "lastModified": "Wed, 18 Nov 2026 11:03:24 GMT"
+  },
+  "STOP_TRAM.xml": {
+    "sha256": "9b4a9d36dbd77fc01ac7ee6043f8047c1b248d7a0ed08e83abcc0fa90ee3c8bd",
+    "fetchedAt": "Mon, 23 Nov 2026 02:29:25 GMT",
+    "lastModified": "Wed, 18 Nov 2026 11:03:25 GMT"
+  },
+  "JSON_TRAM.json": {
+    "sha256": "529c8a2b00e6cc6e55281d65a482ed3490913d930c2ebdc911869239897fc780",
+    "fetchedAt": "Mon, 23 Nov 2026 02:30:15 GMT",
+    "lastModified": "Wed, 18 Nov 2026 11:03:15 GMT"
+  }
+}

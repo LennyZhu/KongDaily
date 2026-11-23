@@ -171,8 +171,8 @@ const input = (screen) => find(screen, 'TextInput').props;
 const empty = (screen) => list(screen).ListEmptyComponent;
 const resultItems = (screen) => list(screen).data.filter((row) => row.type === 'result').map((row) => row.result);
 const displayed = (screen, kind) => resultItems(screen).filter((result) => kind === 'transport_route'
-  ? ['bus_route', 'mtr_line', 'light_rail_route'].includes(result.kind)
-  : kind === 'transport_stop' ? ['bus_stop', 'mtr_station', 'light_rail_stop'].includes(result.kind) : result.kind === kind);
+  ? ['bus_route', 'mtr_line', 'light_rail_route', 'tram_route'].includes(result.kind)
+  : kind === 'transport_stop' ? ['bus_stop', 'mtr_station', 'light_rail_stop', 'tram_stop'].includes(result.kind) : result.kind === kind);
 const hasCopy = (tree, copy) => nodes(tree, true).some(({ props }) => props.children === copy || props.title === copy);
 function tapText(tree, label) {
   const action = nodes(tree, true).find(({ type, props }) =>
@@ -534,7 +534,7 @@ async function verify() {
       ['610', 'light_rail_route', '610', { pathname: '/light-rail/[kind]', params: { kind: 'route', id: '610' } }],
     ]) {
       input(screen).onChangeText(query); screen = await complete();
-      assert(resultItems(screen).every(({ kind }) => ['bus_route', 'mtr_line', 'light_rail_route'].includes(kind)));
+      assert(resultItems(screen).every(({ kind }) => ['bus_route', 'mtr_line', 'light_rail_route', 'tram_route'].includes(kind)));
       const row = list(screen).data.find((row) => row.type === 'result' && row.result.kind === kind && (!id || row.result.entry?.id === id));
       assert(row, `${locale}: ${query}`);
       const actionsBefore = pushed.length;
@@ -567,7 +567,7 @@ async function verify() {
       ['250', 'light_rail_stop', '250', { pathname: '/light-rail/[kind]', params: { kind: 'stop', id: '250' } }],
     ]) {
       input(screen).onChangeText(query); screen = await complete();
-      assert(resultItems(screen).every(({ kind }) => ['bus_stop', 'mtr_station', 'light_rail_stop'].includes(kind)));
+      assert(resultItems(screen).every(({ kind }) => ['bus_stop', 'mtr_station', 'light_rail_stop', 'tram_stop'].includes(kind)));
       const row = list(screen).data.find((row) => row.type === 'result' && row.result.kind === kind && row.result.entry.id === id);
       assert(row, `${locale}: ${query}`);
       const actual = pressRow(row);
@@ -641,7 +641,44 @@ async function verify() {
   }
   assert.deepEqual(ferryPaths, ['/opendata/route'], 'Keywords and screens reuse the catalogue without ETA requests');
 
-  console.log('PASS: four interactive bilingual entry cards; five transport sources including gated HKKF, scoped categories, detail navigation, debounce/return and offline rail under bus failures; facilities and places unchanged');
+  for (locale of ['zh-HK', 'en']) {
+    reset();
+    stopsTask = undefined;
+    screen = render();
+    tapText(empty(screen), labels().search.groups.transport_route);
+    screen = render();
+    const routeName = locale === 'en' ? 'Kennedy Town Happy Valley' : '堅尼地城 跑馬地';
+    input(screen).onChangeText(routeName);
+    screen = await complete();
+    const route = list(screen).data.find(({ result }) => result?.key === 'td:tram:route:4003');
+    assert(route);
+    assert.match(pressRow(route).props.accessibilityLabel, locale === 'en' ? /Tram · Route/ : /電車 · 路線/);
+    pressRow(route).props.onPress();
+    assert.deepEqual(pushed.at(-1), { pathname: '/tram/[kind]', params: { kind: 'route', id: '4003' } });
+    blur(); blur = focusEffect(); advance(16); screen = render();
+    assert.equal(input(screen).value, routeName);
+    tapText(screen, labels().search.clear); screen = render();
+    tapText(empty(screen), labels().search.groups.transport_stop); screen = render();
+    const stopName = locale === 'en' ? 'Western Market Terminus' : '上環街市(西港城)總站';
+    input(screen).onChangeText(stopName);
+    screen = await complete();
+    const stops = resultItems(screen).filter(({ kind }) => kind === 'tram_stop');
+    assert.deepEqual(stops.map(({ stop }) => stop.stopId), [99140, 99212]);
+    assert.deepEqual(stops.map(({ visits }) => visits.find(({ routeId }) => routeId === 4001)?.directionId), [1, 2]);
+    assert(stops.every(({ stop, visits }) => visits.length > 0 && visits.every(({ stopId }) => stopId === stop.stopId)));
+    const row = list(screen).data.find(({ result }) => result?.key === 'td:tram:stop:99212');
+    assert.match(pressRow(row).props.accessibilityLabel, locale === 'en' ? /Tram · Stop · Stop ID 99212/ : /電車 · 車站 · 車站編號 99212/);
+    pressRow(row).props.onPress();
+    assert.deepEqual(pushed.at(-1), { pathname: '/tram/[kind]', params: { kind: 'stop', id: '99212' } });
+    blur(); blur = focusEffect(); advance(16); screen = render();
+    assert.equal(input(screen).value, stopName);
+    input(screen).onChangeText(locale === 'en' ? 'Shek Tong Tsui Terminus' : '石塘咀總站');
+    screen = await complete();
+    const closed = list(screen).data.find(({ result }) => result?.key === 'td:tram:stop:99313');
+    assert.match(pressRow(closed).props.accessibilityLabel, locale === 'en' ? /Temporarily closed/ : /暫時關閉/);
+  }
+
+  console.log('PASS: four interactive bilingual entry cards; six transport sources including offline tram and gated HKKF, scoped categories, detail navigation, debounce/return and offline rail under bus failures; facilities and places unchanged');
 }
 
 verify().catch((error) => { console.error(error); process.exitCode = 1; }).finally(reset);

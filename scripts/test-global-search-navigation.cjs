@@ -133,7 +133,7 @@ const { parseBusCatalogue } = load('bus-routes');
 const { getExplorePlaces } = load('explore-places');
 const { resolveFacilityIdentity, resolveStableFacilityIdentity } = load('facility-identity');
 const { facilityId, nearbyFacilities, visibleFacilityMarkers } = load('facilities');
-const { searchResultDestination } = load('global-search-navigation');
+const { searchResultDestination, tramRouteHref } = load('global-search-navigation');
 const { routeStopKey } = load('bus-stops');
 const end = { orig_tc: '起點', orig_en: 'Origin', dest_tc: '終點', dest_en: 'Destination' };
 const kmb = parseBusCatalogue('kmbLwb', { data: [
@@ -225,6 +225,19 @@ async function main() {
   testFacilityMap();
   await testRouteSelection();
   await testStationWithoutRoute();
+  const { readTramCatalogue } = load('tram-search');
+  const tramStop = readTramCatalogue('Happy Valley Terminus').stops.find(({ stop }) => stop.stopId === 99304);
+  const toStop = searchResultDestination(tramStop).href;
+  const stationStack = push(search, toStop);
+  assert.deepEqual(stationStack.routes.at(-1).params, { kind: 'stop', id: '99304' });
+  const exact = tramStop.visits.find(({ routeId, directionId }) => routeId === 4003 && directionId === 2);
+  const toRoute = tramRouteHref(exact.routeId, exact);
+  const routeStack = push(stationStack, toRoute);
+  assert.deepEqual(routeStack.routes.at(-1).params, { kind: 'route', id: '4003', directionId: '2', stopId: '99304', stopSequence: '1' });
+  assert.deepEqual(pop(routeStack).routes.at(-1).params, stationStack.routes.at(-1).params);
+  assert.equal(pop(stationStack).routes.at(-1).name, 'search');
+  assert.deepEqual(searchResultDestination({ ...tramStop, key: 'td:tram:stop:99313' }), { issue: 'resultUnavailable' });
+
   console.log('PASS: C3 exact identities, root Stack push/pop, isolated map and safe bus direction/stop handling');
 }
 

@@ -15,6 +15,7 @@ import { GlobalSearchResultRow } from '@/components/global-search-result-row';
 import { HkkfSearchNotice } from '@/components/hkkf-search-notice';
 import { LightRailEntryRow } from '@/components/light-rail-ui';
 import { MtrEntryRow } from '@/components/mtr-ui';
+import { TramNearbyRouteCard, TramNearbyStopCard } from '@/components/tram-nearby-rows';
 import { TransportSearch, TransportModePicker, TransportUnavailable, type TransportMode } from '@/components/transport-ui';
 import { AppText, EmptyState, Icon } from '@/components/ui';
 import { loadGlobalBusStops, railwaySearchResult, searchTransport, type BusStopSearchResult, type GlobalBusStopsState, type GmbRouteSearchResult, type FerryRouteSearchResult } from '@/global-search';
@@ -35,18 +36,21 @@ import { nearbyBusLandmarks, type NearbyLandmark } from '@/nearby-bus-landmarks'
 import { gmbNearbySnapshotDate, nearbyGmbRows, searchGmbStopNames, type GmbNearbyRouteRow, type GmbNearbyStopRow } from '@/nearby-gmb';
 import type { FerryNearbyRow } from '@/nearby-hkkf';
 import { locateNearbyBusStops, type NearbyLocationIssue } from '@/nearby-bus-location';
+import { nearbyTramRows, type TramNearbyRow } from '@/nearby-tram';
 import { nearbyRailwayRows, type NearbyRailwayRow } from '@/nearby-railway';
 import { useStationEta } from '@/nearby-stop-eta-hooks';
 import { groupNearbyStops, type NearbyStopGroup } from '@/nearby-stop-groups';
 import { nearbyRouteHref, readNearbyRoutes, readStationRoutes, type NearbyRoute, type StationEtaRecord, type StationRoute } from '@/nearby-stop-routes';
 import { colors, floatingTab, homeLayout, radius, space, touchTarget } from '@/theme';
+import type { TramRouteSearchResult, TramStopSearchResult } from '@/tram-search';
+import { tramSource } from '@/tram-static';
 import { useTransportListPosition } from '@/transport-list-position';
 
 type Reference = { kind: 'current'; point: Coordinates } | { kind: 'landmark'; landmark: NearbyLandmark; point: Coordinates };
 type Results = { reference: Reference; radius: BusSearchRadius; stops?: NearbyBusStop[]; routes?: NearbyRoute[] | 'error' };
 type Mode = 'routes' | 'stops';
 type NearbyItem = NearbyRoute | NearbyStopGroup;
-type ListItem = NearbyItem | BusRoute | MtrEntry | LightRailEntry | NearbyRailwayRow | BusStopSearchResult | GmbRouteSearchResult | FerryRouteSearchResult | GmbNearbyRouteRow | GmbNearbyStopRow | FerryNearbyRow;
+type ListItem = NearbyItem | BusRoute | MtrEntry | LightRailEntry | NearbyRailwayRow | BusStopSearchResult | GmbRouteSearchResult | FerryRouteSearchResult | GmbNearbyRouteRow | GmbNearbyStopRow | FerryNearbyRow | TramRouteSearchResult | TramStopSearchResult | TramNearbyRow;
 const emptyRoutes: NearbyRoute[] = [];
 const emptyStops: NearbyBusStop[] = [];
 const emptySearchResults: BusRoute[] = [];
@@ -58,7 +62,8 @@ const ferryNearby: typeof import('@/hkkf-nearby-preview') | undefined =
   typeof __DEV__ !== 'undefined' && __DEV__ && hkkfPreviewEnabled ? require('@/hkkf-nearby-preview') : undefined;
 
 function browseKey(item: ListItem) {
-  if ('kind' in item && (item.kind === 'bus_stop' || item.kind === 'gmb_route' || item.kind === 'ferry_route')) return item.key;
+  if ('kind' in item && (item.kind === 'bus_stop' || item.kind === 'gmb_route' || item.kind === 'ferry_route' || item.kind === 'tram_route' || item.kind === 'tram_stop'
+    || item.kind === 'nearby-tram-route' || item.kind === 'nearby-tram-stop')) return item.key;
   if ('kind' in item && (item.kind === 'nearby-gmb-route' || item.kind === 'nearby-gmb-stop' || item.kind === 'nearby-ferry-pier' || item.kind === 'nearby-ferry-route')) return item.kind + ':' + item.id;
   if ('kind' in item && item.kind !== 'nearby-railway') return railwaySearchResult(item).key;
   if ('kind' in item) return `${item.kind}:${item.id}`;
@@ -90,6 +95,8 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   const [mode, setMode] = useState<Mode>('routes');
   const [mtrView, setMtrView] = useState<Mode>('routes');
   const [lightRailView, setLightRailView] = useState<Mode>('routes');
+  const [tramView, setTramView] = useState<Mode>('routes');
+  const [expandedTramStop, setExpandedTramStop] = useState<{ scope: string; key: string }>();
   const [minibusView, setMinibusView] = useState<Mode>('routes');
   const [ferryView, setFerryView] = useState<Mode>('routes');
   const [expandedFerryPier, setExpandedFerryPier] = useState<{ scope: string; id: string }>();
@@ -146,6 +153,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
     ? result : undefined;
   const stops = resultForRadius?.stops ?? emptyStops;
   const showBuses = transportMode === 'all' || transportMode === 'bus';
+  const tramMode = transport && transportMode === 'tram';
   const mtrMode = transport && transportMode === 'mtr';
   const lightRailMode = transport && transportMode === 'lightRail';
   const minibusMode = transport && transportMode === 'minibus';
@@ -153,8 +161,8 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   const ferryMode = transport && transportMode === 'ferry' && !!ferryLabels;
   const railCopy = mtrMode ? copy.mtr : lightRailMode ? copy.lightRail : undefined;
   const normalizedQuery = normalizeBusQuery(query);
-  const searching = transport && (showBuses || Boolean(railCopy) || minibusMode || ferryMode) && normalizedQuery.length > 0;
-  const showingNearby = showBuses || Boolean(railCopy) || minibusMode || ferryMode;
+  const searching = transport && (showBuses || Boolean(railCopy) || minibusMode || ferryMode || tramMode) && normalizedQuery.length > 0;
+  const showingNearby = showBuses || Boolean(railCopy) || minibusMode || ferryMode || tramMode;
   const needsNearbyLocation = showingNearby && !searching;
   const searchingBuses = searching && showBuses;
   const gmb = useGmbSearch(query, searching && (minibusMode || transportMode === 'all'), 250);
@@ -171,12 +179,12 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   }, [searchingBuses, busSearchStops.status]);
   const transportMatches = useMemo(() => searchTransport(searching && !ferryMode ? normalizedQuery : '', {
     busCatalogue: catalogue, busStops: busSearchStops, gmb: gmb.state, ferry: ferry.state, surface: 'transport',
-    mode: ferryMode ? 'ferry' : minibusMode ? 'minibus' : mtrMode ? 'mtr' : lightRailMode ? 'lightRail' : transportMode === 'bus' ? 'bus' : undefined,
-  }), [searching, normalizedQuery, catalogue.feeds, catalogue.loading, catalogue.failed, busSearchStops, gmb.state, ferry.state, ferryMode, minibusMode, mtrMode, lightRailMode, transportMode]);
+    mode: tramMode ? 'tram' : ferryMode ? 'ferry' : minibusMode ? 'minibus' : mtrMode ? 'mtr' : lightRailMode ? 'lightRail' : transportMode === 'bus' ? 'bus' : undefined,
+  }), [searching, normalizedQuery, catalogue.feeds, catalogue.loading, catalogue.failed, busSearchStops, gmb.state, ferry.state, ferryMode, tramMode, minibusMode, mtrMode, lightRailMode, transportMode]);
   const busResults = transportMatches.routes.bus?.results ?? emptySearchResults;
   const stopSearch = transportMatches.stops.bus;
   const searchResults = useMemo(() => [...transportMatches.routes.results, ...transportMatches.stops.results]
-    .map((result) => result.kind === 'bus_route' ? result.route : (result.kind === 'bus_stop' || result.kind === 'gmb_route' || result.kind === 'ferry_route') ? result : result.entry), [transportMatches]);
+    .map((result) => result.kind === 'bus_route' ? result.route : ('entry' in result) ? result.entry : result), [transportMatches]);
   const searchFailed = busSources.some((source) => catalogue.failed[source]);
   const gmbSearchIncomplete = gmb.state?.status === 'failed' || gmb.state?.status === 'partial';
   const mixedEmptyTitle = gmbSearchIncomplete || ferry.state?.status === 'failed' ? copy.search.emptyAvailable
@@ -187,7 +195,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   const stopGroups = useMemo(() => showBuses && mode === 'stops' ? groupNearbyStops(stops) : [], [mode, showBuses, stops]);
   const routeResult = resultForRadius?.routes;
   const routeRows = showBuses && !searching && mode === 'routes' && Array.isArray(routeResult) ? routeResult : emptyRoutes;
-  const view = ferryMode ? ferryView : minibusMode ? minibusView : mtrMode ? mtrView : lightRailMode ? lightRailView : mode;
+  const view = tramMode ? tramView : ferryMode ? ferryView : minibusMode ? minibusView : mtrMode ? mtrView : lightRailMode ? lightRailView : mode;
   // During a passive refresh, All keeps rail and the still-visible bus results on the same reference point.
   const nearbyReference = showBuses && resultForRadius ? resultForRadius.reference : reference;
   const railRows = useMemo(() => transport && !searching && nearbyReference
@@ -208,10 +216,15 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
     if (searching) return ferryNearby.searchHkkfNearbyCatalogue(normalizedQuery, ferryView);
     return reference ? ferryNearby.nearbyHkkfRows(reference.point, radiusMeters, ferryView) : [];
   }, [ferryMode, searching, normalizedQuery, ferryView, reference, radiusMeters]);
-  const rows = ferryMode ? ferryRows : gmbNameSearch ? gmbStops : searching ? searchResults : nearbyRows;
+  const tramGroup = tramView === 'routes' ? transportMatches.routes : transportMatches.stops;
+  const tramNearbyRows = useMemo(() => tramMode && !searching && reference
+    ? nearbyTramRows(reference.point, radiusMeters, tramView) : [], [tramMode, searching, reference, radiusMeters, tramView]);
+  const tramRows = searching
+    ? tramGroup.results.filter((result) => result.kind === 'tram_route' || result.kind === 'tram_stop') : tramNearbyRows;
+  const rows = tramMode ? tramRows : ferryMode ? ferryRows : gmbNameSearch ? gmbStops : searching ? searchResults : nearbyRows;
   const mixedNearby = transport && transportMode === 'all' && !searching;
   const nearbyScope = `${view}:${referenceRevision}:${radiusMeters}`;
-  const contentScope = searching ? (ferryMode ? `search:${ferryView}` : 'search') : nearbyScope;
+  const contentScope = tramMode && searching ? `catalogue:${tramView}` : searching ? (ferryMode ? `search:${ferryView}` : 'search') : nearbyScope;
   const listScope = transport ? `${transportMode}:${contentScope}` : nearbyScope;
   const browseScope = searching ? `${listScope}:${normalizedQuery}` : listScope;
   const { recordVisible, scrollProps } = useTransportListPosition<ListItem>(transport, browseScope, rows, listRef, browseKey);
@@ -393,7 +406,12 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
           <AppText variant="brandSubtitle" tone="muted">{copy.minibus.snapshot(gmbNearbySnapshotDate())}</AppText>
         )}
         {ferryMode && <AppText variant="brandSubtitle" tone="muted">{ferryLabels.pierDistanceNote}</AppText>}
-        {transport && transportMode !== 'bus' && !minibusMode && !ferryMode && <>
+        {tramMode && <>
+          <AppText variant="brandSubtitle" tone="muted">{copy.tram.distanceNote}</AppText>
+          <AppText variant="brandSubtitle" tone="muted">{tramSource.attribution[locale]}</AppText>
+          <AppText variant="brandSubtitle" tone="muted">{copy.tram.collectedOn(tramSource.files['STOP_TRAM.xml'].fetchedAt.slice(0, 10))}</AppText>
+        </>}
+        {transport && transportMode !== 'bus' && !minibusMode && !ferryMode && !tramMode && <>
           <AppText variant="brandSubtitle" tone="muted">{copy.transport.railDistanceNote}</AppText>
           <AppText variant="brandSubtitle" tone="muted">{copy.transport.railGeoCredit}</AppText>
         </>}
@@ -415,7 +433,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
     const next = normalizeBusQuery(value);
     if (next) {
       if (showBuses) setCatalogueRequested(true);
-      if ((searching || ferryMode) && next !== normalizedQuery) listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      if ((searching || ferryMode || tramMode) && next !== normalizedQuery) listRef.current?.scrollToOffset({ offset: 0, animated: false });
     }
     setQuery(value);
   }
@@ -430,7 +448,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
     }
   }
 
-  const viewPicker = (showBuses || railCopy || minibusMode || ferryMode) && <View accessibilityRole="tablist" style={[styles.segment, transport && styles.transportSegment]}>
+  const viewPicker = (showBuses || railCopy || minibusMode || ferryMode || tramMode) && <View accessibilityRole="tablist" style={[styles.segment, transport && styles.transportSegment]}>
     {(['routes', 'stops'] as const).map((option) => {
       const selected = view === option;
       const tone = selected ? (transport ? 'primary' : 'onPrimary') : (transport ? 'muted' : 'primary');
@@ -438,6 +456,10 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
         <Pressable key={option} accessibilityRole="tab" accessibilityState={{ selected }}
           onPress={() => {
             if (selected) return;
+            if (tramMode) {
+              setTramView(option);
+              return;
+            }
             if (ferryMode) {
               setFerryView(option);
               return;
@@ -459,7 +481,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
           }}
           style={({ pressed }) => [styles.segmentOption, selected && (transport ? styles.transportSegmentSelected : styles.segmentSelected),
             pressed && styles.pressed]}>
-          <Icon name={option === 'routes' ? (ferryMode ? 'ferry' : mtrMode ? 'tram.fill.tunnel' : lightRailMode ? 'train.side.front.car' : minibusMode ? 'bus.fill' : 'bus') : 'mappin'}
+          <Icon name={option === 'routes' ? (tramMode ? 'tram' : ferryMode ? 'ferry' : mtrMode ? 'tram.fill.tunnel' : lightRailMode ? 'train.side.front.car' : minibusMode ? 'bus.fill' : 'bus') : 'mappin'}
             size={16} color={colors[tone]} />
           <AppText variant="detail" tone={tone} style={styles.shrink}>
             {ferryMode ? (option === 'routes' ? ferryLabels.byRoute : ferryLabels.byPier)
@@ -487,6 +509,14 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
       viewabilityConfig={viewability}
       onViewableItemsChanged={onViewableItemsChanged}
       renderItem={({ item }) => {
+        if ('kind' in item && item.kind === 'nearby-tram-route') {
+          return <TramNearbyRouteCard choice={item.choice} station={item.station} formatDistance={formatDistance} />;
+        }
+        if ('kind' in item && item.kind === 'nearby-tram-stop') {
+          const expanded = expandedTramStop?.scope === browseScope && expandedTramStop.key === item.key;
+          return <TramNearbyStopCard row={item} formatDistance={formatDistance} expanded={expanded}
+            onToggle={() => setExpandedTramStop(expanded ? undefined : { scope: browseScope, key: item.key })} />;
+        }
         if ('kind' in item && item.kind === 'nearby-ferry-route') {
           return ferryNearby ? <ferryNearby.HkkfNearbyRouteCard row={item} formatDistance={formatDistance} /> : null;
         }
@@ -503,7 +533,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
           return <GmbNearbyStopCard row={item} distance={item.distance === undefined ? undefined : formatDistance(item.distance)}
             expanded={expanded} onToggle={() => setExpandedGmbStop(expanded ? undefined : { scope: browseScope, id: item.id })} />;
         }
-        if ('kind' in item && (item.kind === 'gmb_route' || item.kind === 'ferry_route')) return <GlobalSearchResultRow result={item} first last onPress={() => {
+        if ('kind' in item && (item.kind === 'gmb_route' || item.kind === 'ferry_route' || item.kind === 'tram_route' || item.kind === 'tram_stop')) return <GlobalSearchResultRow result={item} first last onPress={() => {
           const target = searchResultDestination(item);
           if ('href' in target) {
             Keyboard.dismiss();
@@ -544,7 +574,12 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
           modeLabel={mixedNearby ? copy.transport.modes.bus : undefined}
           formatDistance={formatDistance} onOpen={openStop} onToggle={() => toggleStopGroup(item.id)} />;
       }}
-      ListHeaderComponent={searching ? (
+      ListHeaderComponent={tramMode && searching ? (
+        <View style={styles.transportHeader}>
+          {viewPicker}
+          <AppText variant="homeHeading" accessibilityRole="header">{tramView === 'routes' ? copy.tram.cityRoutes : copy.tram.cityStops}</AppText>
+        </View>
+      ) : searching ? (
         <View style={[styles.transportHeader, searchingBuses && styles.searchFeedback]}>
           {ferryMode && viewPicker}
           <AppText variant="homeHeading" accessibilityRole="header">
@@ -597,7 +632,8 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
           {viewPicker}
           {showingNearby && <View style={[styles.heading, transport && styles.transportHeading]}>
             <AppText variant="homeHeading" accessibilityRole="header" style={[styles.copy, transport && styles.transportHeadingTitle]}>
-              {ferryMode ? (view === 'routes' ? ferryLabels.nearbyRoutes : ferryLabels.nearbyPiers)
+              {tramMode ? (view === 'routes' ? copy.tram.nearbyRoutes : copy.tram.nearbyStops)
+                : ferryMode ? (view === 'routes' ? ferryLabels.nearbyRoutes : ferryLabels.nearbyPiers)
                 : transport && transportMode !== 'bus' ? (view === 'routes' ? copy.transport.nearbyRoutes : copy.transport.nearbyStops)
                 : mode === 'routes' ? labels.routes : labels.stops}
             </AppText>
@@ -619,6 +655,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
               </View>
             ) : radiusControl}
           </View>}
+          {tramMode && reference && <AppText variant="detail" tone="muted">{copy.tram.nearbyHint}</AppText>}
           {showingNearby && transport && showDistanceInfo && distanceNote}
           {showingNearby && pickingRadius && (
             <View style={styles.segment}>
@@ -663,7 +700,16 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
           )}
         </View>
       )}
-      ListEmptyComponent={ferryMode ? (
+      ListEmptyComponent={tramMode ? (
+        searching || tramGroup.status === 'failed'
+          ? <EmptyState icon={tramGroup.status === 'failed' ? 'exclamationmark.circle' : 'magnifyingglass'}
+            title={tramGroup.status === 'failed' ? copy.tram.unavailable : copy.tram.noMatches} />
+          : reference ? <View style={styles.header}>
+            <EmptyState icon={view === 'routes' ? 'tram' : 'mappin'}
+              title={(view === 'routes' ? copy.tram.noNearbyRoutes : copy.tram.noNearbyStops)(range)} />
+            {!!expandedRadius && <ListAction label={labels.expand(formatDistance(expandedRadius))} onPress={() => updateRadius(expandedRadius)} />}
+          </View> : null
+      ) : ferryMode ? (
         searching ? <EmptyState icon="magnifyingglass" title={view === 'routes' ? copy.ferry.noMatches : ferryLabels.noPierMatches} />
           : reference ? <View style={styles.header}>
             <EmptyState icon={view === 'routes' ? 'ferry' : 'mappin'}
@@ -722,8 +768,8 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   return (
     <View style={styles.transportPage}>
       <View style={styles.transportControls}>
-        {(showBuses || railCopy || minibusMode || ferryMode) && (
-          <TransportSearch label={ferryMode ? copy.ferry.search : minibusMode ? copy.minibus.nearbySearch : railCopy?.search ?? (transportMode === 'all' ? copy.transport.searchAll : copy.transport.searchBuses)}
+        {(showBuses || railCopy || minibusMode || ferryMode || tramMode) && (
+          <TransportSearch label={tramMode ? copy.tram.search : ferryMode ? copy.ferry.search : minibusMode ? copy.minibus.nearbySearch : railCopy?.search ?? (transportMode === 'all' ? copy.transport.searchAll : copy.transport.searchBuses)}
             clearLabel={copy.bus.clearInput} cancelLabel={copy.bus.cancel} query={query} onChange={editQuery}
             autoFocus={focusSearchOnMount} />
         )}

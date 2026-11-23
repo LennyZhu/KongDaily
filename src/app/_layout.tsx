@@ -56,6 +56,7 @@ function RootStack() {
         headerStyle: { backgroundColor: colors.tintedBackground },
         headerShadowVisible: false,
       }} />
+      <Stack.Screen name="tram/[kind]" options={{ title: copy.transport.modes.tram }} />
       <Stack.Screen name="ferry/[id]" options={{ title: copy.transport.modes.ferry }} />
       <Stack.Screen name="minibus/[id]" options={{ title: copy.transport.modes.minibus }} />
       <Stack.Screen name="mtr/[kind]" options={{ title: copy.transport.modes.mtr }} />
