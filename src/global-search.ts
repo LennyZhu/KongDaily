@@ -11,6 +11,7 @@ import { messages } from '@/i18n';
 import { searchLightRail, type LightRailEntry, type LightRailRoute, type LightRailStop } from '@/light-rail-static';
 import { searchMtr, type MtrEntry, type MtrLine, type MtrStation } from '@/mtr-static';
 import { readBusStopsForSearch } from '@/nearby-bus-data';
+import { tramFeatureEnabled } from '@/tram-feature';
 import { readTramCatalogue, type TramRouteSearchResult, type TramStopSearchResult } from '@/tram-search';
 
 export const globalSearchKinds = ['transport_route', 'transport_stop', 'facility', 'explore_place'] as const;
@@ -328,7 +329,8 @@ export function searchTransport(input: string, { busCatalogue, busStops, gmb, fe
     busStops: searchBusStops(query, includeBus ? busStops : undefined, scope), gmb, ferry, browseFerry: mode === 'ferry' && surface === 'transport',
     browseTram: mode === 'tram' && surface === 'transport',
   };
-  const sources = transportSearchSources.filter((source) => mode === undefined || source.id === mode);
+  const sources = transportSearchSources.filter(({ id }) =>
+    (id !== 'tram' || tramFeatureEnabled) && (mode === undefined || id === mode));
   const pages = sources.map((source) => source.search(input, context));
   const hasLocalRail = sources.some(({ id }) => id === 'mtr' || id === 'lightRail');
   const tramFailed = pages.some(({ failed }) => failed);

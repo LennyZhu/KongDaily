@@ -142,6 +142,8 @@ stubs['@/gmb-client'] = { gmbClient: load('gmb-client').createGmbClient({ reques
 const ferryPaths = [];
 const ferryPreview = { hkkfPreviewEnabled: false, hkkfPreviewClient: undefined };
 stubs['@/hkkf-preview'] = ferryPreview;
+const tramFeature = { ...load('tram-feature') };
+stubs['@/tram-feature'] = tramFeature;
 const SearchScreen = load('app/search').default;
 function render(runEffects = true) {
   if (!runEffects) {
@@ -641,6 +643,19 @@ async function verify() {
   }
   assert.deepEqual(ferryPaths, ['/opendata/route'], 'Keywords and screens reuse the catalogue without ETA requests');
 
+  for (locale of ['zh-HK', 'en']) {
+    reset();
+    stopsTask = undefined;
+    screen = render();
+    for (const query of locale === 'en' ? ['Kennedy Town Happy Valley', 'Western Market Terminus'] : ['堅尼地城 跑馬地', '上環街市(西港城)總站']) {
+      input(screen).onChangeText(query);
+      screen = await complete();
+      assert(!resultItems(screen).some(({ kind }) => kind === 'tram_route' || kind === 'tram_stop'));
+    }
+  }
+
+  // Keep the existing navigation and bilingual checks for the future reopening.
+  tramFeature.tramFeatureEnabled = true;
   for (locale of ['zh-HK', 'en']) {
     reset();
     stopsTask = undefined;

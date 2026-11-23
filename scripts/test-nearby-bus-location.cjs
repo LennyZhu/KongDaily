@@ -31,7 +31,7 @@ const blocked = { granted: false, canAskAgain: false };
 function mount(t, {
   permission = granted, servicesEnabled = true, appState = 'active', locale = 'zh-HK', transport = false,
   intent, delayCatalogue = false, offlineCatalogue = false, mtrDetail, lightRailDetail, gmbDetail,
-  ferryPreview = false, development = ferryPreview, ferryDetail, ferryNow = Date.parse('2026-11-23T00:01:00+08:00'), ferryResponse, tramDetail, unavailableTram = false, tramStatuses,
+  ferryPreview = false, development = ferryPreview, ferryDetail, ferryNow = Date.parse('2026-11-23T00:01:00+08:00'), ferryResponse, tramDetail, tramEnabled = false, unavailableTram = false, tramStatuses,
 } = {}) {
   const events = new EventEmitter();
   const requests = [];
@@ -285,6 +285,7 @@ function mount(t, {
   ]));
   const pendingCatalogue = delayCatalogue && new Promise((resolve) => { finishCatalogue = resolve; });
 
+  if (tramEnabled) mocks['@/tram-feature'] = { tramFeatureEnabled: true };
   if (unavailableTram) mocks['@/tram-search'] = { readTramCatalogue: () => ({ status: 'failed' }) };
   if (tramStatuses) {
     const tram = source('tram-static');
@@ -707,10 +708,10 @@ for (const locale of ['zh-HK', 'en']) {
     const page = mount(t, { transport: true, locale });
     const { labels, landmarks, transportCopy: copy } = page;
     const expected = locale === 'en'
-      ? ['All', 'Bus', 'MTR', 'Light Rail', 'Ferry', 'Tram', 'Minibus']
-      : ['全部', '巴士', '港鐵', '輕鐵', '渡輪', '電車', '專線小巴'];
-    assert.deepEqual(Object.values(copy.modes), expected);
+      ? ['All', 'Bus', 'MTR', 'Light Rail', 'Ferry', 'Minibus']
+      : ['全部', '巴士', '港鐵', '輕鐵', '渡輪', '專線小巴'];
     await page.settle();
+    assert.deepEqual(page.modeScroller().children.map(({ props }) => props.children[1].props.children), expected);
     assert.ok(!page.shows(locale === 'en' ? 'Find transport services near you' : '查看附近可用的交通服務'));
     assert.equal(copy.searchAll, locale === 'en' ? 'Search transport routes or stations' : '搜尋交通路線或車站');
     assert.equal(copy.searchBuses, locale === 'en' ? 'Search bus routes or stops' : '搜尋巴士路線或車站');
@@ -2402,8 +2403,41 @@ test('Ferry catalogue treats pending and failed requests separately from no matc
 });
 
 for (const locale of ['zh-HK', 'en']) {
-  test(`Tram nearby preserves manual position, radius, expanded stop and citywide search (${locale})`, async (t) => {
+  test(`Disabled tram is absent from the picker and a stale tram selection falls back to All (${locale})`, async (t) => {
     const page = mount(t, { transport: true, locale, permission: blocked });
+    await page.settle();
+    const copy = page.transportCopy;
+    assert.deepEqual(page.modeScroller().children.map(({ props }) => props.children[1].props.children),
+      ['all', 'bus', 'mtr', 'lightRail', 'ferry', 'minibus'].map((mode) => copy.modes[mode]));
+    page.controls()[1].props.onSelect('tram');
+    await page.settle();
+    assert.equal(page.controls()[1].props.selected, 'all');
+    assert.equal(page.searchInput().placeholder, copy.searchAll);
+    page.searchInput().onChangeText(locale === 'en' ? 'Admiralty' : '金鐘');
+    await page.settle();
+    assert.ok(page.rows().some(({ kind }) => kind === 'mtr-station'));
+    assert.ok(!page.rows().some(({ kind }) => kind === 'tram_stop' || kind === 'tram_route'));
+  });
+
+  test(`Disabled route and stop links render an unavailable screen (${locale})`, async (t) => {
+    for (const tramDetail of [
+      { kind: 'route', id: '4003', directionId: '2', stopId: '99304', stopSequence: '1' },
+      { kind: 'stop', id: '99313' },
+    ]) {
+      const page = mount(t, { tramDetail, locale });
+      await page.settle();
+      assert.ok(page.shows(page.tramCopy.notOpen));
+      assert.ok(!page.shows(page.tramCopy.source));
+      assert.ok(!page.shows(page.tramCopy.sequence));
+      assert.ok(!page.shows(page.tramCopy.visits));
+      assert.deepEqual(page.routes, []);
+    }
+  });
+}
+
+for (const locale of ['zh-HK', 'en']) {
+  test(`Tram nearby preserves manual position, radius, expanded stop and citywide search (${locale})`, async (t) => {
+    const page = mount(t, { transport: true, tramEnabled: true, locale, permission: blocked });
     await page.settle();
     page.press(page.transportCopy.modes.tram);
     await page.settle();
@@ -2482,7 +2516,7 @@ for (const locale of ['zh-HK', 'en']) {
 }
 
 test('Tram GPS failure offers recovery and a GPS fix at Happy Valley highlights the exact visit', async (t) => {
-  const page = mount(t, { transport: true, locale: 'en' });
+  const page = mount(t, { transport: true, tramEnabled: true, locale: 'en' });
   await page.settle();
   page.press(page.transportCopy.modes.tram);
   await page.settle();
@@ -2502,7 +2536,7 @@ test('Tram GPS failure offers recovery and a GPS fix at Happy Valley highlights 
   page.openResult(index);
   const params = page.routes.at(-1).params;
   assert.deepEqual(params, { kind: 'route', id: '4002', directionId: '2', stopId: '99304', stopSequence: '1' });
-  const detail = mount(t, { tramDetail: params, locale: 'en' });
+  const detail = mount(t, { tramEnabled: true, tramDetail: params, locale: 'en' });
   await detail.settle();
   assert.equal(detail.directionFilters().selected, '2');
   assert.ok(detail.visibleElements().some(({ props }) => Array.isArray(props.children)
@@ -2510,7 +2544,7 @@ test('Tram GPS failure offers recovery and a GPS fix at Happy Valley highlights 
 });
 
 test('Tram unavailable catalogue is distinct from empty search', async (t) => {
-  const page = mount(t, { transport: true, permission: blocked, unavailableTram: true });
+  const page = mount(t, { transport: true, tramEnabled: true, permission: blocked, unavailableTram: true });
   await page.settle();
   page.press(page.transportCopy.modes.tram);
   await page.settle();
@@ -2519,7 +2553,7 @@ test('Tram unavailable catalogue is distinct from empty search', async (t) => {
 });
 
 test('Tram route keeps every stop in official order and switches to the actual Happy Valley exit', async (t) => {
-  const page = mount(t, { tramDetail: { kind: 'route', id: '4002' }, locale: 'en' });
+  const page = mount(t, { tramEnabled: true, tramDetail: { kind: 'route', id: '4002' }, locale: 'en' });
   await page.settle();
   assert.deepEqual(page.directionFilters().options, [['1', 'Westbound on main line'], ['2', 'Eastbound on main line']]);
   const stationRows = () => page.visibleElements().filter(({ type, props }) => type === 'Pressable'
@@ -2536,7 +2570,7 @@ test('Tram route keeps every stop in official order and switches to the actual H
 });
 
 test('Tram closed and unverified stops have distinct copy and official links; stop route choices preserve the exact visit', async (t) => {
-  const closed = mount(t, { tramDetail: { kind: 'stop', id: '99313' }, locale: 'en' });
+  const closed = mount(t, { tramEnabled: true, tramDetail: { kind: 'stop', id: '99313' }, locale: 'en' });
   await closed.settle();
   assert.ok(closed.visibleElements().some(({ props }) => props.accessibilityRole === 'alert'
     && props.children === closed.tramCopy.status.temporarily_closed));
@@ -2545,7 +2579,7 @@ test('Tram closed and unverified stops have distinct copy and official links; st
   assert.ok(!closed.shows(closed.tramCopy.pickDrop[2]));
   closed.press(closed.tramCopy.officialNotice);
   assert.match(closed.openedLinks.at(-1), /hktramways\.com\/en\/service-updates-detail\/141/);
-  const unknown = mount(t, { tramDetail: { kind: 'stop', id: '99304' }, locale: 'zh-HK' });
+  const unknown = mount(t, { tramEnabled: true, tramDetail: { kind: 'stop', id: '99304' }, locale: 'zh-HK' });
   await unknown.settle();
   assert.ok(!unknown.shows(unknown.tramCopy.status.unknown));
   assert.ok(unknown.shows(unknown.tramCopy.staticStopNote));
@@ -2555,11 +2589,11 @@ test('Tram closed and unverified stops have distinct copy and official links; st
   routes[1].props.onPress();
   const params = unknown.routes.at(-1).params;
   assert.deepEqual(params, { kind: 'route', id: '4002', directionId: '2', stopId: '99304', stopSequence: '1' });
-  const route = mount(t, { tramDetail: params });
+  const route = mount(t, { tramEnabled: true, tramDetail: params });
   await route.settle();
   assert.equal(route.directionFilters().selected, '2');
   assert.ok(route.visibleElements().some(({ type, props }) => type === 'Pressable' && props.accessibilityState?.selected === true));
-  const closedRoute = mount(t, { tramDetail: { kind: 'route', id: '4004' }, locale: 'en' });
+  const closedRoute = mount(t, { tramEnabled: true, tramDetail: { kind: 'route', id: '4004' }, locale: 'en' });
   await closedRoute.settle();
   assert.ok(closedRoute.shows(closed.tramCopy.status.temporarily_closed));
   assert.ok(closedRoute.findAction(closedRoute.tramCopy.officialNotice));
@@ -2569,7 +2603,7 @@ test('Tram closed and unverified stops have distinct copy and official links; st
 for (const locale of ['zh-HK', 'en']) {
   test(`Tram stop shows one source note and reserves status cards for evidence (${locale})`, async (t) => {
     const tramDetail = { kind: 'stop', id: '99304' };
-    const unknown = mount(t, { tramDetail, locale });
+    const unknown = mount(t, { tramEnabled: true, tramDetail, locale });
     await unknown.settle();
     const note = unknown.tramCopy.staticStopNote;
     const elements = unknown.visibleElements();
@@ -2581,7 +2615,7 @@ for (const locale of ['zh-HK', 'en']) {
     assert.ok(!unknown.shows(unknown.tramCopy.status.active));
     assert.equal(elements.find(({ props }) => props.children === note).props.numberOfLines, undefined);
 
-    const active = mount(t, { tramDetail, locale, tramStatuses: [{
+    const active = mount(t, { tramEnabled: true, tramDetail, locale, tramStatuses: [{
       stopId: 99304, serviceStatus: 'active',
       notice: { url: 'https://www.hktramways.com/en/test-only',
         publishedOn: '2026-11-01', checkedOn: '2026-11-23',

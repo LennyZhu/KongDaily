@@ -289,9 +289,15 @@ async function verify() {
   assert(group(searchGlobal('610', noBus), 'transport_route').results.some(({ kind }) => kind === 'light_rail_route'));
   assert(group(searchGlobal('Admiralty', noBus), 'transport_stop').results.some(({ kind }) => kind === 'mtr_station'));
   const admiralty = searchTransport('Admiralty', transportOptions).stops.results;
-  const mtrIndex = admiralty.findIndex(({ key }) => key === 'mtr_station:ADM');
-  const tramIndex = admiralty.findIndex(({ kind }) => kind === 'tram_stop');
-  assert(mtrIndex >= 0 && tramIndex > mtrIndex, 'Existing sources retain precedence in a shared place-name search');
+  assert(admiralty.some(({ key }) => key === 'mtr_station:ADM'));
+  assert(!admiralty.some(({ kind }) => kind === 'tram_stop'));
+  for (const surface of ['global', 'transport']) {
+    for (const mode of [undefined, 'tram']) {
+      const opts = { ...transportOptions, mode, surface };
+      assert(!searchTransport('Kennedy Town Happy Valley', opts).routes.results.some(({ kind }) => kind === 'tram_route'));
+      assert(!searchTransport('Western Market Terminus', opts).stops.results.some(({ kind }) => kind === 'tram_stop'));
+    }
+  }
   assert.equal(searchTransport('68x', { ...transportOptions, mode: 'bus' }).routes.totalMatches, 0);
   assert.equal(searchTransport('68x', { ...transportOptions, mode: 'bus', surface: 'transport' }).routes.totalMatches, 2,
     'The dedicated bus substring rule remains explicit in the shared adapter');

@@ -133,6 +133,8 @@ const { parseBusCatalogue } = load('bus-routes');
 const { getExplorePlaces } = load('explore-places');
 const { resolveFacilityIdentity, resolveStableFacilityIdentity } = load('facility-identity');
 const { facilityId, nearbyFacilities, visibleFacilityMarkers } = load('facilities');
+const tramFeature = { ...load('tram-feature') };
+stubs['@/tram-feature'] = tramFeature;
 const { searchResultDestination, tramRouteHref } = load('global-search-navigation');
 const { routeStopKey } = load('bus-stops');
 const end = { orig_tc: '起點', orig_en: 'Origin', dest_tc: '終點', dest_en: 'Destination' };
@@ -227,6 +229,13 @@ async function main() {
   await testStationWithoutRoute();
   const { readTramCatalogue } = load('tram-search');
   const tramStop = readTramCatalogue('Happy Valley Terminus').stops.find(({ stop }) => stop.stopId === 99304);
+  const tramRoute = readTramCatalogue('Kennedy Town Happy Valley').routes.find(({ service }) => service.routeId === 4003);
+  assert.deepEqual(searchResultDestination(tramStop), { issue: 'resultUnavailable' });
+  assert.deepEqual(searchResultDestination(tramRoute), { issue: 'resultUnavailable' });
+  for (const href of ['/tram/route?id=4003', '/tram/stop?id=99313']) {
+    assert.equal(stack.getRehydratedState(stateFor(href), options).routes.at(-1).name, 'tram/[kind]');
+  }
+  tramFeature.tramFeatureEnabled = true;
   const toStop = searchResultDestination(tramStop).href;
   const stationStack = push(search, toStop);
   assert.deepEqual(stationStack.routes.at(-1).params, { kind: 'stop', id: '99304' });

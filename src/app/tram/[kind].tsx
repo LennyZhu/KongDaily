@@ -7,6 +7,7 @@ import { tramRouteHref, tramStopHref } from '@/global-search-navigation';
 import { useLanguage } from '@/language';
 import { colors, radius, space, touchTarget } from '@/theme';
 import { tramDirectionLabel } from '@/tram-direction';
+import { tramFeatureEnabled } from '@/tram-feature';
 import {
   getTramRoute, getTramStop, getTramStopServiceStatus, getTramVisitsForStop, tramNoticeAttribution, tramSource,
   type TramDirection, type TramRoute, type TramStop, type TramStopServiceStatus, type TramVisit,
@@ -173,6 +174,7 @@ function TramStopDetail({ stop }: { stop: TramStop }) {
 export default function TramScreen() {
   const params = useLocalSearchParams();
   const { copy: { tram } } = useLanguage();
+  if (!tramFeatureEnabled) return <Screen hasHeader><EmptyState icon="tram" title={tram.notOpen} /></Screen>;
   const id = parseId(params.id);
   if (id !== undefined && params.kind === 'stop') {
     const stop = getTramStop(id);

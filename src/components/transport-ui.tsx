@@ -5,6 +5,7 @@ import { Keyboard, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimens
 import { AppText, EmptyState, Icon, type IconName } from '@/components/ui';
 import type { Messages } from '@/i18n';
 import { colors, homeLayout, radius, space, touchTarget, typography } from '@/theme';
+import { tramFeatureEnabled } from '@/tram-feature';
 
 type TransportCopy = Messages['transport'];
 export type TransportMode = keyof TransportCopy['modes'];
@@ -13,7 +14,7 @@ const modeIcons = {
   all: 'square.grid.2x2', bus: 'bus', mtr: 'tram.fill.tunnel', lightRail: 'train.side.front.car',
   ferry: 'ferry', tram: 'tram', minibus: 'bus.fill',
 } satisfies Record<TransportMode, IconName>;
-const modes = Object.keys(modeIcons) as TransportMode[];
+const modes = (Object.keys(modeIcons) as TransportMode[]).filter((mode) => mode !== 'tram' || tramFeatureEnabled);
 
 export function TransportModePicker({ copy, selected, onSelect }: {
   copy: TransportCopy; selected: TransportMode; onSelect: (mode: TransportMode) => void;
