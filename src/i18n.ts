@@ -771,6 +771,13 @@ const zhHK = {
     empty: '暫無探索地點',
     categoryEmpty: '這個分類暫無地點。',
   },
+  gmbFavorites: {
+    title: '收藏專線小巴',
+    empty: '尚未收藏專線小巴',
+    emptyDetail: '在專線小巴路線詳情展開上車站，即可收藏指定方向及停靠站。',
+    towards: (destination: string) => `往${destination}`,
+    service: (station: string, destination: string) => `${station}・往${destination}`,
+  },
   railwayFavorites: {
     title: '收藏鐵路服務',
     service: '選擇收藏路線',
@@ -789,7 +796,7 @@ const zhHK = {
   },
   saved: {
     moreActions: '更多操作',
-    categories: { all: '全部', buses: '巴士', mtr: '港鐵', lightRail: '輕鐵', places: '地點' },
+    categories: { all: '全部', buses: '巴士', mtr: '港鐵', lightRail: '輕鐵', minibus: '專線小巴', places: '地點' },
     busSection: '常用巴士',
     empty: {
       all: '暫無收藏',
@@ -1634,6 +1641,13 @@ const en: typeof zhHK = {
     empty: 'No places to explore yet',
     categoryEmpty: 'This category has no places yet.',
   },
+  gmbFavorites: {
+    title: 'Saved minibus services',
+    empty: 'No saved minibuses yet',
+    emptyDetail: 'Open a boarding stop in the route details to save that direction and stop.',
+    towards: (destination: string) => `To ${destination}`,
+    service: (station: string, destination: string) => `${station} · To ${destination}`,
+  },
   railwayFavorites: {
     title: 'Saved railway services',
     service: 'Choose a route to save',
@@ -1652,7 +1666,7 @@ const en: typeof zhHK = {
   },
   saved: {
     moreActions: 'More actions',
-    categories: { all: 'All', buses: 'Buses', mtr: 'MTR', lightRail: 'Light Rail', places: 'Places' },
+    categories: { all: 'All', buses: 'Buses', mtr: 'MTR', lightRail: 'Light Rail', minibus: 'Minibus', places: 'Places' },
     busSection: 'Favorite buses',
     empty: {
       all: 'Nothing saved yet',

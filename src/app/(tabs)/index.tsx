@@ -6,6 +6,7 @@ import { loadBusFavorites, useBusFavorites, useUnavailableFavorites } from '@/bu
 import { BusAction } from '@/components/bus-ui';
 import { FeaturedCard, HomeHero, HomeLink, HomeSection, QuickLinkCard } from '@/components/home-ui';
 import { HomeFavoriteBus } from '@/components/saved-bus-ui';
+import { HomeFavoriteGmb } from '@/components/home-favorite-gmb';
 import { HomeFavoriteRailway } from '@/components/home-favorite-railway';
 import { AppText, EmptyState, Icon, Screen, type IconName } from '@/components/ui';
 import { WeatherWarningLink } from '@/components/weather-warning-ui';
@@ -14,6 +15,7 @@ import { getExplorePlace, homeFeaturedPlaceIds } from '@/explore-places';
 import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
 import { homePinKey, loadHomePins, useHomePins } from '@/home-transport-pins';
+import { loadGmbFavorites, useGmbFavorites } from '@/gmb-favorites';
 import { loadRailwayFavorites, useRailwayFavorites } from '@/railway-favorite-hooks';
 import { colors, homeColors, homeLayout, radius, space, touchTarget } from '@/theme';
 
@@ -50,22 +52,26 @@ export default function HomeScreen() {
   const { home } = copy;
   const { items, status } = useBusFavorites();
   const railway = useRailwayFavorites();
+  const minibus = useGmbFavorites();
   const homePins = useHomePins();
   const cards = useMemo(() => {
     const busesById = new Map(items.map((favorite) => [favorite.id, favorite]));
+    const minibusesById = new Map(minibus.items.map((favorite) => [favorite.id, favorite]));
     const railwaysByKey = new Map(railway.items.map((favorite) => [homePinKey(favorite), favorite]));
     return homePins.pins.map((pin) => {
       const key = homePinKey(pin);
       return pin.mode === 'bus'
         ? { key, bus: busesById.get(pin.id) }
-        : { key, rail: railwaysByKey.get(key) };
+        : pin.mode === 'gmb' ? { key, gmb: minibusesById.get(pin.id) }
+          : { key, rail: railwaysByKey.get(key) };
     });
-  }, [homePins.pins, items, railway.items]);
+  }, [homePins.pins, items, railway.items, minibus.items]);
   const buses = useMemo(() => cards.flatMap(({ bus }) => bus ? [bus] : []), [cards]);
   const unavailable = useUnavailableFavorites(buses);
-  const waiting = status === 'loading' || railway.status === 'loading' || homePins.status === 'loading';
-  const hasError = status === 'error' || railway.status === 'error' || homePins.status === 'error';
-  const hasCards = cards.some(({ bus, rail }) => bus || rail);
+  const hasMinibusPin = homePins.pins.some(({ mode }) => mode === 'gmb');
+  const waiting = status === 'loading' || railway.status === 'loading' || (hasMinibusPin && minibus.status === 'loading') || homePins.status === 'loading';
+  const hasError = status === 'error' || railway.status === 'error' || (hasMinibusPin && minibus.status === 'error') || homePins.status === 'error';
+  const hasCards = cards.some(({ bus, rail, gmb }) => bus || rail || gmb);
 
   return (
     <Screen contentStyle={styles.screenContent} topBackgroundColor={homeColors.harbourSky}>
@@ -74,15 +80,16 @@ export default function HomeScreen() {
         <WeatherWarningLink compact />
 
         <HomeSection title={home.buses} icon="bus" action={{ label: copy.homeRailway.viewSaved, href: '/saved?category=all' }}>
-          {cards.map(({ key, bus, rail }) => {
+          {cards.map(({ key, bus, rail, gmb }) => {
             if (bus) return <HomeFavoriteBus key={key} favorite={bus} unavailable={unavailable.has(bus.id)} />;
+            if (gmb) return <HomeFavoriteGmb key={key} favorite={gmb} />;
             return rail ? <HomeFavoriteRailway key={key} favorite={rail} /> : null;
           })}
           {waiting && <AppText variant="detail" tone="muted">{copy.homePins.loading}</AppText>}
           {hasError && <>
             <AppText variant="detail" tone="error">{copy.homePins.loadError}</AppText>
             <BusAction label={copy.bus.retry} onPress={() => {
-              void Promise.all([loadBusFavorites(), loadRailwayFavorites(), loadHomePins()]);
+              void Promise.all([loadBusFavorites(), loadRailwayFavorites(), loadGmbFavorites(), loadHomePins()]);
             }} />
           </>}
           {!hasCards && !waiting && !hasError && (

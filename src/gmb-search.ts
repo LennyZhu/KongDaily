@@ -1,6 +1,6 @@
 import { normalizeBusQuery } from '@/bus-routes';
 import { gmbClient } from '@/gmb-client';
-import { gmbRegions, type GmbRoute, type GmbText, type GmbVisit } from '@/gmb-data';
+import { gmbRegions, type GmbRoute, type GmbText, type GmbVisit, type GmbVisitKey } from '@/gmb-data';
 
 export type GmbSearchState =
   | { status: 'loading' }
@@ -27,7 +27,7 @@ export function gmbText(text: GmbText, locale: 'zh-HK' | 'en') {
   return (locale === 'en' ? text.en?.trim() || text.tc?.trim() : text.tc?.trim() || text.en?.trim()) || text.sc?.trim() || '';
 }
 
-export function gmbVisitKey({ routeId, routeSeq, stopSeq, stopId }: GmbVisit) {
+export function gmbVisitKey({ routeId, routeSeq, stopSeq, stopId }: GmbVisitKey) {
   return [routeId, routeSeq, stopSeq, stopId].join(':');
 }
 

@@ -214,7 +214,7 @@ test('timeout aborts a hung call and a network rejection stays recoverable', asy
   assert.equal((await offline('ISL', 'ADM')).payload.kind, 'failed');
 });
 
-function mountHook() {
+function mountHook(gmbClient) {
   const slots = [];
   const events = new EventEmitter();
   const calls = [];
@@ -254,6 +254,11 @@ function mountHook() {
       cleanup = focused ? effect() : undefined;
     } },
     '@/mtr-realtime': { mtrClock: () => now },
+    ...(gmbClient ? {
+      '@/gmb-client': { gmbClient },
+      '@/database': { getDatabase: () => assert.fail('ETA verification is independent of SQLite') },
+      '@/bus-data': {},
+    } : {}),
     '@/mtr-next-train-client': { readMtrNextTrains: (line, station) =>
       new Promise((resolve) => calls.push({ line, station, resolve })) },
   }, {
@@ -263,7 +268,13 @@ function mountHook() {
   const useHook = load('mtr-next-train-hooks').useMtrNextTrains;
   const useNextTrainReading = load('next-train-hooks').useNextTrainReading;
   const simulatedClock = () => now;
+  const readPinned = gmbClient ? load('home-gmb-eta').readPinnedGmbEta : undefined;
   return {
+    renderMinibus(visit) {
+      cursor = 0;
+      const read = react.useCallback((signal) => readPinned(visit, signal), [visit]);
+      return useNextTrainReading('minibus', read, simulatedClock, true);
+    },
     render(line, station, autoRefresh = false) { cursor = 0; return useHook(line, station, autoRefresh); },
     renderLightRail(station) {
       cursor = 0;
@@ -280,6 +291,84 @@ function mountHook() {
     calls, ticks, listeners: () => events.listenerCount('change'), callbacks: () => callbacks,
   };
 }
+
+test('Home minibus checks exact official stop visits and respects expiry, request limits, focus and AppState', async () => {
+  const visit = { routeId: 2009246, routeSeq: 2, stopSeq: 1, stopId: 101 };
+  const terminal = { ...visit, stopSeq: 2, stopId: 102 };
+  const name = { tc: '站', en: 'Stop', sc: null };
+  const visits = [{ ...visit, name }, { ...terminal, name }];
+  const directions = [];
+  const etas = [];
+  const client = {
+    readRouteStops(key, signal) {
+      assert.deepEqual(key, visit);
+      return new Promise((resolve) => directions.push({ signal, resolve }));
+    },
+    readEta(key, signal) {
+      assert.deepEqual(key, visit);
+      return new Promise((resolve) => etas.push({ signal, resolve }));
+    },
+  };
+  const verified = (rows = visits) => reading({ kind: 'ready', generatedAt: wall, data: {
+    routeId: visit.routeId, routeSeq: visit.routeSeq, visits: rows, updatedAt: wall,
+  } });
+  const page = mountHook(client);
+  const { gmbEtaView } = sources()('gmb-data');
+  page.renderMinibus(visit);
+  page.state('background');
+  assert.equal(directions[0].signal.aborted, true);
+  directions[0].resolve(verified());
+  await nextTick();
+  assert.equal(etas.length, 0, 'Backgrounding stops the chain before ETA');
+  assert.equal(page.ticks.size, 0);
+  page.state('active');
+  directions[1].resolve(verified());
+  await nextTick();
+  assert.equal(etas.length, 1);
+  const entry = { kind: 'scheduled', sequence: 1, timestamp: wall + 300000, diff: 5, remarks: name };
+  etas[0].resolve(reading({ kind: 'ready', generatedAt: wall, data: { stopId: visit.stopId, kind: 'forecast', entries: [entry] } },
+    { retryAt: start.monotonic + 60_000 }));
+  await nextTick();
+  function forecast() {
+    const { reading: result, now } = page.renderMinibus(visit);
+    return gmbEtaView({ ...result, payload: result.payload.eta }, now);
+  }
+  assert.equal(forecast().entries[0].kind, 'scheduled');
+  assert.equal(forecast().entries[0].remainingMinutes, undefined);
+  page.advance(59_999);
+  assert.equal(directions.length, 2);
+  page.advance(60_000);
+  directions[2].resolve(verified());
+  await nextTick();
+  assert.equal(etas.length, 2);
+  page.advance(120_000);
+  assert.equal(forecast().kind, 'stale');
+  etas[1].resolve(reading({ kind: 'timeout' }, { retryAt: start.monotonic + 180_000 }));
+  await nextTick();
+  assert.equal(forecast().kind, 'timeout');
+  page.advance(180_000);
+  directions[3].resolve(verified());
+  await nextTick();
+  etas[2].resolve(reading({ kind: 'rateLimited' }, { retryAt: start.monotonic + 210_000 }));
+  await nextTick();
+  assert.equal(forecast().kind, 'rateLimited');
+  page.advance(209_999);
+  assert.equal(directions.length, 4);
+  page.advance(210_000);
+  directions[4].resolve(verified([{ ...visit, stopId: 103, name }, visits[1]]));
+  await nextTick();
+  assert.equal(page.renderMinibus(visit).reading.payload.kind, 'changed');
+  assert.equal(etas.length, 3, 'A changed stop ID must never request ETA for the new stop');
+  page.focus(false);
+  assert.equal(page.listeners(), 0);
+  assert.equal(page.ticks.size, 0);
+  page.focus(true);
+  directions[5].resolve(verified([visits[0], { ...terminal, stopId: visit.stopId, name }]));
+  await nextTick();
+  assert.equal(page.renderMinibus(visit).reading.payload.kind, 'ambiguous');
+  assert.equal(etas.length, 3);
+  page.focus(false);
+});
 
 test('station switches, focus, and AppState ignore old responses and do not poll in background', async () => {
   const page = mountHook();
@@ -560,13 +649,15 @@ function homeRailUi(locale, initialMtr, initialRail, extra = {}) {
   let mtr = initialMtr;
   let rail = initialRail;
   let now = start;
+  let dimensions = { width: 390, fontScale: 1 };
   const calls = [];
   const routes = [];
   const copy = source('i18n').messages[locale];
   const mocks = {
     react: { useCallback: (fn) => fn },
     'expo-router': { useRouter: () => ({ push: (href) => routes.push(href) }) },
-    'react-native': { View: 'View', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', StyleSheet: { create: (styles) => styles, hairlineWidth: 1 } },
+    'react-native': { View: 'View', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', StyleSheet: { create: (styles) => styles, hairlineWidth: 1 },
+      useWindowDimensions: () => dimensions },
     '@/components/ui': { AppText: 'AppText', Icon: 'Icon' },
     '@/components/saved-bus-ui': { savedBusStyles: { card: {} } },
     '@/database': { getDatabase() { throw new Error('Home must not write or migrate favorites'); } },
@@ -590,12 +681,98 @@ function homeRailUi(locale, initialMtr, initialRail, extra = {}) {
   }
   return {
     copy, calls, routes,
+    resize(width, fontScale) { dimensions = { width, fontScale }; },
     render(favorite) { return elements(load('components/home-favorite-railway').HomeFavoriteRailway({ favorite })); },
+    renderMinibus(favorite) { return elements(load('components/home-favorite-gmb').HomeFavoriteGmb({ favorite })); },
     update(payload, at = start) { mtr = payload; rail = payload; now = at; },
   };
 }
 
 for (const locale of ['zh-HK', 'en']) {
+  test(`Home minibus separates stop details from status and permits large-type wrapping (${locale})`, () => {
+    const base = clockAfter(60_000);
+    let now = base;
+    let sample;
+    const favorite = { mode: 'gmb', id: '2009246:2:1:101', routeId: 2009246, routeCode: '2', region: 'KLN', routeSeq: 2,
+      stopSeq: 1, stopId: 101, stopName: { en: 'Whampoa Garden Public Transport Interchange', 'zh-HK': '黃埔花園公共運輸交匯處' },
+      destination: { en: 'Kowloon Tong (Festival Walk)', 'zh-HK': '九龍塘（又一城）' } };
+    const page = homeRailUi(locale, undefined, undefined, {
+      '@/home-gmb-eta': {},
+      '@/next-train-hooks': { useNextTrainReading(key, _read, _clock, auto) {
+        assert.equal(key, favorite.id);
+        assert.equal(auto, true);
+        return { reading: sample, now };
+      } },
+    });
+    const labels = page.copy.minibus;
+    const at = base.wall + 180_000;
+    const forecast = (kind) => ({
+      kind: 'ready', generatedAt: base.wall, data: { kind: 'forecast', stopId: 101,
+        entries: [{ kind, sequence: 1, timestamp: at, diff: 3, remarks: {} }] },
+    });
+    const eta = (payload) => reading({ kind: 'eta', first: false, eta: payload }, { receivedAt: base, serverNow: base.wall, retryAt: base.monotonic });
+    sample = eta(forecast('live'));
+    const nodes = page.renderMinibus(favorite);
+    const getText = (list, value) => list.find(({ type, props }) => type === 'AppText' && props.children === value);
+    const stopLabel = labels.stopLabel(1, favorite.stopName[locale]);
+    const route = `${page.copy.saved.categories.minibus} · 2 · ${labels.regions.KLN}`;
+    for (const label of [route, stopLabel, page.copy.gmbFavorites.towards(favorite.destination[locale])]) {
+      const { props } = getText(nodes, label);
+      assert.equal(props.numberOfLines, undefined);
+      assert.equal(props.maxFontSizeMultiplier, undefined);
+    }
+    const countdown = getText(nodes, labels.minutes(3));
+    const time = getText(nodes, formatHongKongTime(at).slice(11));
+    assert.equal(countdown.props.variant, 'title');
+    assert.equal(time.props.variant, 'caption');
+    assert.equal(time.props.tone, 'muted');
+    assert.equal(countdown.props.style.textAlign, 'right');
+    assert.equal(time.props.style.textAlign, 'right');
+    const summary = (tree) => tree[0].props.children[0];
+    const etaColumn = (tree) => summary(tree).props.children[1];
+    assert.equal(summary(nodes).props.style[0].flexDirection, 'row');
+    assert.equal(etaColumn(nodes).props.style[0].alignItems, 'flex-end');
+    for (const [width, fontScale] of [[320, 1], [430, 1.8]]) {
+      page.resize(width, fontScale);
+      const narrow = page.renderMinibus(favorite);
+      assert.equal(summary(narrow).props.style[1].flexDirection, 'column');
+      assert.equal(etaColumn(narrow).props.style[1].alignSelf, 'flex-end');
+      assert.ok(getText(narrow, stopLabel));
+      assert.ok(getText(narrow, labels.minutes(3)));
+      assert.ok(getText(narrow, formatHongKongTime(at).slice(11)));
+    }
+    page.resize(390, 1);
+    const actions = nodes.filter(({ type }) => type === 'Pressable');
+    assert.equal(actions.length, 1, 'The only Home card action opens details');
+    assert.ok(actions[0].props.accessibilityLabel.includes(stopLabel));
+    assert.equal(actions[0].props.style({ pressed: false })[0].minHeight, 44);
+    actions[0].props.onPress();
+    assert.deepEqual(page.routes, [{ pathname: '/minibus/[id]', params: { id: '2009246', routeSeq: '2', stopSeq: '1', stopId: '101' } }]);
+
+    sample = eta(forecast('scheduled'));
+    assert.ok(getText(page.renderMinibus(favorite), labels.scheduled));
+    assert.equal(getText(page.renderMinibus(favorite), labels.minutes(3)), undefined);
+    const followingDay = base.wall + 24 * 60 * 60_000;
+    const overnight = forecast('scheduled');
+    overnight.data.entries[0].timestamp = followingDay;
+    overnight.data.entries[0].diff = 1440;
+    sample = eta(overnight);
+    assert.ok(getText(page.renderMinibus(favorite), formatHongKongTime(followingDay)));
+    for (const [state, text] of [
+      [eta({ kind: 'ready', generatedAt: base.wall, data: { kind: 'empty', stopId: 101 } }), labels.etaEmpty],
+      [eta({ kind: 'timeout' }), labels.etaTimeout], [eta({ kind: 'network' }), labels.etaFailed],
+      [reading({ kind: 'ambiguous' }), labels.etaAmbiguous], [undefined, labels.loadingEta],
+    ]) {
+      sample = state;
+      const statusCard = page.renderMinibus(favorite);
+      assert.equal(getText(statusCard, text).props.accessibilityLiveRegion, 'polite');
+      assert.equal(statusCard.filter(({ type }) => type === 'Pressable').length, 1);
+    }
+    sample = eta(forecast('live'));
+    now = clockAfter(180_000);
+    assert.ok(getText(page.renderMinibus(favorite), labels.etaStale));
+  });
+
   test(`Home railway cards show accurate compact bilingual predictions and original detail links (${locale})`, () => {
     const mtr = reading(parseMtrForecast(body('EAL-HUH', [train('LOW', '1', { timeType: 'D' })], [train('ADM', '1', { timeType: 'A' })]), 'EAL', 'HUH'));
     const page = homeRailUi(locale, mtr, reading(homeRailPayload()));
@@ -605,12 +782,7 @@ for (const locale of ['zh-HK', 'en']) {
     assert.deepEqual(page.calls, [['mtr', 'EAL', 'HUH', true]]);
     const content = text(nodes);
     assert.ok(!content.includes(page.copy.mtr.nextTrains.title), 'Home omits the standalone ETA heading');
-    const header = nodes.find(({ type, props }) => type === 'View' && Array.isArray(props.children)
-      && props.children.length === 2 && props.children.every((child) => child?.type === 'Pressable'));
-    assert.ok(header, 'Navigation and refresh share one header with separate touch targets');
-    const refresh = header.props.children.find(({ props }) => props.accessibilityLabel);
-    const [touchArea] = refresh.props.style({ pressed: false });
-    assert.ok(touchArea.width >= 44 && touchArea.height >= 44);
+    assert.equal(nodes.filter(({ type }) => type === 'Pressable').length, 1);
     for (const label of [page.copy.homeRailway.direction('UP'), page.copy.homeRailway.direction('DOWN'),
       page.copy.mtr.nextTrains.arrival, page.copy.mtr.nextTrains.departure,
       locale === 'en' ? 'Hung Hom' : '紅磡', locale === 'en' ? 'Lo Wu' : '羅湖']) assert.ok(content.includes(label), label);
@@ -622,6 +794,26 @@ for (const locale of ['zh-HK', 'en']) {
     assert.deepEqual(page.calls.at(-1), ['mtr', 'EAL', 'ADM', true]);
 
     const railNodes = page.render(homeFavorite('light_rail', '610', '380'));
+    assert.equal(railNodes.filter(({ type }) => type === 'Pressable').length, 1);
+    const forecastBody = (tree) => tree.find(({ type, props }) => type === 'View' && props.style?.borderTopWidth > 0);
+    const bodyStyle = forecastBody(railNodes).props.style;
+    assert.equal(bodyStyle, forecastBody(nodes).props.style, 'Light Rail and MTR use the same body style');
+    assert.equal(bodyStyle.paddingStart, undefined);
+    assert.equal(bodyStyle.paddingLeft, undefined);
+    const forecasts = railNodes.filter(({ type, props }) => type === 'View' && props.style?.flexWrap === 'wrap');
+    assert.equal(forecasts.length, 2);
+    assert.equal(forecasts[0].props.style, forecasts[1].props.style);
+    for (const { props } of forecasts) {
+      const [copy, time] = props.children;
+      assert.ok(props.style.columnGap > 0, 'Direction and ETA retain horizontal breathing room');
+      assert.equal(copy.props.style.minWidth, 0);
+      assert.equal(time.props.style[0].textAlign, 'right');
+      assert.equal(time.props.style[1].marginStart, 'auto');
+      for (const text of [...copy.props.children, time]) {
+        assert.equal(text.props.numberOfLines, undefined);
+        assert.equal(text.props.maxFontSizeMultiplier, undefined);
+      }
+    }
     const railText = text(railNodes);
     assert.deepEqual(page.calls.at(-1), ['light_rail', '380', true]);
     assert.ok(railText.includes(locale === 'en' ? 'Yuen Long' : '元朗'));
@@ -632,7 +824,7 @@ for (const locale of ['zh-HK', 'en']) {
     page.update(undefined);
     const loading = page.render(favorite);
     assert.ok(text(loading).includes(page.copy.homeRailway.status.loading));
-    assert.equal(loading.find(({ type, props }) => type === 'Pressable' && props.accessibilityLabel).props.disabled, true);
+    assert.equal(loading.filter(({ type }) => type === 'Pressable').length, 1);
     page.update(mtr, clockAfter(60_000));
     const stale = text(page.render(favorite));
     assert.ok(stale.includes(page.copy.homeRailway.status.stale));

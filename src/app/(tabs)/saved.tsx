@@ -10,13 +10,15 @@ import { AppText, EmptyState, Filters, Icon, PageHeading, Screen } from '@/compo
 import { loadFacilityFavorites, removeSavedFacility, useFacilityFavorites } from '@/facility-favorite-hooks';
 import { resolveFacilityFavorite } from '@/facility-favorites';
 import { facilityText, facilityType } from '@/facilities';
+import { gmbRouteHref } from '@/global-search-navigation';
+import { loadGmbFavorites, setGmbFavorite, useGmbFavorites } from '@/gmb-favorites';
 import { changeHomePin, homePinKey, homeTransportLimit, loadHomePins, useHomePins, type HomePin } from '@/home-transport-pins';
 import { useLanguage } from '@/language';
 import { loadRailwayFavorites, removeSavedRailway, useRailwayFavorites } from '@/railway-favorite-hooks';
 import { railwayFavoriteHref, resolveRailwayService, type RailwayMode } from '@/railway-favorites';
 import { colors, radius, space, touchTarget } from '@/theme';
 
-const categories = ['all', 'buses', 'mtr', 'lightRail', 'places'] as const;
+const categories = ['all', 'buses', 'mtr', 'lightRail', 'minibus', 'places'] as const;
 
 export default function SavedScreen() {
   const { copy } = useLanguage();
@@ -48,6 +50,7 @@ export default function SavedScreen() {
       {(category === 'all' || category === 'mtr' || category === 'lightRail') && (
         <SavedRailways mode={category === 'all' ? undefined : category === 'mtr' ? 'mtr' : 'light_rail'} />
       )}
+      {(category === 'all' || category === 'minibus') && <SavedMinibuses />}
       {(category === 'all' || category === 'places') && <SavedFacilities />}
     </Screen>
   );
@@ -143,6 +146,47 @@ function SavedRailways({ mode }: { mode?: RailwayMode }) {
                 {operation === 'uncertain' ? labels.read : labels.write}
               </AppText>
             )}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function SavedMinibuses() {
+  const { copy, locale } = useLanguage();
+  const router = useRouter();
+  const { items, status } = useGmbFavorites();
+  const labels = copy.gmbFavorites;
+  return (
+    <View style={styles.list}>
+      <AppText variant="section" accessibilityRole="header">{labels.title}</AppText>
+      {status === 'loading' && <EmptyState icon="clock" title={copy.railwayFavorites.loading} />}
+      {status === 'error' && <>
+        <EmptyState icon="exclamationmark.circle" title={copy.railwayFavorites.read} />
+        <BusAction label={copy.bus.retry} onPress={() => void loadGmbFavorites()} />
+      </>}
+      {status === 'ready' && items.length === 0 && <EmptyState icon="bookmark" title={labels.empty} detail={labels.emptyDetail} />}
+      {items.map((favorite) => {
+        const route = `${copy.saved.categories.minibus} · ${favorite.routeCode} · ${copy.minibus.regions[favorite.region]}`;
+        const stop = copy.minibus.stopLabel(favorite.stopSeq, favorite.stopName[locale]);
+        const direction = labels.towards(favorite.destination[locale]);
+        return (
+          <View key={favorite.id} style={savedBusStyles.card}>
+            <View style={styles.transportLine}>
+              <Pressable accessibilityRole="button" accessibilityLabel={`${route} · ${stop} · ${direction}`}
+                style={({ pressed }) => [styles.facilityRow, pressed && styles.pressed]}
+                onPress={() => router.push(gmbRouteHref(favorite.routeId, favorite.routeSeq, favorite))}>
+                <View style={styles.facilityBadge}><Icon name="bus.fill" size={18} /></View>
+                <View style={styles.facilityCopy}>
+                  <AppText variant="caption" tone="primary">{route}</AppText>
+                  <AppText variant="homeCardTitle">{stop}</AppText>
+                  <AppText variant="detail">{direction}</AppText>
+                  <HomePinPosition pin={favorite} />
+                </View>
+              </Pressable>
+              <TransportFavoriteActions pin={favorite} onRemove={() => setGmbFavorite(favorite, false)} />
+            </View>
           </View>
         );
       })}

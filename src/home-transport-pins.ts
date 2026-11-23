@@ -5,12 +5,12 @@ import { getDatabase } from '@/database';
 import type { RailwayFavoriteIdentity, RailwayMode } from '@/railway-favorites';
 
 export const homeTransportLimit = 3;
-export type HomePin = { mode: 'bus'; id: string } | RailwayFavoriteIdentity;
+export type HomePin = { mode: 'bus'; id: string } | { mode: 'gmb'; id: string } | RailwayFavoriteIdentity;
 type PinChange = { pin: HomePin } & ({ type: 'pin' } | { type: 'unpin' } | { type: 'move'; step: -1 | 1 });
-type PinRow = { mode: 'bus'; bus_id: string } | { mode: RailwayMode; line_id: string; station_id: string };
+type PinRow = { mode: 'bus'; bus_id: string } | { mode: 'gmb'; gmb_id: string } | { mode: RailwayMode; line_id: string; station_id: string };
 
 export function homePinKey(pin: HomePin) {
-  return pin.mode === 'bus' ? JSON.stringify(['bus', pin.id]) : JSON.stringify([pin.mode, pin.lineId, pin.stationId]);
+  return pin.mode === 'bus' || pin.mode === 'gmb' ? JSON.stringify([pin.mode, pin.id]) : JSON.stringify([pin.mode, pin.lineId, pin.stationId]);
 }
 
 // All transport favorite writes share this queue. SQLite makes the pin changes and deletes atomic.
@@ -26,10 +26,10 @@ export function waitForTransportFavoriteWrites() {
 
 export async function readHomePins(database?: SQLiteDatabase): Promise<HomePin[]> {
   const rows = await (database ?? await getDatabase()).getAllAsync<PinRow>(
-    'SELECT mode, bus_id, line_id, station_id FROM home_transport_pins ORDER BY position',
+    'SELECT mode, bus_id, line_id, station_id, gmb_id FROM home_transport_pins ORDER BY position',
   );
   return rows.map((row) => row.mode === 'bus' ? { mode: 'bus', id: row.bus_id }
-    : { mode: row.mode, lineId: row.line_id, stationId: row.station_id });
+    : row.mode === 'gmb' ? { mode: 'gmb', id: row.gmb_id } : { mode: row.mode, lineId: row.line_id, stationId: row.station_id });
 }
 
 type PinState = { pins: HomePin[]; status: 'loading' | 'ready' | 'error' };
@@ -74,6 +74,7 @@ export function forgetDeletedHomePin(pin: HomePin) {
 async function favoriteExists(database: SQLiteDatabase, pin: HomePin) {
   return pin.mode === 'bus'
     ? database.getFirstAsync('SELECT 1 FROM bus_favorites WHERE id = ?', pin.id)
+    : pin.mode === 'gmb' ? database.getFirstAsync('SELECT 1 FROM gmb_favorites WHERE id = ?', pin.id)
     : database.getFirstAsync('SELECT 1 FROM railway_favorites WHERE mode = ? AND line_id = ? AND station_id = ?',
       pin.mode, pin.lineId, pin.stationId);
 }
@@ -103,10 +104,11 @@ export function changeHomePin(change: PinChange) {
         }
         await transaction.runAsync('DELETE FROM home_transport_pins');
         for (const [offset, pin] of pins.entries()) {
+          const railway = pin.mode === 'bus' || pin.mode === 'gmb' ? undefined : pin;
           await transaction.runAsync(
-            'INSERT INTO home_transport_pins (position, mode, bus_id, line_id, station_id) VALUES (?, ?, ?, ?, ?)',
+            'INSERT INTO home_transport_pins (position, mode, bus_id, line_id, station_id, gmb_id) VALUES (?, ?, ?, ?, ?, ?)',
             offset + 1, pin.mode, pin.mode === 'bus' ? pin.id : null,
-            pin.mode === 'bus' ? null : pin.lineId, pin.mode === 'bus' ? null : pin.stationId,
+            railway?.lineId ?? null, railway?.stationId ?? null, pin.mode === 'gmb' ? pin.id : null,
           );
         }
       });

@@ -123,6 +123,7 @@ function mount(t, {
   };
   const native = Object.fromEntries(['ActivityIndicator', 'FlatList', 'Pressable', 'ScrollView', 'TextInput', 'View'].map((name) => [name, name]));
   const setVisible = () => {};
+  const savedGmb = new Map();
   const mocks = {
     react,
     'expo-linear-gradient': { LinearGradient: 'LinearGradient' },
@@ -291,6 +292,18 @@ function mount(t, {
     const tram = source('tram-static');
     mocks['@/tram-static'] = { ...tram, ...tram.createTramServiceIndex(tramStatuses) };
   }
+  if (gmbDetail) {
+    const repository = source('gmb-favorites');
+    mocks['@/gmb-favorites'] = {
+      ...repository,
+      useGmbFavorites: () => ({ items: [...savedGmb.values()], status: 'ready' }),
+      async setGmbFavorite(favorite, enabled) {
+        if (enabled) savedGmb.set(favorite.id, favorite);
+        else savedGmb.delete(favorite.id);
+        return 'ok';
+      },
+    };
+  }
   const busScreen = source('app/bus/nearby').default;
   const searchAdapter = source('global-search');
   const loadStops = searchAdapter.loadGlobalBusStops;
@@ -438,7 +451,7 @@ function mount(t, {
     calls, labels, landmarks, requests, queries, routes, settings, alerts, openedLinks, settle, press, shows, unmount, findAction,
     visibleElements, renderFilters: (props) => source('components/ui').Filters(props),
     transportCopy: copy.transport, tramCopy: copy.tram, busCopy: copy.bus, mtrCopy: copy.mtr, lightRailCopy: copy.lightRail,
-    ferryPaths, ferryCopy: copy.ferry, gmbPaths, gmbCopy: copy.minibus, catalogueRoutes, theme: source('theme'),
+    ferryPaths, ferryCopy: copy.ferry, savedGmb, gmbPaths, gmbCopy: copy.minibus, catalogueRoutes, theme: source('theme'),
     mtr: () => source('mtr-static'),
     lightRail: () => source('light-rail-static'),
     geo: () => source('railway-station-geo'),
@@ -1994,6 +2007,44 @@ test('minibus detail retains repeated visits and withholds ambiguous ETA', async
   assert.deepEqual(page.gmbPaths, ['/route/2006474', '/route-stop/2006474/1']);
 });
 
+for (const locale of ['zh-HK', 'en']) {
+  test(`Minibus detail saves and removes the exact visit with a bilingual accessible action (${locale})`, async (t) => {
+    const page = mount(t, { gmbDetail: { id: '2006474' }, locale });
+    await page.settle();
+    const first = gmbFixture.circular.data.route_stops[0];
+    page.press(page.gmbCopy.stopLabel(first.stop_seq, locale === 'en' ? first.name_en : first.name_tc));
+    await page.settle();
+    const favoriteAction = () => page.visibleElements().find(({ props }) => props.accessibilityLabel?.includes(' · ')
+      && props.accessibilityState?.selected !== undefined);
+    const save = favoriteAction();
+    assert.ok(save.props.accessibilityLabel.includes(locale === 'en' ? 'Save' : '收藏'));
+    const [touchArea] = save.props.style({ pressed: false });
+    assert.equal(touchArea.minHeight, 44);
+    assert.equal(touchArea.minWidth, 44);
+    assert.equal(touchArea.borderWidth, undefined);
+    const actionText = (button) => button.props.children[1].props;
+    assert.equal(actionText(save).children, locale === 'en' ? 'Save' : '收藏');
+    assert.equal(actionText(save).numberOfLines, undefined);
+    assert.equal(save.props.children[0].props.children.props.name, 'bookmark');
+    save.props.onPress();
+    await page.settle();
+    assert.deepEqual([...page.savedGmb.keys()], ['2006474:1:1:' + gmbFixture.circular.data.route_stops[0].stop_id]);
+    const saved = favoriteAction();
+    assert.equal(saved.props.accessibilityState.selected, true);
+    assert.ok(saved.props.accessibilityLabel.startsWith(locale === 'en' ? 'Remove from saved' : '取消收藏'));
+    assert.equal(actionText(saved).children, locale === 'en' ? 'Saved' : '已收藏');
+    assert.equal(saved.props.children[0].props.children.props.name, 'bookmark.fill');
+    assert.ok(saved.props.children[0].props.style[1].backgroundColor);
+    assert.equal(page.findAction(page.gmbCopy.stopLabel(first.stop_seq, locale === 'en' ? first.name_en : first.name_tc))
+      .props.accessibilityState.expanded, true);
+    favoriteAction().props.onPress();
+    await page.settle();
+    assert.equal(page.savedGmb.size, 0);
+    assert.equal(favoriteAction().props.accessibilityState.selected, false);
+    assert.deepEqual(page.gmbPaths, ['/route/2006474', '/route-stop/2006474/1'], 'Ambiguous circular ETA is still withheld');
+  });
+}
+
 test('minibus detail requests just the selected visit, labels planned service and clears on direction change', async (t) => {
   const page = mount(t, { gmbDetail: { id: '2009246' }, locale: 'en' });
   await page.settle();
@@ -2002,6 +2053,7 @@ test('minibus detail requests just the selected visit, labels planned service an
   page.press(forward);
   await page.settle();
   assert.ok(page.shows(page.gmbCopy.scheduled));
+  assert.ok(page.findAction(page.gmbCopy.refresh));
   assert.deepEqual(page.gmbPaths, ['/route/2009246', '/route-stop/2009246/1', '/eta/route-stop/2009246/1/1']);
   page.directionFilters().onSelect('2');
   await page.settle();

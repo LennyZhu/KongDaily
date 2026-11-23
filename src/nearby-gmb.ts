@@ -1,5 +1,5 @@
 import { normalizeBusQuery } from '@/bus-routes';
-import type { GmbRegion, GmbRouteSeq, GmbText, GmbVisit } from '@/gmb-data';
+import type { GmbRegion, GmbRouteSeq, GmbText, GmbVisit, GmbVisitKey } from '@/gmb-data';
 import { distanceBetween, isNearHongKong, type BusSearchRadius, type Coordinates } from '@/nearby-bus-data';
 
 type SnapshotDirection = [routeId: number, seq: GmbRouteSeq, region: GmbRegion, code: string,
@@ -21,6 +21,24 @@ export type GmbNearbyStop = { stopId: number; coordinate: Coordinates; name: Gmb
 export type GmbNearbyRouteRow = { kind: 'nearby-gmb-route'; id: string; visit: GmbNearbyVisit; distance: number };
 export type GmbNearbyStopRow = { kind: 'nearby-gmb-stop'; id: string; stop: GmbNearbyStop; distance?: number };
 
+function snapshot(): Snapshot {
+  return require('../assets/data/gmb-nearby.json') as Snapshot;
+}
+
+function gmbKnownDropOffOnly(visit: GmbVisitKey) {
+  const { stops, directions } = snapshot();
+  return stops.find(([id]) => id === visit.stopId)?.[3].some(([directionIndex, seq, pickDrop]) => {
+    const [routeId, routeSeq] = directions[directionIndex];
+    return pickDrop === 1 && seq === visit.stopSeq && routeId === visit.routeId && routeSeq === visit.routeSeq;
+  }) ?? false;
+}
+
+export function gmbBoardingVisit(visit: GmbVisitKey, visits: readonly GmbVisit[]) {
+  const index = visits.findIndex(({ routeId, routeSeq, stopId, stopSeq }) =>
+    routeId === visit.routeId && routeSeq === visit.routeSeq && stopId === visit.stopId && stopSeq === visit.stopSeq);
+  return index >= 0 && index < visits.length - 1 && !gmbKnownDropOffOnly(visit);
+}
+
 let loaded: { stops: readonly GmbNearbyStop[]; capturedOn: string } | undefined;
 let nameIndex: ReturnType<typeof indexedNames> | undefined;
 
@@ -31,18 +49,18 @@ function bilingual(tc: string, en: string): GmbText {
 function index() {
   if (loaded) return loaded;
   // Delay decoding the packaged catalogue until entering the Minibus mode.
-  const snapshot = require('../assets/data/gmb-nearby.json') as Snapshot;
+  const data = snapshot();
   const variants = new Map<string, Set<number>>();
-  for (const [routeId, , region, code] of snapshot.directions) {
+  for (const [routeId, , region, code] of data.directions) {
     const key = region + ':' + code;
     if (!variants.has(key)) variants.set(key, new Set());
     variants.get(key)?.add(routeId);
   }
-  const directions = snapshot.directions.map(([routeId, routeSeq, region, routeCode, zhFrom, enFrom, zhTo, enTo]): GmbNearbyDirection => ({
+  const directions = data.directions.map(([routeId, routeSeq, region, routeCode, zhFrom, enFrom, zhTo, enTo]): GmbNearbyDirection => ({
     routeId, routeSeq, region, routeCode, origin: bilingual(zhFrom, enFrom), destination: bilingual(zhTo, enTo),
     hasVariants: (variants.get(region + ':' + routeCode)?.size ?? 0) > 1,
   }));
-  const stops = snapshot.stops.flatMap(([stopId, latitude, longitude, rows]): GmbNearbyStop[] => {
+  const stops = data.stops.flatMap(([stopId, latitude, longitude, rows]): GmbNearbyStop[] => {
     const visits = rows.map(([directionIndex, stopSeq, pickDrop, zh, en]): GmbNearbyVisit => {
       const direction = directions[directionIndex];
       return { routeId: direction.routeId, routeSeq: direction.routeSeq, stopId, stopSeq,
@@ -51,7 +69,7 @@ function index() {
     const firstBoarding = visits.find(({ boarding }) => boarding);
     return firstBoarding ? [{ stopId, coordinate: { latitude, longitude }, name: firstBoarding.name, visits }] : [];
   });
-  return loaded = { stops, capturedOn: snapshot.source.capturedOn };
+  return loaded = { stops, capturedOn: data.source.capturedOn };
 }
 
 export function gmbNearbySnapshotDate() {

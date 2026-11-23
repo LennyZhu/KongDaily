@@ -4,7 +4,7 @@ import { AppState } from 'react-native';
 
 import { nextTrainClock, type NextTrainReading } from '@/next-train-time';
 
-export function useNextTrainReading<Payload>(key: string, read: () => Promise<NextTrainReading<Payload>>, clock = nextTrainClock, autoRefresh = false) {
+export function useNextTrainReading<Payload>(key: string, read: (signal: AbortSignal) => Promise<NextTrainReading<Payload>>, clock = nextTrainClock, autoRefresh = false) {
   const [sample, setSample] = useState<{ key: string; reading: NextTrainReading<Payload> }>();
   const [now, setNow] = useState(clock);
   const [busy, setBusy] = useState(true);
@@ -13,17 +13,17 @@ export function useNextTrainReading<Payload>(key: string, read: () => Promise<Ne
   useFocusEffect(useCallback(() => {
     let active = false;
     let pending = false;
-    let generation = 0;
+    let request: AbortController | undefined;
     let retryAt = Infinity;
     let ticker: ReturnType<typeof setInterval> | undefined;
 
     function load() {
       if (!active || pending) return;
       pending = true;
-      const attempt = ++generation;
+      const attempt = request = new AbortController();
       setBusy(true);
-      void read().then((sample) => {
-        if (!active || generation !== attempt) return;
+      void read(attempt.signal).then((sample) => {
+        if (!active || request !== attempt) return;
         pending = false;
         retryAt = sample.retryAt;
         setSample({ key, reading: sample });
@@ -47,7 +47,8 @@ export function useNextTrainReading<Payload>(key: string, read: () => Promise<Ne
     function pause() {
       active = false;
       pending = false;
-      generation++;
+      request?.abort();
+      request = undefined;
       clearInterval(ticker);
     }
 

@@ -267,6 +267,7 @@ async function verify() {
   stubs['@/components/saved-bus-ui'] = { HomeFavoriteBus: 'HomeFavoriteBus' };
   stubs['@/components/home-favorite-railway'] = { HomeFavoriteRailway: 'HomeFavoriteRailway' };
   stubs['@/railway-favorite-hooks'] = { useRailwayFavorites: () => ({ items: [], status: 'ready' }) };
+  stubs['@/gmb-favorites'] = { useGmbFavorites: () => ({ items: [], status: 'ready' }) };
   stubs['@/home-transport-pins'] = {
     homePinKey: ({ id }) => id,
     useHomePins: () => ({ pins: favoriteItems.map(({ id }) => ({ mode: 'bus', id })), status: 'ready' }),

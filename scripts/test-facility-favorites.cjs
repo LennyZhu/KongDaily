@@ -20,7 +20,7 @@ const encodeIndex = (index) => JSON.stringify({ ...index, recordsSha256: digest(
   (_key, value) => value && typeof value === 'object' && !Array.isArray(value)
     ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]])) : value)) });
 
-function loadApp(file, { failAfterV8 = false, failAfterV9 = false, failAfterV10 = false, changeCatalog, registry, beforeQuery, stubs = {} } = {}) {
+function loadApp(file, { failAfterV8 = false, failAfterV9 = false, failAfterV10 = false, failAfterV11 = false, changeCatalog, registry, beforeQuery, stubs = {} } = {}) {
   const loaded = new Map();
   let connection;
   function databaseAdapter(db, afterExec) {
@@ -64,6 +64,10 @@ function loadApp(file, { failAfterV8 = false, failAfterV9 = false, failAfterV10 
             if (failAfterV10 && sql.includes('PRAGMA user_version = 10')) {
               throw new Error('Injected failure after v10 DDL');
             }
+            if (failAfterV11 && sql.includes('PRAGMA user_version = 11')) {
+              failAfterV11 = false;
+              throw new Error('Injected failure after v11 DDL');
+            }
           }));
           db.exec('COMMIT');
         } catch (error) {
@@ -78,7 +82,7 @@ function loadApp(file, { failAfterV8 = false, failAfterV9 = false, failAfterV10 
     const testExports = {
       'app/(tabs)/nearby': 'FacilityListRow',
       'components/facility-selection-card': 'FacilitySummary',
-      'app/(tabs)/saved': 'SavedBuses, SavedFacilities, SavedRailways, TransportFavoriteActions',
+      'app/(tabs)/saved': 'SavedBuses, SavedFacilities, SavedRailways, SavedMinibuses, TransportFavoriteActions',
       'app/light-rail/[kind]': 'LightRailStationServices, LightRailRouteStops',
       'app/bus/route': 'SelectedStopCard',
       'app/bus/eta': 'EtaDetails',
@@ -139,7 +143,9 @@ function inspectV7Data(file) {
   try {
     const tables = db.prepare(`SELECT name, sql FROM sqlite_schema
       WHERE type IN ('table', 'trigger', 'index') AND sql IS NOT NULL
-        AND name NOT IN ('facility_favorites', 'railway_favorites', 'home_transport_pins', 'remove_home_bus_pin', 'remove_home_railway_pin') ORDER BY name`).all();
+        AND name NOT IN ('facility_favorites', 'railway_favorites', 'home_transport_pins', 'remove_home_bus_pin', 'remove_home_railway_pin',
+          'gmb_favorites', 'home_pin_v11_orphans', 'remove_home_gmb_pin', 'require_home_pin_target',
+          'require_home_pin_reinsert', 'preserve_pinned_bus_id', 'preserve_pinned_railway_identity', 'preserve_pinned_gmb_id') ORDER BY name`).all();
     return [tables, tables.filter(({ sql }) => sql.startsWith('CREATE TABLE')).map(({ name }) =>
       db.prepare(`SELECT * FROM ${name} ORDER BY rowid`).all())];
   } finally {
@@ -211,7 +217,7 @@ async function test() {
   const fresh = join(scratch, 'fresh.db');
   const freshApp = loadApp(fresh);
   const freshDb = await freshApp.load('database').getDatabase();
-  assert.equal((await freshDb.getFirstAsync('PRAGMA user_version')).user_version, 10);
+  assert.equal((await freshDb.getFirstAsync('PRAGMA user_version')).user_version, 11);
   assert.equal(await freshApp.load('database').readLanguage(), 'system');
   freshApp.close();
 
@@ -241,7 +247,7 @@ async function test() {
   assert.equal(rolledBack.prepare("SELECT 1 FROM sqlite_schema WHERE name='facility_favorites'").get(), undefined);
   rolledBack.close();
   assert.deepEqual(inspectV7Data(file), before);
-  assert.equal((await (await db.getDatabase()).getFirstAsync('PRAGMA user_version')).user_version, 10);
+  assert.equal((await (await db.getDatabase()).getFirstAsync('PRAGMA user_version')).user_version, 11);
   assert.equal(await db.readLanguage(), 'en');
   assert.deepEqual(inspectV7Data(file), before);
 
@@ -1178,7 +1184,7 @@ async function testRailwayFavorites() {
   const hasText = (tree, value) => tree.some(({ props }) => props?.children === value || props?.title === value);
   try {
     const db = await app.load('database').getDatabase();
-    assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 10);
+    assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 11);
     assert.deepEqual(await db.getAllAsync('SELECT * FROM facility_favorites'), originalFacilities);
     const oldBus = await app.load('bus-favorites').readBusFavorites();
     assert.equal(oldBus[0].id, 'legacy-bus');
@@ -1376,7 +1382,7 @@ async function testRailwayFavorites() {
       useBusFavorites: () => ({ items: busItems, status: busStatus }),
       useUnavailableFavorites: () => new Set(),
     };
-    const { SavedRailways, SavedBuses, SavedFacilities, TransportFavoriteActions, default: SavedScreen } = reopened.load('app/(tabs)/saved');
+    const { SavedRailways, SavedBuses, SavedFacilities, SavedMinibuses, TransportFavoriteActions, default: SavedScreen } = reopened.load('app/(tabs)/saved');
     stubs['@/components/saved-bus-ui'].HomeFavoriteBus = 'HomeFavoriteBus';
     stubs['@/components/home-ui'] = Object.fromEntries(['FeaturedCard', 'HomeHero', 'HomeLink', 'HomeSection', 'QuickLinkCard'].map((name) => [name, name]));
     stubs['@/components/weather-warning-ui'] = { WeatherWarningLink: 'WeatherWarningLink' };
@@ -1387,6 +1393,13 @@ async function testRailwayFavorites() {
       ...newHooks,
       useRailwayFavorites: () => homeRailwayOverride ?? newHooks.useRailwayFavorites(),
     };
+    const minibus = {
+      mode: 'gmb', id: '2009246:2:3:10', routeId: 2009246, routeSeq: 2, stopSeq: 3, stopId: 10,
+      region: 'KLN', routeCode: '2', stopName: { 'zh-HK': '上車站', en: 'Boarding stop' },
+      destination: { 'zh-HK': '黃埔', en: 'Whampoa' },
+    };
+    const gmbStore = reopened.load('gmb-favorites');
+    await gmbStore.setGmbFavorite(minibus, true);
     const HomeScreen = reopened.load('app/(tabs)/index').default;
     const { FavoriteBusRow: RealFavoriteBusRow } = reopened.load('components/saved-bus-ui');
     for (const language of ['zh-HK', 'en']) {
@@ -1402,6 +1415,7 @@ async function testRailwayFavorites() {
         { buses: [], rails: [islFavorite], order: [isl], expected: [islFavorite] },
         { buses: [], rails: [lrFavorite], order: [lr610], expected: [lrFavorite] },
         { buses: oldBus, rails: railItems, order: [lr610, busPin, isl], expected: [lrFavorite, oldBus[0], islFavorite] },
+        { buses: oldBus, rails: railItems, order: [minibus, busPin, isl], expected: [minibus, oldBus[0], islFavorite] },
         { buses: oldBus, rails: railItems, order: [], expected: [] },
       ];
       for (const { buses, rails, order, expected } of scenarios) {
@@ -1410,7 +1424,7 @@ async function testRailwayFavorites() {
         busItems = buses;
         homeRailwayOverride = { status: 'ready', items: rails, operations: new Map() };
         const tree = render(HomeScreen);
-        const cards = tree.filter(({ type }) => type === 'HomeFavoriteBus' || type.name === 'HomeFavoriteRailway');
+        const cards = tree.filter(({ type }) => type === 'HomeFavoriteBus' || ['HomeFavoriteRailway', 'HomeFavoriteGmb'].includes(type.name));
         assert.deepEqual(cards.map(({ props }) => props.favorite), expected, 'Home follows the persisted order across transport types');
         assert.equal(tree.some(({ type, props }) => type === 'EmptyState' && props.title === copy().homePins.empty), expected.length === 0);
         assert.ok(tree.some(({ type, props }) => type === 'HomeSection' && props.action?.href === '/saved?category=all'));
@@ -1533,15 +1547,24 @@ async function testRailwayFavorites() {
           }
         }
       }
+      const minibusCard = render(SavedMinibuses);
+      const exactLink = { pathname: '/minibus/[id]', params: { id: '2009246', routeSeq: '2', stopSeq: '3', stopId: '10' } };
+      const minibusLink = minibusCard.find(({ type }) => type === 'Pressable');
+      assert.ok(minibusLink.props.accessibilityLabel.includes(minibus.stopName[locale]));
+      minibusLink.props.onPress();
+      assert.deepEqual(opened.at(-1), exactLink);
+      assert.equal(minibusCard.find(({ type }) => type === TransportFavoriteActions).props.pin.id, minibus.id);
+
       busItems = oldBus; busStatus = 'ready';
-      for (const category of ['all', 'buses', 'mtr', 'lightRail', 'places']) {
+      for (const category of ['all', 'buses', 'mtr', 'lightRail', 'minibus', 'places']) {
         params = { category };
         const rootTree = render(SavedScreen);
         assert.equal(rootTree.find(({ type }) => type === 'Filters').props.horizontal, true);
         assert.deepEqual(rootTree.find(({ type }) => type === 'Filters').props.options.map(([key]) => key),
-          ['all', 'buses', 'mtr', 'lightRail', 'places']);
+          ['all', 'buses', 'mtr', 'lightRail', 'minibus', 'places']);
         assert.equal(rootTree.some(({ type }) => type === SavedBuses), ['all', 'buses'].includes(category));
         assert.equal(rootTree.some(({ type }) => type === SavedFacilities), ['all', 'places'].includes(category));
+        assert.equal(rootTree.some(({ type }) => type === SavedMinibuses), ['all', 'minibus'].includes(category));
         const railSection = rootTree.find(({ type }) => type === SavedRailways);
         assert.equal(!!railSection, ['all', 'mtr', 'lightRail'].includes(category));
         if (!railSection) continue;
@@ -1657,7 +1680,7 @@ async function testHomePinMigration() {
     const store = migrated.load('home-transport-pins');
     assert.deepEqual(await store.readHomePins(), order);
     const db = new DatabaseSync(file);
-    assert.equal(version(db), 10);
+    assert.equal(version(db), 11);
     assert.deepEqual(['bus_favorites', 'railway_favorites'].map((table) => db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()), before);
     db.close();
     if (count === 1) {
@@ -1685,7 +1708,118 @@ async function testHomePinMigration() {
   console.log('PASS: v9→v10 rollback, zero-to-three legacy bus pins, deterministic railway fill, shared limit, cross-mode order, removal and restart');
 }
 
-test().then(testNearbyFavoriteButtons).then(testSavedFacilityIntegration).then(testRouteStopQuickFavorite).then(testRailwayFavorites).then(testHomePinMigration)
-  .then(() => console.log('PASS: registry, SQLite v10, facility favorites, nearby bilingual filters, bus and railway favorites and shared Home pins'))
+async function testMinibusV11Migration() {
+  const fixture = require('./fixtures/gmb-api.json');
+  const modes = ['bus', 'mtr', 'light_rail'];
+  for (const orphanMode of modes) {
+    const file = join(scratch, `pins-v10-${orphanMode}.db`);
+    const seed = new DatabaseSync(file);
+    seed.exec(sqlFromSource.slice(0, 10).join('\n'));
+    seed.exec(`
+      INSERT INTO bus_favorites (id, source, route_number, direction, stop_id, stop_seq, repeated_stop,
+        station_zh, station_en, destination_zh, destination_en, created_at, updated_at)
+        VALUES ('B', 'citybus', '1', 'outbound', '000001', 1, 0, '站', 'Stop', '終點', 'Destination', 1, 1);
+      INSERT INTO railway_favorites VALUES ('mtr', 'EAL', 'ADM', '路線', 'Route', '站', 'Station', 2, 2);
+      INSERT INTO railway_favorites VALUES ('light_rail', '610', '380', '路線', 'Route', '站', 'Station', 3, 3);
+    `);
+    const values = [
+      { mode: 'bus', id: 'B' },
+      { mode: 'mtr', lineId: 'EAL', stationId: 'ADM' },
+      { mode: 'light_rail', lineId: '610', stationId: '380' },
+    ];
+    const valid = values.toReversed().filter(({ mode }) => mode !== orphanMode);
+    const orphan = orphanMode === 'bus' ? { mode: orphanMode, id: 'missing' }
+      : { mode: orphanMode, lineId: 'missing', stationId: 'unknown' };
+    const v10Write = seed.prepare('INSERT INTO home_transport_pins (position, mode, bus_id, line_id, station_id) VALUES (?, ?, ?, ?, ?)');
+    [valid[0], orphan, valid[1]].forEach((pin, index) => v10Write.run(index + 1, pin.mode, pin.id ?? null, pin.lineId ?? null, pin.stationId ?? null));
+    const preserved = ['bus_favorites', 'railway_favorites'];
+    const readOriginal = (db) => preserved.map((table) => db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all());
+    const original = readOriginal(seed);
+    const oldPins = seed.prepare('SELECT * FROM home_transport_pins ORDER BY position').all();
+    seed.close();
+
+    const app = loadApp(file, { failAfterV11: true });
+    try {
+      await assert.rejects(app.load('database').getDatabase(), /v11 DDL/);
+      const undone = new DatabaseSync(file);
+      assert.equal(version(undone), 10);
+      assert.deepEqual(undone.prepare('SELECT * FROM home_transport_pins ORDER BY position').all(), oldPins);
+      assert.equal(undone.prepare("SELECT name FROM sqlite_schema WHERE name = 'home_pin_v11_orphans'").get(), undefined);
+      undone.close();
+
+      const store = app.load('home-transport-pins');
+      const gmb = app.load('gmb-favorites');
+      const { parseGmbRoutes, parseGmbRouteStops } = app.load('gmb-data');
+      const bus = values[0];
+      assert.deepEqual(await store.readHomePins(), valid);
+      const database = await app.load('database').getDatabase();
+      const check = new DatabaseSync(file);
+      assert.equal(version(check), 11);
+      assert.deepEqual(readOriginal(check), original);
+      check.close();
+      assert.deepEqual((await database.getAllAsync('SELECT position FROM home_transport_pins ORDER BY position')).map(({ position }) => position), [1, 2]);
+      assert.deepEqual({ ...await database.getFirstAsync('SELECT * FROM home_pin_v11_orphans') },
+        { previous_position: 2, mode: orphanMode, bus_id: orphan.id ?? null, line_id: orphan.lineId ?? null,
+          station_id: orphan.stationId ?? null, reason: 'missing_favorite' });
+      await assert.rejects(database.runAsync("INSERT INTO home_transport_pins (position, mode, bus_id) VALUES (3, 'bus', 'missing')"), /Missing home pin target/);
+      await assert.rejects(database.runAsync("INSERT INTO home_transport_pins (position, mode, gmb_id) VALUES (3, 'gmb', 'missing')"), /Missing home pin target/);
+      await assert.rejects(database.runAsync("INSERT INTO home_transport_pins (position, mode, line_id, station_id) VALUES (3, 'tram', '4003', '99304')"));
+      await assert.rejects(database.runAsync("INSERT INTO home_transport_pins (position, mode, line_id, station_id) VALUES (3, 'ferry', '1', '2')"));
+      await assert.rejects(database.runAsync('UPDATE home_transport_pins SET position = 3 WHERE position = 2'), /Replace home pins/);
+
+      const routes = ['hki2', 'kln2', 'nt2'].flatMap((key) => {
+        const { region } = fixture[key].data[0];
+        return parseGmbRoutes(fixture[key].data, { region, routeCode: '2' });
+      });
+      const names = { tc: '站', sc: null, en: 'Stop' };
+      const favorites = routes.map((route) => gmb.createGmbFavorite(route, route.directions[0],
+        { routeId: route.routeId, routeSeq: route.directions[0].routeSeq, stopSeq: 1, stopId: 100, name: names }));
+      const loop = parseGmbRouteStops(fixture.circular.data, routes[0].directions[0]);
+      const first = loop.visits[0];
+      const repeated = { ...first, stopSeq: first.stopSeq + 1 };
+      const terminal = loop.visits.at(-1);
+      const repeatFixture = [first, repeated, terminal];
+      const { gmbBoardingVisit } = app.load('nearby-gmb');
+      assert.equal(gmbBoardingVisit(first, repeatFixture), true);
+      assert.equal(gmbBoardingVisit(repeated, repeatFixture), true);
+      assert.equal(gmbBoardingVisit(terminal, repeatFixture), false);
+      favorites.push(gmb.createGmbFavorite(routes[0], routes[0].directions[0], first));
+      favorites.push(gmb.createGmbFavorite(routes[0], routes[0].directions[0], repeated));
+      assert.equal(new Set(favorites.map(({ id }) => id)).size, favorites.length);
+      assert(favorites.every(({ routeCode }) => routeCode === '2'));
+
+      const [pin] = favorites;
+      assert.equal(await gmb.setGmbFavorite({ ...pin, stopId: 101 }, true), 'failed');
+      assert.equal(await gmb.setGmbFavorite({ ...pin, mode: 'tram' }, true), 'failed');
+      assert.deepEqual(await Promise.all([...favorites, pin].map((favorite) => gmb.setGmbFavorite(favorite, true))),
+        Array(favorites.length + 1).fill('ok'));
+      assert.equal((await gmb.listGmbFavorites()).length, favorites.length);
+      assert.deepEqual(await store.readHomePins(), valid, 'Saving never pins');
+      assert.equal(await store.changeHomePin({ type: 'pin', pin }), 'ok');
+      assert.equal(await store.changeHomePin({ type: 'pin', pin: favorites[1] }), 'limit');
+      assert.equal(await store.changeHomePin({ type: 'pin', pin: bus }), valid.some(({ mode }) => mode === 'bus') ? 'ok' : 'limit');
+      await assert.rejects(database.runAsync("INSERT INTO home_transport_pins (position, mode, gmb_id) VALUES (4, 'gmb', ?)", favorites[1].id));
+      await store.changeHomePin({ type: 'move', pin, step: -1 });
+      assert.deepEqual(await store.readHomePins(), [valid[0], { mode: 'gmb', id: pin.id }, valid[1]]);
+      await store.changeHomePin({ type: 'unpin', pin });
+      assert.equal((await gmb.listGmbFavorites()).length, favorites.length);
+      await store.changeHomePin({ type: 'pin', pin });
+      await gmb.setGmbFavorite(pin, false);
+      assert.deepEqual(await store.readHomePins(), valid);
+      await store.changeHomePin({ type: 'pin', pin: favorites[1] });
+      assert.equal((await database.getFirstAsync('PRAGMA integrity_check')).integrity_check, 'ok');
+    } finally { app.close(); }
+    const copy = join(scratch, `pins-v11-copy-${orphanMode}.db`);
+    copyFileSync(file, copy);
+    const reopened = loadApp(copy);
+    assert.deepEqual((await reopened.load('home-transport-pins').readHomePins()).map(({ mode }) => mode), [...valid.map(({ mode }) => mode), 'gmb']);
+    assert.equal((await reopened.load('gmb-favorites').listGmbFavorites()).length, 7);
+    reopened.close();
+  }
+  console.log('PASS: v10→v11 rollback, orphan audit for all legacy modes, unchanged favorites, cross-mode cap/order, minibus visit identities and restored copy');
+}
+
+test().then(testNearbyFavoriteButtons).then(testSavedFacilityIntegration).then(testRouteStopQuickFavorite).then(testRailwayFavorites).then(testHomePinMigration).then(testMinibusV11Migration)
+  .then(() => console.log('PASS: registry, SQLite v11, facility favorites, nearby bilingual filters, bus and railway favorites and shared Home pins'))
   .catch((error) => { console.error(error); process.exitCode = 1; })
   .finally(() => rmSync(scratch, { recursive: true, force: true }));

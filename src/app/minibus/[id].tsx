@@ -2,13 +2,16 @@ import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
 
-import { GmbFeedback } from '@/components/gmb-status';
+import { GmbFavoriteAction } from '@/components/gmb-favorite-action';
+import { GmbFeedback, GmbForecastRows } from '@/components/gmb-status';
 import { AppText, EmptyState, Filters, Icon, PageHeading, Screen } from '@/components/ui';
 import { gmbClient } from '@/gmb-client';
 import { gmbEtaView, gmbIsDirection, gmbPositiveId, type GmbDirection, type GmbRoute, type GmbRouteSeq, type GmbVisit, type GmbVisitKey } from '@/gmb-data';
+import { createGmbFavorite, type GmbFavorite } from '@/gmb-favorites';
 import { useGmbQuery } from '@/gmb-query-hooks';
 import { gmbRepeatedStopIds, gmbText, gmbVisitKey } from '@/gmb-search';
 import { useLanguage } from '@/language';
+import { gmbBoardingVisit } from '@/nearby-gmb';
 import { useNextTrainReading } from '@/next-train-hooks';
 import { formatHongKongTime } from '@/next-train-time';
 import { colors, radius, space, touchTarget } from '@/theme';
@@ -96,17 +99,18 @@ function RouteDirections({ route, initialDirection, initialVisit }: {
           }} />
       </>}
       {!!description && <AppText variant="detail" tone="muted">{description}</AppText>}
-      <DirectionStops key={direction.routeSeq} direction={direction}
+      <DirectionStops key={direction.routeSeq} route={route} direction={direction}
         initialVisit={direction.routeSeq === initialDirection ? requested : undefined} />
     </View>
   );
 }
 
-function DirectionStops({ direction: { routeId, routeSeq }, initialVisit }: {
-  direction: GmbDirection; initialVisit?: VisitSelection;
+function DirectionStops({ route, direction, initialVisit }: {
+  route: GmbRoute; direction: GmbDirection; initialVisit?: VisitSelection;
 }) {
   const { copy, locale } = useLanguage();
   const labels = copy.minibus;
+  const { routeId, routeSeq } = direction;
   const read = useCallback((signal: AbortSignal) => gmbClient.readRouteStops({ routeId, routeSeq }, signal), [routeId, routeSeq]);
   const { result, retry } = useGmbQuery(read);
   const [selected, select] = useState<string>();
@@ -129,6 +133,7 @@ function DirectionStops({ direction: { routeId, routeSeq }, initialVisit }: {
                   const key = gmbVisitKey(visit);
                   const name = gmbText(visit.name, locale);
                   const open = key === activeKey;
+                  const favorite = open && gmbBoardingVisit(visit, visits) ? createGmbFavorite(route, direction, visit) : undefined;
                   return (
                     <View key={key} style={index > 0 && styles.divider}>
                       <Pressable accessibilityRole="button" accessibilityLabel={labels.stopLabel(visit.stopSeq, name)}
@@ -138,9 +143,14 @@ function DirectionStops({ direction: { routeId, routeSeq }, initialVisit }: {
                         <AppText variant="detail" style={styles.flex}>{name}</AppText>
                         <Icon name={open ? 'chevron.up' : 'chevron.down'} size={13} />
                       </Pressable>
-                      {open && (repeated?.has(visit.stopId)
-                        ? <View style={styles.forecast}><GmbFeedback text={labels.etaAmbiguous} /></View>
-                        : <StopForecast visit={visit} first={index === 0} />)}
+                      {open && <View style={styles.forecast}>
+                        {repeated?.has(visit.stopId) ? (
+                          <View style={styles.toolbar}>
+                            <View style={styles.toolbarTitle}><GmbFeedback text={labels.etaAmbiguous} /></View>
+                            {favorite && <GmbFavoriteAction favorite={favorite} />}
+                          </View>
+                        ) : <StopForecast visit={visit} first={index === 0} favorite={favorite} />}
+                      </View>}
                     </View>
                   );
                 })}
@@ -150,21 +160,16 @@ function DirectionStops({ direction: { routeId, routeSeq }, initialVisit }: {
   );
 }
 
-function StopForecast({ visit, first }: { visit: GmbVisit; first: boolean }) {
-  const { copy: { minibus: labels }, locale } = useLanguage();
-  const read = useCallback(() => gmbClient.readEta(visit), [visit]);
+function StopForecast({ visit, first, favorite }: { visit: GmbVisit; first: boolean; favorite?: GmbFavorite }) {
+  const { copy: { minibus: labels } } = useLanguage();
+  const read = useCallback((signal: AbortSignal) => gmbClient.readEta(visit, signal), [visit]);
   const { reading, busy, now, refresh } = useNextTrainReading(gmbVisitKey(visit), read, undefined, true);
   const view = reading ? gmbEtaView(reading, now) : undefined;
   const refreshDisabled = busy || Boolean(reading && now.monotonic < reading.retryAt);
-  const message = !view ? labels.loadingEta : view.kind === 'forecast' ? undefined
-    : view.kind === 'stale' ? labels.etaStale : view.kind === 'empty' ? labels.etaEmpty
-      : view.kind === 'disabled' ? gmbText(view.description, locale) || labels.etaDisabled
-        : view.kind === 'timeout' ? labels.etaTimeout
-          : view.kind === 'rateLimited' ? labels.etaRateLimited : labels.etaFailed;
   return (
-    <View style={styles.forecast}>
+    <>
       <View style={styles.toolbar}>
-        <AppText variant="homeCardTitle" accessibilityRole="header" style={styles.flex}>
+        <AppText variant="homeCardTitle" accessibilityRole="header" style={styles.toolbarTitle}>
           {first ? labels.firstStopEtaTitle : labels.etaTitle}
         </AppText>
         <Pressable accessibilityRole="button" accessibilityLabel={labels.refresh} accessibilityState={{ disabled: refreshDisabled, busy }}
@@ -172,27 +177,13 @@ function StopForecast({ visit, first }: { visit: GmbVisit; first: boolean }) {
           style={({ pressed }) => [styles.refresh, (pressed || refreshDisabled) && styles.pressed]}>
           {busy ? <ActivityIndicator size="small" color={colors.primary} /> : <Icon name="arrow.clockwise" size={16} />}
         </Pressable>
+        {favorite && <GmbFavoriteAction favorite={favorite} />}
       </View>
-      {!!message && <AppText variant="detail" tone="muted" accessibilityLiveRegion="polite">{message}</AppText>}
-      {view?.kind === 'forecast' && view.entries.map((entry) => {
-        const remark = gmbText(entry.remarks, locale);
-        if (entry.kind === 'notice') return <AppText key={entry.sequence} variant="detail" tone="muted">{remark}</AppText>;
-        const time = formatHongKongTime(entry.timestamp);
-        // The source does not distinguish typed arrival and departure times at the first stop.
-        const label = entry.kind === 'scheduled' ? labels.scheduled
-          : first && entry.imminent ? labels.dueSoonService
-            : entry.imminent ? labels.due : entry.remainingMinutes === undefined ? undefined : labels.minutes(entry.remainingMinutes);
-        return (
-          <View key={entry.sequence} style={styles.etaRow}>
-            {!!label && <AppText variant="detail" tone="primary" style={styles.flex}>{label}</AppText>}
-            <AppText variant="detail">{time}</AppText>
-          </View>
-        );
-      })}
+      <GmbForecastRows view={view} first={first} />
       {view && 'generatedAt' in view && (
         <AppText variant="caption" tone="muted">{labels.updates(formatHongKongTime(view.generatedAt))}</AppText>
       )}
-    </View>
+    </>
   );
 }
 
@@ -207,8 +198,8 @@ const styles = StyleSheet.create({
   selected: { backgroundColor: colors.tint },
   pressed: { opacity: 0.65 },
   forecast: { padding: space.md, gap: space.sm, backgroundColor: colors.tintedBackground },
-  toolbar: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space.xs },
+  toolbarTitle: { flexGrow: 1, flexShrink: 1, flexBasis: 120, minWidth: 0, maxWidth: '100%' },
   refresh: { minHeight: touchTarget, minWidth: touchTarget, justifyContent: 'center', alignItems: 'center' },
-  etaRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: space.sm },
   link: { minHeight: touchTarget, flexDirection: 'row', alignItems: 'center', gap: space.sm },
 });
