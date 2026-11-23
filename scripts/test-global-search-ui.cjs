@@ -259,9 +259,12 @@ async function complete() {
 async function verify() {
   const { HomeHero, HomeLink, HomeSection, QuickLinkCard } = load('components/home-ui');
   const pinnedB2 = { id: 'pinned-b2', target: { source: 'nlb', number: 'B2', routeId: '37', stopId: '200', stopSeq: 13 } };
-  let favoriteItems = [pinnedB2];
+  const favoriteItems = [pinnedB2, { id: 'bus-2' }, { id: 'bus-3' }, { id: 'bus-4' }];
+  const busPins = favoriteItems.map(({ id }) => ({ mode: 'bus', id }));
+  let busStatus = 'ready';
+  let pinState;
   stubs['@/bus-favorite-hooks'] = {
-    useBusFavorites: () => ({ items: favoriteItems, status: 'ready' }),
+    useBusFavorites: () => ({ items: favoriteItems, status: busStatus }),
     useUnavailableFavorites: () => new Set(),
   };
   stubs['@/components/saved-bus-ui'] = { HomeFavoriteBus: 'HomeFavoriteBus' };
@@ -269,8 +272,8 @@ async function verify() {
   stubs['@/railway-favorite-hooks'] = { useRailwayFavorites: () => ({ items: [], status: 'ready' }) };
   stubs['@/gmb-favorites'] = { useGmbFavorites: () => ({ items: [], status: 'ready' }) };
   stubs['@/home-transport-pins'] = {
-    homePinKey: ({ id }) => id,
-    useHomePins: () => ({ pins: favoriteItems.map(({ id }) => ({ mode: 'bus', id })), status: 'ready' }),
+    ...load('home-transport-pins'),
+    useHomePins: () => pinState,
   };
   stubs['@/components/weather-warning-ui'] = { WeatherWarningLink: 'WeatherWarningLink' };
   const HomeScreen = load('app/(tabs)/index').default;
@@ -278,7 +281,7 @@ async function verify() {
   for (locale of ['zh-HK', 'en']) {
     const { empty: emptyTitle, emptyDetail } = labels().homePins;
     const addLabel = locale === 'en' ? 'Add frequent transport' : '新增常用交通';
-    favoriteItems = [pinnedB2];
+    pinState = { pins: busPins.slice(0, 1), status: 'ready' };
     hookIndex = 0;
     const page = nodes(HomeScreen());
     assert(page.some(({ type }) => type === HomeHero));
@@ -303,15 +306,43 @@ async function verify() {
     find(HomeLink(transportLink.props), 'Pressable').props.onPress();
     assert.equal(pushed.pop(), '/transport');
 
-    favoriteItems = [];
-    hookIndex = 0;
-    const emptyFrequent = nodes(HomeScreen()).find(({ type, props }) => type === HomeSection && props.title === labels().home.buses);
+    function assertPinVisibility(pins, status, cardCount, showAdd) {
+      pinState = { pins, status };
+      hookIndex = 0;
+      const homePage = nodes(HomeScreen());
+      const section = homePage.find(({ type, props }) => type === HomeSection && props.title === labels().home.buses);
+      const children = nodes(section.props.children);
+      assert.deepEqual(children.map(({ type }) => type),
+        [...Array(cardCount).fill('HomeFavoriteBus'),
+          ...(status === 'loading' || busStatus === 'loading' ? ['AppText'] : []),
+          ...(cardCount === 0 && showAdd ? ['EmptyState'] : []),
+          ...(showAdd ? [HomeLink, 'Icon', 'AppText'] : [])]);
+      assert.equal(children.find(({ type }) => type === HomeLink)?.props.label, showAdd ? addLabel : undefined);
+      assert.equal(section.props.action.href, '/saved?category=all');
+      assert.deepEqual(homePage.filter(({ type }) => type === QuickLinkCard).map(({ props }) => props.href),
+        shortcuts.map(({ props }) => props.href));
+      return section;
+    }
+
+    // A cold start or a pending favorite read cannot infer availability from partial data.
+    assertPinVisibility([], 'loading', 0, false);
+    busStatus = 'loading';
+    assertPinVisibility(busPins.slice(0, 2), 'ready', 2, false);
+    busStatus = 'ready';
+    const emptyFrequent = assertPinVisibility([], 'ready', 0, true);
     assert(hasCopy(emptyFrequent, emptyTitle));
     assert.equal(find(emptyFrequent, 'EmptyState').props.detail, emptyDetail);
     tapText(emptyFrequent, addLabel);
     assert.deepEqual(pushed.pop(), addFrequentHref);
     tapText(emptyFrequent, labels().homeRailway.viewSaved);
     assert.equal(pushed.pop(), '/saved?category=all');
+    assertPinVisibility(busPins.slice(0, 2), 'ready', 2, true);
+    const fullFrequent = assertPinVisibility(busPins.slice(0, 3), 'ready', 3, false);
+    tapText(fullFrequent, labels().homeRailway.viewSaved);
+    assert.equal(pushed.pop(), '/saved?category=all');
+    // Returning from Saved uses the latest shared pin snapshot.
+    assertPinVisibility(busPins.slice(0, 2), 'ready', 2, true);
+    assertPinVisibility([...busPins.slice(0, 2), { mode: 'bus', id: 'missing' }], 'ready', 2, true);
   }
   locale = 'zh-HK';
   slots = [];

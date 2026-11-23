@@ -14,7 +14,7 @@ import { getExplorePhoto } from '@/explore-place-images';
 import { getExplorePlace, homeFeaturedPlaceIds } from '@/explore-places';
 import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
-import { homePinKey, loadHomePins, useHomePins } from '@/home-transport-pins';
+import { homePinKey, homeTransportLimit, loadHomePins, useHomePins } from '@/home-transport-pins';
 import { loadGmbFavorites, useGmbFavorites } from '@/gmb-favorites';
 import { loadRailwayFavorites, useRailwayFavorites } from '@/railway-favorite-hooks';
 import { colors, homeColors, homeLayout, radius, space, touchTarget } from '@/theme';
@@ -64,14 +64,14 @@ export default function HomeScreen() {
         ? { key, bus: busesById.get(pin.id) }
         : pin.mode === 'gmb' ? { key, gmb: minibusesById.get(pin.id) }
           : { key, rail: railwaysByKey.get(key) };
-    });
+    }).filter(({ bus, rail, gmb }) => bus || rail || gmb);
   }, [homePins.pins, items, railway.items, minibus.items]);
   const buses = useMemo(() => cards.flatMap(({ bus }) => bus ? [bus] : []), [cards]);
   const unavailable = useUnavailableFavorites(buses);
   const hasMinibusPin = homePins.pins.some(({ mode }) => mode === 'gmb');
   const waiting = status === 'loading' || railway.status === 'loading' || (hasMinibusPin && minibus.status === 'loading') || homePins.status === 'loading';
   const hasError = status === 'error' || railway.status === 'error' || (hasMinibusPin && minibus.status === 'error') || homePins.status === 'error';
-  const hasCards = cards.some(({ bus, rail, gmb }) => bus || rail || gmb);
+  const canAddTransport = !waiting && !hasError && cards.length < homeTransportLimit;
 
   return (
     <Screen contentStyle={styles.screenContent} topBackgroundColor={homeColors.harbourSky}>
@@ -92,13 +92,15 @@ export default function HomeScreen() {
               void Promise.all([loadBusFavorites(), loadRailwayFavorites(), loadGmbFavorites(), loadHomePins()]);
             }} />
           </>}
-          {!hasCards && !waiting && !hasError && (
+          {cards.length === 0 && !waiting && !hasError && (
             <EmptyState icon="pin" title={copy.homePins.empty} detail={copy.homePins.emptyDetail} />
           )}
-          <HomeLink href="/transport" label={home.addFrequentRoute} style={styles.addBus}>
-            <Icon name="plus" size={16} />
-            <AppText variant="detail" tone="primary" style={styles.buttonLabel}>{home.addFrequentRoute}</AppText>
-          </HomeLink>
+          {canAddTransport && (
+            <HomeLink href="/transport" label={home.addFrequentRoute} style={styles.addBus}>
+              <Icon name="plus" size={16} />
+              <AppText variant="detail" tone="primary" style={styles.buttonLabel}>{home.addFrequentRoute}</AppText>
+            </HomeLink>
+          )}
         </HomeSection>
 
         <HomeSection title={home.shortcuts} icon="safari">
