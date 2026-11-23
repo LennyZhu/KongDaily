@@ -1738,7 +1738,16 @@ async function testMinibusV11Migration() {
     const oldPins = seed.prepare('SELECT * FROM home_transport_pins ORDER BY position').all();
     seed.close();
 
-    const app = loadApp(file, { failAfterV11: true });
+    let failFavoriteRead = false;
+    const app = loadApp(file, {
+      failAfterV11: true,
+      stubs: { react: { useEffect() {}, useSyncExternalStore: (_subscribe, snapshot) => snapshot() } },
+      beforeQuery(sql) {
+        if (failFavoriteRead && sql.startsWith('SELECT * FROM gmb_favorites')) {
+          throw new Error('Injected minibus favorite readback failure');
+        }
+      },
+    });
     try {
       await assert.rejects(app.load('database').getDatabase(), /v11 DDL/);
       const undone = new DatabaseSync(file);
@@ -1791,12 +1800,19 @@ async function testMinibusV11Migration() {
       const [pin] = favorites;
       assert.equal(await gmb.setGmbFavorite({ ...pin, stopId: 101 }, true), 'failed');
       assert.equal(await gmb.setGmbFavorite({ ...pin, mode: 'tram' }, true), 'failed');
+      failFavoriteRead = true;
+      assert.equal(await gmb.setGmbFavorite(pin, true), 'failed');
+      failFavoriteRead = false;
+      assert.deepEqual(await gmb.listGmbFavorites(), [], 'A failed save does not leave a hidden favorite');
       assert.deepEqual(await Promise.all([...favorites, pin].map((favorite) => gmb.setGmbFavorite(favorite, true))),
         Array(favorites.length + 1).fill('ok'));
       assert.equal((await gmb.listGmbFavorites()).length, favorites.length);
       assert.deepEqual(await store.readHomePins(), valid, 'Saving never pins');
-      assert.equal(await store.changeHomePin({ type: 'pin', pin }), 'ok');
-      assert.equal(await store.changeHomePin({ type: 'pin', pin: favorites[1] }), 'limit');
+      assert.deepEqual(await Promise.all([
+        store.changeHomePin({ type: 'pin', pin }),
+        store.changeHomePin({ type: 'pin', pin }),
+        store.changeHomePin({ type: 'pin', pin: favorites[1] }),
+      ]), ['ok', 'ok', 'limit'], 'Rapid duplicate taps cannot take another slot or replace a pin');
       assert.equal(await store.changeHomePin({ type: 'pin', pin: bus }), valid.some(({ mode }) => mode === 'bus') ? 'ok' : 'limit');
       await assert.rejects(database.runAsync("INSERT INTO home_transport_pins (position, mode, gmb_id) VALUES (4, 'gmb', ?)", favorites[1].id));
       await store.changeHomePin({ type: 'move', pin, step: -1 });
@@ -1804,8 +1820,23 @@ async function testMinibusV11Migration() {
       await store.changeHomePin({ type: 'unpin', pin });
       assert.equal((await gmb.listGmbFavorites()).length, favorites.length);
       await store.changeHomePin({ type: 'pin', pin });
-      await gmb.setGmbFavorite(pin, false);
-      assert.deepEqual(await store.readHomePins(), valid);
+      const pinned = await store.readHomePins();
+      failFavoriteRead = true;
+      assert.equal(await gmb.setGmbFavorite(pin, false), 'failed');
+      failFavoriteRead = false;
+      assert.deepEqual(await store.readHomePins(), pinned, 'Readback failure rolls back the minibus pin deletion');
+      assert.ok((await gmb.listGmbFavorites()).some(({ id }) => id === pin.id));
+      assert.deepEqual(store.useHomePins().pins.map(store.homePinKey), pinned.map(store.homePinKey),
+        'Home retains the committed pin snapshot');
+      assert.equal(gmb.useGmbFavorites().status, 'ready');
+      assert.ok(gmb.useGmbFavorites().items.some(({ id }) => id === pin.id));
+      assert.deepEqual(await Promise.all([
+        gmb.setGmbFavorite(pin, false),
+        store.changeHomePin({ type: 'pin', pin }),
+      ]), ['ok', 'ok']);
+      assert.deepEqual(await store.readHomePins(), valid, 'A queued re-pin cannot revive a deleted favorite');
+      assert.deepEqual(store.useHomePins().pins, valid);
+      assert.ok(!gmb.useGmbFavorites().items.some(({ id }) => id === pin.id));
       await store.changeHomePin({ type: 'pin', pin: favorites[1] });
       assert.equal((await database.getFirstAsync('PRAGMA integrity_check')).integrity_check, 'ok');
     } finally { app.close(); }

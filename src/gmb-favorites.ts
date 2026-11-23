@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
+import type { SQLiteDatabase } from 'expo-sqlite';
 
 import { getDatabase } from '@/database';
 import { gmbIsDirection, gmbIsRegion, gmbIsRouteCode, gmbPositiveId,
@@ -28,9 +29,8 @@ type Row = {
   region: GmbRegion; route_code: string; stop_zh: string; stop_en: string; destination_zh: string; destination_en: string;
 };
 
-export async function listGmbFavorites(): Promise<GmbFavorite[]> {
-  const database = await getDatabase();
-  const rows = await database.getAllAsync<Row>('SELECT * FROM gmb_favorites ORDER BY created_at DESC, id');
+export async function listGmbFavorites(database?: SQLiteDatabase): Promise<GmbFavorite[]> {
+  const rows = await (database ?? await getDatabase()).getAllAsync<Row>('SELECT * FROM gmb_favorites ORDER BY created_at DESC, id');
   return rows.map((row) => ({
     mode: 'gmb', id: row.id, routeId: row.route_id, routeSeq: row.route_seq, stopSeq: row.stop_seq,
     stopId: row.stop_id, region: row.region, routeCode: row.route_code,
@@ -75,20 +75,23 @@ export function setGmbFavorite(favorite: GmbFavorite, saved: boolean) {
           !gmbPositiveId(favorite.stopId) || !gmbPositiveId(favorite.stopSeq) ||
           !gmbIsRegion(favorite.region) || !gmbIsRouteCode(favorite.routeCode)) return 'failed';
       const db = await getDatabase();
-      if (saved) {
-        await db.runAsync(`
-          INSERT INTO gmb_favorites (id, route_id, route_seq, stop_seq, stop_id, region, route_code,
-            stop_zh, stop_en, destination_zh, destination_en, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING
-        `, favorite.id, favorite.routeId, favorite.routeSeq, favorite.stopSeq, favorite.stopId, favorite.region, favorite.routeCode,
-        favorite.stopName['zh-HK'], favorite.stopName.en, favorite.destination['zh-HK'], favorite.destination.en, Date.now());
-      } else {
-        await db.runAsync('DELETE FROM gmb_favorites WHERE id = ?', favorite.id);
-        forgetDeletedHomePin(favorite);
-      }
+      let items: GmbFavorite[] = [];
+      await db.withExclusiveTransactionAsync(async (transaction) => {
+        if (saved) {
+          await transaction.runAsync(`
+            INSERT INTO gmb_favorites (id, route_id, route_seq, stop_seq, stop_id, region, route_code,
+              stop_zh, stop_en, destination_zh, destination_en, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING
+          `, favorite.id, favorite.routeId, favorite.routeSeq, favorite.stopSeq, favorite.stopId, favorite.region, favorite.routeCode,
+          favorite.stopName['zh-HK'], favorite.stopName.en, favorite.destination['zh-HK'], favorite.destination.en, Date.now());
+        } else {
+          await transaction.runAsync('DELETE FROM gmb_favorites WHERE id = ?', favorite.id);
+        }
+        items = await listGmbFavorites(transaction);
+      });
+      if (!saved) forgetDeletedHomePin(favorite);
+      publish({ items, status: 'ready' });
     } catch { return 'failed'; }
-    try { publish({ items: await listGmbFavorites(), status: 'ready' }); }
-    catch { publish({ ...snapshot, status: 'error' }); return 'failed'; }
     return 'ok';
   });
 }

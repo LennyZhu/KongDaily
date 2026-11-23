@@ -50,6 +50,8 @@ const modules = {
   '@/bus-favorite-hooks': {
     useBusFavorites: () => ({ items: [], status: 'ready' }), useUnavailableFavorites: () => new Set(),
   },
+  '@/components/home-favorite-gmb': { HomeFavoriteGmb: 'HomeFavoriteGmb' },
+  '@/gmb-favorites': { useGmbFavorites: () => ({ items: [], status: 'ready' }) },
   '@/components/home-favorite-railway': { HomeFavoriteRailway: 'HomeFavoriteRailway' },
   '@/railway-favorite-hooks': { useRailwayFavorites: () => ({ items: [], status: 'ready' }) },
   '@/home-transport-pins': { useHomePins: () => ({ pins: [], status: 'ready' }) },
