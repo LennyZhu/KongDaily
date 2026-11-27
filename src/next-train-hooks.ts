@@ -8,28 +8,34 @@ export function useNextTrainReading<Payload>(key: string, read: (signal: AbortSi
   const [sample, setSample] = useState<{ key: string; reading: NextTrainReading<Payload> }>();
   const [now, setNow] = useState(clock);
   const [busy, setBusy] = useState(true);
-  const refresh = useRef<() => void>(undefined);
+  const refresh = useRef<() => Promise<void> | undefined>(undefined);
+  const refreshManually = useCallback(() => refresh.current?.(), []);
 
   useFocusEffect(useCallback(() => {
     let active = false;
-    let pending = false;
+    let pending: Promise<void> | undefined;
     let request: AbortController | undefined;
     let retryAt = Infinity;
     let ticker: ReturnType<typeof setInterval> | undefined;
 
     function load() {
-      if (!active || pending) return;
-      pending = true;
+      if (!active) return;
+      if (pending) return pending;
       const attempt = request = new AbortController();
       setBusy(true);
-      void read(attempt.signal).then((sample) => {
+      pending = read(attempt.signal).then((sample) => {
         if (!active || request !== attempt) return;
-        pending = false;
         retryAt = sample.retryAt;
         setSample({ key, reading: sample });
+      }, () => {
+        if (active && request === attempt) retryAt = Infinity;
+      }).finally(() => {
+        if (!active || request !== attempt) return;
+        pending = undefined;
         setNow(clock());
         setBusy(false);
       });
+      return pending;
     }
 
     function resume() {
@@ -46,7 +52,7 @@ export function useNextTrainReading<Payload>(key: string, read: (signal: AbortSi
 
     function pause() {
       active = false;
-      pending = false;
+      pending = undefined;
       request?.abort();
       request = undefined;
       clearInterval(ticker);
@@ -65,5 +71,5 @@ export function useNextTrainReading<Payload>(key: string, read: (signal: AbortSi
     };
   }, [autoRefresh, clock, key, read]));
 
-  return { reading: sample?.key === key ? sample.reading : undefined, now, busy, refresh: () => refresh.current?.() };
+  return { reading: sample?.key === key ? sample.reading : undefined, now, busy, refresh: refreshManually };
 }

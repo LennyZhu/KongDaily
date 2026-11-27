@@ -37,6 +37,7 @@ const zhHK = {
   homePins: {
     loading: '正在載入首頁置頂…',
     loadError: '未能載入常用交通',
+    refreshEta: '更新常用交通預報',
     empty: '尚未置頂常用交通',
     emptyDetail: '在「收藏」選擇最多三項交通服務置頂，方便在首頁查看預報。',
     limitTitle: '首頁置頂已滿',
@@ -907,6 +908,7 @@ const en: typeof zhHK = {
   homePins: {
     loading: 'Loading Home pins…',
     loadError: 'Couldn’t load frequent transport',
+    refreshEta: 'Refresh frequent transport predictions',
     empty: 'No transport pinned to Home',
     emptyDetail: 'Pin up to three services from Saved to see their predictions on Home.',
     limitTitle: 'Home pins are full',

@@ -1,6 +1,6 @@
 import type { Href } from 'expo-router';
 import { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { RefreshControl, StyleSheet, View } from 'react-native';
 
 import { loadBusFavorites, useBusFavorites, useUnavailableFavorites } from '@/bus-favorite-hooks';
 import { BusAction } from '@/components/bus-ui';
@@ -14,6 +14,7 @@ import { getExplorePhoto } from '@/explore-place-images';
 import { getExplorePlace, homeFeaturedPlaceIds } from '@/explore-places';
 import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
+import { useHomeEtaRefresh } from '@/home-eta-refresh';
 import { homePinKey, homeTransportLimit, loadHomePins, useHomePins } from '@/home-transport-pins';
 import { loadGmbFavorites, useGmbFavorites } from '@/gmb-favorites';
 import { loadRailwayFavorites, useRailwayFavorites } from '@/railway-favorite-hooks';
@@ -54,6 +55,7 @@ export default function HomeScreen() {
   const railway = useRailwayFavorites();
   const minibus = useGmbFavorites();
   const homePins = useHomePins();
+  const { refreshing, refresh, register } = useHomeEtaRefresh();
   const cards = useMemo(() => {
     const busesById = new Map(items.map((favorite) => [favorite.id, favorite]));
     const minibusesById = new Map(minibus.items.map((favorite) => [favorite.id, favorite]));
@@ -74,16 +76,18 @@ export default function HomeScreen() {
   const canAddTransport = !waiting && !hasError && cards.length < homeTransportLimit;
 
   return (
-    <Screen contentStyle={styles.screenContent} topBackgroundColor={homeColors.harbourSky}>
+    <Screen contentStyle={styles.screenContent} topBackgroundColor={homeColors.harbourSky}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary}
+        accessibilityLabel={copy.homePins.refreshEta} accessibilityState={{ busy: refreshing }} />}>
       <HomeHero name={home.name} subtitle={home.subtitle} search={home.search} />
       <View style={styles.sections}>
         <WeatherWarningLink compact />
 
         <HomeSection title={home.buses} icon="bus" action={{ label: copy.homeRailway.viewSaved, href: '/saved?category=all' }}>
           {cards.map(({ key, bus, rail, gmb }) => {
-            if (bus) return <HomeFavoriteBus key={key} favorite={bus} unavailable={unavailable.has(bus.id)} />;
-            if (gmb) return <HomeFavoriteGmb key={key} favorite={gmb} />;
-            return rail ? <HomeFavoriteRailway key={key} favorite={rail} /> : null;
+            if (bus) return <HomeFavoriteBus key={key} favorite={bus} unavailable={unavailable.has(bus.id)} registerRefresh={register} />;
+            if (gmb) return <HomeFavoriteGmb key={key} favorite={gmb} registerRefresh={register} />;
+            return rail ? <HomeFavoriteRailway key={key} favorite={rail} registerRefresh={register} /> : null;
           })}
           {waiting && <AppText variant="detail" tone="muted">{copy.homePins.loading}</AppText>}
           {hasError && <>

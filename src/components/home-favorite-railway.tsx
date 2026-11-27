@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { lightRailTimeText } from '@/components/light-rail-next-trains';
 import { savedBusStyles } from '@/components/saved-bus-ui';
 import { AppText, Icon } from '@/components/ui';
+import { useHomeEtaRegistration, type RegisterHomeEtaRefresh } from '@/home-eta-refresh';
 import { homeLightRailPreview, homeMtrPreview } from '@/home-railway-eta';
 import { useLanguage } from '@/language';
 import { useLightRailNextTrains } from '@/light-rail-next-train-hooks';
@@ -13,18 +14,22 @@ import { findMtrStation, mtrName } from '@/mtr-static';
 import { railwayFavoriteHref, resolveRailwayService, type RailwayFavorite } from '@/railway-favorites';
 import { colors, radius, space, touchTarget } from '@/theme';
 
-export function HomeFavoriteRailway({ favorite }: { favorite: RailwayFavorite }) {
+type HomeRailwayProps = { favorite: RailwayFavorite; registerRefresh?: RegisterHomeEtaRefresh };
+
+export function HomeFavoriteRailway({ favorite, registerRefresh }: HomeRailwayProps) {
   const { copy } = useLanguage();
   if (!resolveRailwayService(favorite)) return <RailwayCard favorite={favorite} notice={copy.railwayFavorites.unavailable} />;
-  return favorite.mode === 'mtr' ? <HomeMtrFavorite favorite={favorite} /> : <HomeLightRailFavorite favorite={favorite} />;
+  return favorite.mode === 'mtr' ? <HomeMtrFavorite favorite={favorite} registerRefresh={registerRefresh} />
+    : <HomeLightRailFavorite favorite={favorite} registerRefresh={registerRefresh} />;
 }
 
-function HomeMtrFavorite({ favorite }: { favorite: RailwayFavorite }) {
+function HomeMtrFavorite({ favorite, registerRefresh }: HomeRailwayProps) {
   const { copy, locale } = useLanguage();
   const { lineId, stationId } = favorite;
-  const { reading, now } = useMtrNextTrains(lineId, stationId, true);
+  const { reading, now, busy, refresh } = useMtrNextTrains(lineId, stationId, true);
+  useHomeEtaRegistration(registerRefresh, refresh);
   const view = reading ? homeMtrPreview(reading, now) : undefined;
-  const kind = view?.kind ?? 'loading';
+  const kind = view?.kind ?? (busy === false ? 'failed' : 'loading');
   const labels = copy.mtr.nextTrains;
   const notice = kind === 'ready' ? undefined : { ...labels, ...copy.homeRailway.status }[kind];
   return (
@@ -54,12 +59,13 @@ function HomeMtrFavorite({ favorite }: { favorite: RailwayFavorite }) {
   );
 }
 
-function HomeLightRailFavorite({ favorite }: { favorite: RailwayFavorite }) {
+function HomeLightRailFavorite({ favorite, registerRefresh }: HomeRailwayProps) {
   const { copy, locale } = useLanguage();
-  const { reading, now } = useLightRailNextTrains(favorite.stationId, true);
+  const { reading, now, busy, refresh } = useLightRailNextTrains(favorite.stationId, true);
+  useHomeEtaRegistration(registerRefresh, refresh);
   const view = reading ? homeLightRailPreview(reading, now, favorite.lineId) : undefined;
   const labels = copy.lightRail.nextTrains;
-  const kind = view?.kind ?? 'loading';
+  const kind = view?.kind ?? (busy === false ? 'failed' : 'loading');
   const notice = kind === 'ready' ? undefined : kind === 'empty' ? copy.homeRailway.noMatching
     : { ...labels, ...copy.homeRailway.status }[kind];
   return (

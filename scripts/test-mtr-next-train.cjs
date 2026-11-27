@@ -374,7 +374,9 @@ test('station switches, focus, and AppState ignore old responses and do not poll
   const page = mountHook();
   const first = page.render('AEL', 'HOK');
   assert.deepEqual(page.calls.map(({ line, station }) => [line, station]), [['AEL', 'HOK']]);
-  first.refresh();
+  const joined = first.refresh();
+  assert.ok(joined instanceof Promise);
+  assert.equal(first.refresh(), joined);
   assert.equal(page.calls.length, 1);
   assert.equal(page.ticks.size, 1);
   assert.equal(page.render('TCL', 'HOK').reading, undefined);
@@ -654,7 +656,7 @@ function homeRailUi(locale, initialMtr, initialRail, extra = {}) {
   const routes = [];
   const copy = source('i18n').messages[locale];
   const mocks = {
-    react: { useCallback: (fn) => fn },
+    react: { useCallback: (fn) => fn, useEffect() {} },
     'expo-router': { useRouter: () => ({ push: (href) => routes.push(href) }) },
     'react-native': { View: 'View', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', StyleSheet: { create: (styles) => styles, hairlineWidth: 1 },
       useWindowDimensions: () => dimensions },

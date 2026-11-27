@@ -8,12 +8,13 @@ import { AppText, Icon } from '@/components/ui';
 import { gmbEtaView } from '@/gmb-data';
 import type { GmbFavorite } from '@/gmb-favorites';
 import { gmbRouteHref } from '@/global-search-navigation';
+import { useHomeEtaRegistration, type RegisterHomeEtaRefresh } from '@/home-eta-refresh';
 import { readPinnedGmbEta } from '@/home-gmb-eta';
 import { useLanguage } from '@/language';
 import { useNextTrainReading } from '@/next-train-hooks';
 import { colors, homeLayout, radius, space, touchTarget } from '@/theme';
 
-export function HomeFavoriteGmb({ favorite }: { favorite: GmbFavorite }) {
+export function HomeFavoriteGmb({ favorite, registerRefresh }: { favorite: GmbFavorite; registerRefresh?: RegisterHomeEtaRefresh }) {
   const { copy, locale } = useLanguage();
   const router = useRouter();
   const { width, fontScale } = useWindowDimensions();
@@ -25,9 +26,11 @@ export function HomeFavoriteGmb({ favorite }: { favorite: GmbFavorite }) {
   const { routeId, routeSeq, stopId, stopSeq } = favorite;
   const read = useCallback((signal: AbortSignal) => readPinnedGmbEta({ routeId, routeSeq, stopId, stopSeq }, signal),
     [routeId, routeSeq, stopId, stopSeq]);
-  const { reading, now } = useNextTrainReading(favorite.id, read, undefined, true);
+  const { reading, now, busy, refresh } = useNextTrainReading(favorite.id, read, undefined, true);
+  useHomeEtaRegistration(registerRefresh, refresh);
   const payload = reading?.payload;
-  const view = reading && payload?.kind === 'eta' ? gmbEtaView({ ...reading, payload: payload.eta }, now) : undefined;
+  const view = reading && payload?.kind === 'eta' ? gmbEtaView({ ...reading, payload: payload.eta }, now)
+    : !reading && busy === false ? { kind: 'invalidResponse' } as const : undefined;
 
   const hasTime = view?.kind === 'forecast' && !!view.entries[0] && view.entries[0].kind !== 'notice';
   const forecast = payload?.kind === 'changed' || payload?.kind === 'ambiguous' ? (

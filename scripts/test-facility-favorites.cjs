@@ -1136,6 +1136,7 @@ async function testRailwayFavorites() {
         return [current[index], (next) => { current[index] = typeof next === 'function' ? next(current[index]) : next; }];
       },
       useRef: (current) => ({ current }),
+      useCallback: (fn) => fn,
       useMemo: (fn) => fn(),
       useEffect: (fn) => effects.push(fn),
       useSyncExternalStore: (_subscribe, snapshot) => snapshot(),
@@ -1144,7 +1145,7 @@ async function testRailwayFavorites() {
       ActionSheetIOS: { showActionSheetWithOptions: (options, choose) => actionSheets.push({ options, choose }) },
       Alert: { alert: (...args) => pinAlerts.push(args) }, useWindowDimensions: () => ({ width: cardWidth, fontScale }),
       StyleSheet: { create: (styles) => styles, hairlineWidth: 1 }, Keyboard: { dismiss() {} } },
-    'expo-router': { Link: 'Link', useLocalSearchParams: () => params,
+    'expo-router': { Link: 'Link', useFocusEffect() {}, useLocalSearchParams: () => params,
       useRouter: () => ({ push: (href) => opened.push(href), setParams: (next) => { params = { ...params, ...next }; } }) },
     '@/components/ui': Object.fromEntries(['AppText', 'Icon', 'EmptyState', 'Filters', 'PageHeading', 'Screen'].map((name) => [name, name])),
     '@/components/saved-bus-ui': { FavoriteAction: 'FavoriteAction', FavoriteBusRow: 'FavoriteBusRow', savedBusStyles: { card: {} } },

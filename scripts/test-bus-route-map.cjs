@@ -895,6 +895,8 @@ async function checkHomeB2EtaSettlement() {
   const { createMtrNextTrainClient } = load('mtr-next-train-client');
   const target = { source: 'nlb', number: 'B2', routeId: '37', stopId: '152', stopSeq: 3 };
   const props = { favorite: { target, station: { zh: '測試站', en: 'Test stop' }, destination: { zh: '總站', en: 'Terminus' } }, unavailable: false };
+  let refreshBus;
+  props.registerRefresh = (refresh) => { refreshBus = refresh; return () => {}; };
   const originalFetch = global.fetch;
   const originalDev = global.__DEV__;
   let cleanup;
@@ -935,7 +937,11 @@ async function checkHomeB2EtaSettlement() {
         return Promise.resolve(new Response(JSON.stringify({ estimatedArrivals: arrivals })));
       };
       assert(cardText().includes(labels.loading));
+      effects.forEach((effect) => effect());
       cleanup = focusedEffect();
+      const pull = refreshBus();
+      assert.ok(pull instanceof Promise);
+      assert.equal(refreshBus(), pull, 'Home pull joins the in-flight automatic B2 request');
       let finishRail;
       const rail = createMtrNextTrainClient({ request: () => new Promise((resolve) => { finishRail = resolve; }) })('ISL', 'ADM');
       await flush();
@@ -944,6 +950,7 @@ async function checkHomeB2EtaSettlement() {
         await flush();
         assert.equal(signal.aborted, true, scenario);
       }
+      await pull;
       assert(cardText().includes(expected), scenario + ' must show its result or terminal status');
       assert(!cardText().includes(labels.loading), scenario + ' must leave Loading');
       assert.equal(requests, 1);
@@ -956,6 +963,12 @@ async function checkHomeB2EtaSettlement() {
         assert.equal(requests, 2, 'Normal Home polling can recover after the timeout');
         assert(cardText().includes(countdown));
         assert(!cardText().includes(expected));
+      }
+      if (scenario === 'valid ETA') {
+        assert.equal(refreshBus(), undefined, 'Manual cooldown remains in force');
+        mock.timers.tick(10_000);
+        await refreshBus();
+        assert.equal(requests, 2, 'A pull fetches before the next auto poll when eligible');
       }
       finishRail(new Response(null, { status: 503 }));
       await rail;

@@ -7,6 +7,7 @@ import { describeEta, etaEntryNotes } from '@/bus-eta';
 import { favoriteEtaHref, type BusFavorite } from '@/bus-favorites';
 import { routePlaceName } from '@/bus-routes';
 import { AppText, Icon, type IconName } from '@/components/ui';
+import { useHomeEtaRegistration, type RegisterHomeEtaRefresh } from '@/home-eta-refresh';
 import { useLanguage } from '@/language';
 import { colors, radius, space, touchTarget } from '@/theme';
 
@@ -48,11 +49,14 @@ export function FavoriteBusRow({ favorite, destination, trailing, children, comp
   );
 }
 
-export function HomeFavoriteBus({ favorite, unavailable }: { favorite: BusFavorite; unavailable: boolean }) {
+export function HomeFavoriteBus({ favorite, unavailable, registerRefresh }: {
+  favorite: BusFavorite; unavailable: boolean; registerRefresh?: RegisterHomeEtaRefresh;
+}) {
   // Each row is keyed by its complete stop-visit ID, so order changes preserve the active ETA request.
   const [target] = useState(favorite.target);
   const { copy, locale } = useLanguage();
-  const { snapshot, error, now, loading } = useBusEta(target, locale, !unavailable);
+  const { snapshot, error, now, loading, refresh } = useBusEta(target, locale, !unavailable);
+  useHomeEtaRegistration(unavailable ? undefined : registerRefresh, refresh);
   const eta = copy.busEta;
   const view = describeEta(snapshot, error, now, loading, locale, eta);
   const [next, later] = unavailable ? [] : view.upcoming;

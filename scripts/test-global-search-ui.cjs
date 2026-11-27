@@ -80,7 +80,13 @@ const router = {
 let keyboardDismissals = 0;
 const native = Object.fromEntries(['TextInput', 'FlatList', 'Text', 'View', 'Pressable', 'ActivityIndicator', 'Image']
   .map((name) => [name, name]));
+let homeAppStateListener;
 Object.assign(native, {
+  RefreshControl: 'RefreshControl',
+  AppState: { currentState: 'active', addEventListener(_event, fn) {
+    homeAppStateListener = fn;
+    return { remove() { homeAppStateListener = undefined; } };
+  } },
   StyleSheet: { create: (styles) => styles, hairlineWidth: 1 },
   Keyboard: { dismiss() { keyboardDismissals++; } },
   Alert: { alert: (title) => alerts.push(title) },
@@ -263,14 +269,17 @@ async function verify() {
   const busPins = favoriteItems.map(({ id }) => ({ mode: 'bus', id }));
   let busStatus = 'ready';
   let pinState;
+  let railwayItems = [];
+  let gmbItems = [];
   stubs['@/bus-favorite-hooks'] = {
     useBusFavorites: () => ({ items: favoriteItems, status: busStatus }),
     useUnavailableFavorites: () => new Set(),
   };
   stubs['@/components/saved-bus-ui'] = { HomeFavoriteBus: 'HomeFavoriteBus' };
   stubs['@/components/home-favorite-railway'] = { HomeFavoriteRailway: 'HomeFavoriteRailway' };
-  stubs['@/railway-favorite-hooks'] = { useRailwayFavorites: () => ({ items: [], status: 'ready' }) };
-  stubs['@/gmb-favorites'] = { useGmbFavorites: () => ({ items: [], status: 'ready' }) };
+  stubs['@/components/home-favorite-gmb'] = { HomeFavoriteGmb: 'HomeFavoriteGmb' };
+  stubs['@/railway-favorite-hooks'] = { useRailwayFavorites: () => ({ items: railwayItems, status: 'ready' }) };
+  stubs['@/gmb-favorites'] = { useGmbFavorites: () => ({ items: gmbItems, status: 'ready' }) };
   stubs['@/home-transport-pins'] = {
     ...load('home-transport-pins'),
     useHomePins: () => pinState,
@@ -284,6 +293,9 @@ async function verify() {
     pinState = { pins: busPins.slice(0, 1), status: 'ready' };
     hookIndex = 0;
     const page = nodes(HomeScreen());
+    const control = page.find(({ type }) => type === 'Screen').props.refreshControl;
+    assert.equal(control.type, 'RefreshControl');
+    assert.equal(control.props.accessibilityLabel, locale === 'en' ? 'Refresh frequent transport predictions' : '更新常用交通預報');
     assert(page.some(({ type }) => type === HomeHero));
     assert(page.some(({ type }) => type === 'WeatherWarningLink'));
     const pinned = page.find(({ type }) => type === 'HomeFavoriteBus');
@@ -344,8 +356,77 @@ async function verify() {
     assertPinVisibility(busPins.slice(0, 2), 'ready', 2, true);
     assertPinVisibility([...busPins.slice(0, 2), { mode: 'bus', id: 'missing' }], 'ready', 2, true);
   }
+  reset();
+  function renderHomeRefresh() {
+    hookIndex = 0;
+    effects = [];
+    const page = HomeScreen();
+    effects.forEach((effect) => effect());
+    return page.props.refreshControl.props;
+  }
+  pinState = { pins: [], status: 'ready' };
+  await renderHomeRefresh().onRefresh();
+  assert.equal(renderHomeRefresh().refreshing, false);
+
+  pinState = { pins: busPins.slice(0, 3), status: 'ready' };
+  hookIndex = 0;
+  const registeredCards = nodes(HomeScreen()).filter(({ type }) => type === 'HomeFavoriteBus');
+  for (const count of [1, 2, 3]) {
+    const calls = [];
+    const resolvers = [];
+    const unregister = registeredCards.slice(0, count).map(({ props }, index) =>
+      props.registerRefresh(() => {
+        calls.push(props.favorite.id);
+        return new Promise((resolve, reject) => resolvers.push(index === 0 ? () => reject(Error('provider failure')) : resolve));
+      }));
+    const cycle = renderHomeRefresh().onRefresh();
+    assert.equal(renderHomeRefresh().accessibilityState.busy, true);
+    await renderHomeRefresh().onRefresh();
+    assert.deepEqual(calls, busPins.slice(0, count).map(({ id }) => id));
+    resolvers[0]();
+    await Promise.resolve();
+    if (count > 1) assert.equal(renderHomeRefresh().refreshing, true);
+    resolvers.slice(1).forEach((resolve) => resolve());
+    await cycle;
+    assert.equal(renderHomeRefresh().refreshing, false);
+    unregister.forEach((stop) => stop());
+  }
+  railwayItems = [{ mode: 'mtr', lineId: 'ISL', stationId: 'ADM' }, { mode: 'light_rail', lineId: '610', stationId: '380' }];
+  gmbItems = [{ mode: 'gmb', id: 'minibus-visit' }];
+  for (const pins of [[busPins[0], railwayItems[0], railwayItems[1]], [railwayItems[1], gmbItems[0], busPins[0]]]) {
+    pinState = { pins, status: 'ready' };
+    const homeCards = () => {
+      hookIndex = 0;
+      return nodes(HomeScreen()).filter(({ type }) => ['HomeFavoriteBus', 'HomeFavoriteRailway', 'HomeFavoriteGmb'].includes(type));
+    };
+    const calls = [];
+    const unregister = homeCards().map(({ props }) => props.registerRefresh(() => { calls.push(props.favorite); }));
+    await renderHomeRefresh().onRefresh();
+    assert.deepEqual(calls, homeCards().map(({ props }) => props.favorite));
+    assert.deepEqual(calls.map((item) => item.mode ?? 'bus'), pins.map(({ mode }) => mode));
+    unregister.forEach((stop) => stop());
+  }
+  const pending = [];
+  const unregister = registeredCards[0].props.registerRefresh(() => new Promise((resolve) => pending.push(resolve)));
+  const oldCycle = renderHomeRefresh().onRefresh();
+  native.AppState.currentState = 'background';
+  homeAppStateListener('background');
+  assert.equal(renderHomeRefresh().refreshing, false);
+  await renderHomeRefresh().onRefresh();
+  assert.equal(pending.length, 1);
+  native.AppState.currentState = 'active';
+  const newCycle = renderHomeRefresh().onRefresh();
+  pending[0]();
+  await oldCycle;
+  assert.equal(renderHomeRefresh().refreshing, true, 'Old completion cannot end the newer gesture');
+  blur();
+  assert.equal(renderHomeRefresh().refreshing, false);
+  pending[1]();
+  await newCycle;
+  assert.equal(renderHomeRefresh().refreshing, false);
+  unregister();
+  reset();
   locale = 'zh-HK';
-  slots = [];
   hookIndex = 0;
   const home = HomeHero(labels().home);
   const entry = nodes(home).find(({ type, props }) => type === HomeLink && props.href === '/search');

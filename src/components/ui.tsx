@@ -1,6 +1,6 @@
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import type { PropsWithChildren, Ref } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, type ColorValue, type StyleProp, type TextProps, type ViewStyle } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, type ColorValue, type ScrollViewProps, type StyleProp, type TextProps, type ViewStyle } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, floatingTab, radius, space, touchTarget, typography } from '@/theme';
@@ -20,11 +20,12 @@ export function AppText({ variant = 'body', tone = 'text', style, ...props }: Ap
   return <Text {...props} style={[typography[variant], { color: colors[tone] }, style]} />;
 }
 
-export function Screen({ children, hasHeader = false, contentStyle, topBackgroundColor, scrollRef }: PropsWithChildren<{
+export function Screen({ children, hasHeader = false, contentStyle, topBackgroundColor, scrollRef, refreshControl }: PropsWithChildren<{
   hasHeader?: boolean;
   contentStyle?: StyleProp<ViewStyle>;
   topBackgroundColor?: string;
   scrollRef?: Ref<ScrollView>;
+  refreshControl?: ScrollViewProps['refreshControl'];
 }>) {
   const { bottom } = useSafeAreaInsets();
   const tabClearance = hasHeader ? 0 : bottom + floatingTab.height + floatingTab.bottomGap + space.lg;
@@ -36,6 +37,7 @@ export function Screen({ children, hasHeader = false, contentStyle, topBackgroun
     >
       <ScrollView
         ref={scrollRef}
+        refreshControl={refreshControl}
         style={styles.scroll}
         contentInsetAdjustmentBehavior="never"
         contentContainerStyle={[styles.screenContent, contentStyle, !hasHeader && { paddingBottom: tabClearance }]}

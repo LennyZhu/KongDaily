@@ -15,7 +15,7 @@ export function useBusEta(target: EtaTarget, locale: EtaLocale, enabled = true, 
   const [now, setNow] = useState(Date.now);
   const [refreshAfter, setRefreshAfter] = useState(0);
   const active = useRef(false);
-  const inFlight = useRef<AbortController | null>(null);
+  const inFlight = useRef<{ controller: AbortController; done: Promise<void> } | null>(null);
   const lastUrl = useRef<string | undefined>(undefined);
   const nextPoll = useRef(0);
   const nextManual = useRef(0);
@@ -24,7 +24,9 @@ export function useBusEta(target: EtaTarget, locale: EtaLocale, enabled = true, 
 
   const refresh = useCallback((manual = false) => {
     const startedAt = Date.now();
-    if (!active.current || inFlight.current || startedAt < rateLimitedUntil.current) return;
+    if (!active.current) return;
+    if (inFlight.current) return inFlight.current.done;
+    if (startedAt < rateLimitedUntil.current) return;
     if (startedAt < (cooldowns?.get(target.source) ?? 0)) {
       setError((current) => current?.status === 429 ? current : new BusFeedError('http', 429));
       setLoading(false);
@@ -34,7 +36,6 @@ export function useBusEta(target: EtaTarget, locale: EtaLocale, enabled = true, 
     if ((url === lastUrl.current && startedAt < threshold) || startedAt < (cooldowns?.get(url) ?? 0)) return;
 
     const controller = new AbortController();
-    inFlight.current = controller;
     lastUrl.current = url;
     nextManual.current = startedAt + etaManualInterval;
     nextPoll.current = startedAt + etaPollInterval;
@@ -42,7 +43,7 @@ export function useBusEta(target: EtaTarget, locale: EtaLocale, enabled = true, 
     setRefreshAfter(nextManual.current);
     setNow(startedAt);
     setLoading(true);
-    void fetchEta(target, url, controller.signal).then(
+    const done = fetchEta(target, url, controller.signal).then(
       (snapshot) => {
         if (controller.signal.aborted) return;
         setResult((previous) => ({
@@ -61,12 +62,15 @@ export function useBusEta(target: EtaTarget, locale: EtaLocale, enabled = true, 
         setError(nextError);
       },
     ).finally(() => {
-      if (inFlight.current !== controller) return;
+      if (inFlight.current?.controller !== controller) return;
       inFlight.current = null;
       setNow(Date.now());
       setLoading(false);
     });
+    inFlight.current = { controller, done };
+    return done;
   }, [cooldowns, target, url]);
+  const refreshManually = useCallback(() => refresh(true), [refresh]);
 
   useFocusEffect(useCallback(() => {
     if (!enabled) return;
@@ -75,7 +79,7 @@ export function useBusEta(target: EtaTarget, locale: EtaLocale, enabled = true, 
       active.current = false;
       clearInterval(ticker);
       if (inFlight.current) {
-        inFlight.current.abort();
+        inFlight.current.controller.abort();
         inFlight.current = null;
         // Retry an interrupted request after the short request cooldown.
         nextPoll.current = nextManual.current;
@@ -104,5 +108,5 @@ export function useBusEta(target: EtaTarget, locale: EtaLocale, enabled = true, 
   }, [enabled, refresh]));
 
   const canRefresh = enabled && !loading && now >= refreshAfter;
-  return { snapshot: result?.snapshot, error, now, loading, canRefresh, refresh: () => refresh(true) };
+  return { snapshot: result?.snapshot, error, now, loading, canRefresh, refresh: refreshManually };
 }
