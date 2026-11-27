@@ -15,7 +15,7 @@ export type StopRow = Coordinates & {
 };
 
 export type NearbyBusStop = StopRow & { distance: number };
-export type BusSearchRadius = 500 | 1000 | 2000;
+export type BusSearchRadius = 300 | 500 | 1000 | 2000;
 type StopSeed = [id: string, zh: string, en: string, lat: number, lon: number, streetZh: string, streetEn: string];
 type SourceRow = { source: BusSource; fetched_at: number };
 

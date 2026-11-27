@@ -114,7 +114,7 @@ test('radius is inclusive using unrounded distance and results are sorted with s
     assert.ok(rows.every((row, index) => index === 0 || rows[index - 1].distance <= row.distance));
   }
   assert.deepEqual(findNearbyTramStops({ latitude: NaN, longitude: 114.2 }, 500), []);
-  assert.deepEqual(findNearbyTramStops(stop, 300), []);
+  assert.deepEqual(findNearbyTramStops(stop, 250), []);
 });
 
 test('known closure stays visible in the catalogue but outside nearby results', () => {

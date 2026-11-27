@@ -4,7 +4,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { getDatabase } from '@/database';
 import type { RailwayFavoriteIdentity, RailwayMode } from '@/railway-favorites';
 
-export const homeTransportLimit = 3;
+export const homeTransportLimit = 4;
 export type HomePin = { mode: 'bus'; id: string } | { mode: 'gmb'; id: string } | RailwayFavoriteIdentity;
 type PinChange = { pin: HomePin } & ({ type: 'pin' } | { type: 'unpin' } | { type: 'move'; step: -1 | 1 });
 type PinRow = { mode: 'bus'; bus_id: string } | { mode: 'gmb'; gmb_id: string } | { mode: RailwayMode; line_id: string; station_id: string };

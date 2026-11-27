@@ -56,7 +56,7 @@ const emptyRoutes: NearbyRoute[] = [];
 const emptyStops: NearbyBusStop[] = [];
 const emptySearchResults: BusRoute[] = [];
 const viewability = { itemVisiblePercentThreshold: 35, minimumViewTime: 250 };
-const radii = [500, 1000, 2000] as const;
+const radii = [300, 500, 1000, 2000] as const;
 // Keep the 4B3 UI and coordinate snapshot out of the production dependency graph.
 const ferryNearby: typeof import('@/hkkf-nearby-preview') | undefined =
   typeof __DEV__ !== 'undefined' && __DEV__ && hkkfPreviewEnabled ? require('@/hkkf-nearby-preview') : undefined;
@@ -106,7 +106,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   const [expandedFerryPier, setExpandedFerryPier] = useState<{ scope: string; id: string }>();
   const [expandedGmbStop, setExpandedGmbStop] = useState<{ scope: string; id: string }>();
   const [expandedStopGroups, setExpandedStopGroups] = useState<Set<string>>(() => new Set());
-  const [radiusMeters, setRadiusMeters] = useState<BusSearchRadius>(500);
+  const [radiusMeters, setRadiusMeters] = useState<BusSearchRadius>(300);
   const [pickingRadius, setPickingRadius] = useState(false);
   const [showDistanceInfo, setShowDistanceInfo] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -240,16 +240,13 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
     setVisible(viewableItems.flatMap(({ item }) => 'route' in item ? [item.route.id] : []));
   }, [recordVisible, setVisible, transport]);
 
-  const updateReference = useCallback((value: Reference, resetRadius: boolean) => {
-    if (!transport || resetRadius) {
+  const updateReference = useCallback((value: Reference, resetResults: boolean) => {
+    if (!transport || resetResults) {
       setVisible([]);
       setPickingRadius(false);
       setReferenceRevision((revision) => revision + 1);
     }
-    if (resetRadius) {
-      setRadiusMeters(500);
-      if (transport) setResult(undefined);
-    }
+    if (resetResults && transport) setResult(undefined);
     setReference(value);
   }, [setVisible, transport]);
 
@@ -350,7 +347,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
     });
   }
 
-  const expandedRadius = radiusMeters === 500 ? 1000 : radiusMeters === 1000 ? 2000 : undefined;
+  const expandedRadius = radii[radii.indexOf(radiusMeters) + 1];
   const referenceName = reference?.kind === 'landmark' ? labels.landmarkReference(labels.landmarks[reference.landmark])
     : reference ? labels.currentLocation : labels.noReference;
   const range = formatDistance(radiusMeters);
@@ -666,7 +663,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
           {showingNearby && pickingRadius && (
             <View style={styles.radiusMenu}>
               {transport && <AppText variant="caption" tone="muted" accessibilityRole="header">{copy.transport.straightLineDistance}</AppText>}
-              <View style={styles.segment}>
+              <View style={[styles.segment, styles.radiusOptions]}>
                 {radii.map((value) => (
                   <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: value === radiusMeters }}
                     onPress={() => updateRadius(value)}
@@ -1009,6 +1006,7 @@ const styles = StyleSheet.create({
   headingActions: { marginStart: 'auto', maxWidth: '100%', flexDirection: 'row', flexWrap: 'wrap',
     alignItems: 'center', justifyContent: 'flex-end', columnGap: space.xs },
   radiusMenu: { gap: space.xs },
+  radiusOptions: { flexWrap: 'wrap' },
   infoButton: { minHeight: touchTarget, minWidth: touchTarget, alignItems: 'center', justifyContent: 'center' },
   segment: { flexDirection: 'row', gap: space.xs, borderRadius: radius.pill, padding: space.xs, backgroundColor: colors.tint },
   segmentOption: {

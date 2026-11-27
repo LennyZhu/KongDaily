@@ -167,8 +167,8 @@ test('nearest distance selects a real entrance and ignores a closer reference po
   assert.equal(geo.nearestRailwayPosition(center, referenceOnly).position.kind, 'station-reference');
 });
 
-test('500/1000/2000 metre radius boundaries use unrounded Haversine distances and sort ascending', () => {
-  for (const radius of [500, 1000, 2000]) {
+test('300/500/1000/2000 metre radius boundaries use unrounded Haversine distances and sort ascending', () => {
+  for (const radius of [300, 500, 1000, 2000]) {
     const within = stationFixture('WITHIN', [position(radius - 0.001)]);
     const outside = stationFixture('OUTSIDE', [position(radius + 0.001)]);
     const near = stationFixture('NEAR', [position(1)]);
@@ -215,7 +215,7 @@ test('real geographic samples cover Hong Kong regions and mode filters remain se
 test('nearby railway route recommendations deduplicate lines and choose the closest verified boarding station', () => {
   const { nearbyRailwayRows } = load('nearby-railway');
   const point = geo.getMtrStationPositions('CEN').find(({ kind }) => kind === 'entrance').coordinate;
-  for (const radius of [500, 1000, 2000]) {
+  for (const radius of [300, 500, 1000, 2000]) {
     const stops = geo.findNearbyRailwayStations(point, radius, 'mtr');
     const routes = nearbyRailwayRows(point, radius, 'routes', 'mtr');
     assert.equal(new Set(routes.map(({ entry }) => entry.id)).size, routes.length);
@@ -233,7 +233,7 @@ test('nearby railway route recommendations deduplicate lines and choose the clos
 test('nearby Light Rail uses reference points and preserves actual circular/asymmetric route objects', () => {
   const { nearbyRailwayRows } = load('nearby-railway');
   const point = geo.getLightRailStopPositions('430')[0].coordinate;
-  for (const radius of [500, 1000, 2000]) {
+  for (const radius of [300, 500, 1000, 2000]) {
     const stations = nearbyRailwayRows(point, radius, 'stops', 'lightRail');
     assert(stations.every(({ location }) => location.position.kind === 'station-reference' && location.distance <= radius));
     assert.equal(new Set(stations.map(({ entry }) => entry.id)).size, stations.length);

@@ -20,7 +20,7 @@ const encodeIndex = (index) => JSON.stringify({ ...index, recordsSha256: digest(
   (_key, value) => value && typeof value === 'object' && !Array.isArray(value)
     ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]])) : value)) });
 
-function loadApp(file, { failAfterV8 = false, failAfterV9 = false, failAfterV10 = false, failAfterV11 = false, changeCatalog, registry, beforeQuery, stubs = {} } = {}) {
+function loadApp(file, { failAfterV8 = false, failAfterV9 = false, failAfterV10 = false, failAfterV11 = false, failAfterV12 = false, changeCatalog, registry, beforeQuery, stubs = {} } = {}) {
   const loaded = new Map();
   let connection;
   function databaseAdapter(db, afterExec) {
@@ -63,6 +63,10 @@ function loadApp(file, { failAfterV8 = false, failAfterV9 = false, failAfterV10 
             }
             if (failAfterV10 && sql.includes('PRAGMA user_version = 10')) {
               throw new Error('Injected failure after v10 DDL');
+            }
+            if (failAfterV12 && sql.includes('PRAGMA user_version = 12')) {
+              failAfterV12 = false;
+              throw new Error('Injected failure after v12 DDL');
             }
             if (failAfterV11 && sql.includes('PRAGMA user_version = 11')) {
               failAfterV11 = false;
@@ -218,7 +222,7 @@ async function test() {
   const fresh = join(scratch, 'fresh.db');
   const freshApp = loadApp(fresh);
   const freshDb = await freshApp.load('database').getDatabase();
-  assert.equal((await freshDb.getFirstAsync('PRAGMA user_version')).user_version, 11);
+  assert.equal((await freshDb.getFirstAsync('PRAGMA user_version')).user_version, 12);
   assert.equal(await freshApp.load('database').readLanguage(), 'system');
   freshApp.close();
 
@@ -248,7 +252,7 @@ async function test() {
   assert.equal(rolledBack.prepare("SELECT 1 FROM sqlite_schema WHERE name='facility_favorites'").get(), undefined);
   rolledBack.close();
   assert.deepEqual(inspectV7Data(file), before);
-  assert.equal((await (await db.getDatabase()).getFirstAsync('PRAGMA user_version')).user_version, 11);
+  assert.equal((await (await db.getDatabase()).getFirstAsync('PRAGMA user_version')).user_version, 12);
   assert.equal(await db.readLanguage(), 'en');
   assert.deepEqual(inspectV7Data(file), before);
 
@@ -1191,7 +1195,7 @@ async function testRailwayFavorites() {
   const hasText = (tree, value) => tree.some(({ props }) => props?.children === value || props?.title === value);
   try {
     const db = await app.load('database').getDatabase();
-    assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 11);
+    assert.equal((await db.getFirstAsync('PRAGMA user_version')).user_version, 12);
     assert.deepEqual(await db.getAllAsync('SELECT * FROM facility_favorites'), originalFacilities);
     const oldBus = await app.load('bus-favorites').readBusFavorites();
     assert.equal(oldBus[0].id, 'legacy-bus');
@@ -1504,11 +1508,13 @@ async function testRailwayFavorites() {
           await pinStore.changeHomePin({ type: 'move', pin, step: -1 });
         }
       }
+      await pinStore.changeHomePin({ type: 'pin', pin: minibus });
       const fourth = renderActions(eal);
       action(fourth, pinLabel).props.onPress();
       await new Promise(setImmediate);
-      assert.deepEqual(pinAlerts.at(-1), [copy().homePins.limitTitle, copy().busFavorites.pinLimit(3)]);
-      assert.deepEqual(await pinStore.readHomePins(), [busPin, lr610, isl]);
+      assert.deepEqual(pinAlerts.at(-1), [copy().homePins.limitTitle, copy().busFavorites.pinLimit(4)]);
+      assert.deepEqual(await pinStore.readHomePins(), [busPin, lr610, isl, { mode: 'gmb', id: minibus.id }]);
+      await pinStore.changeHomePin({ type: 'unpin', pin: minibus });
       fontScale = 2.5;
       const large = renderActions(eal);
       assert.ok(action(large, pinLabel));
@@ -1526,7 +1532,7 @@ async function testRailwayFavorites() {
       action(renderActions(isl), pinLabel).props.onPress();
       await new Promise(setImmediate);
       assert.deepEqual(await pinStore.readHomePins(), [busPin, lr610, isl]);
-      assert.equal(hasAddTransport(render(HomeScreen)), false);
+      assert.equal(hasAddTransport(render(HomeScreen)), true);
       assert.equal(opened.length, navBeforeActions, 'Compact actions must not navigate');
 
       const savedBusTree = render(SavedBuses, { emptyTitle: copy().saved.empty.buses });
@@ -1610,7 +1616,7 @@ async function testRailwayFavorites() {
     const remainingPins = [{ mode: 'bus', id: oldBus[0].id }, { mode: 'gmb', id: minibus.id }];
     for (const pin of remainingPins) assert.equal(await reopenedPins.changeHomePin({ type: 'pin', pin }), 'ok');
     await reopenedPins.changeHomePin({ type: 'pin', pin: removedFromHome });
-    assert.equal(hasAddTransport(render(HomeScreen)), false);
+    assert.equal(hasAddTransport(render(HomeScreen)), true);
     assert.equal(render(HomeScreen).some(({ type, props }) => type.name === 'HomeFavoriteRailway' && props.favorite.id === removedFromHome.id), true);
     const railCardActions = render(SavedRailways).find(({ type, props }) => type === TransportFavoriteActions && props.pin.id === removedFromHome.id);
     const more = render(TransportFavoriteActions, railCardActions.props)
@@ -1698,13 +1704,14 @@ async function testHomePinMigration() {
     const store = migrated.load('home-transport-pins');
     assert.deepEqual(await store.readHomePins(), order);
     const db = new DatabaseSync(file);
-    assert.equal(version(db), 11);
+    assert.equal(version(db), 12);
     assert.deepEqual(['bus_favorites', 'railway_favorites'].map((table) => db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()), before);
     db.close();
     if (count === 1) {
       assert.equal(await store.changeHomePin({ type: 'pin', pin: lightRail }), 'ok');
       const results = await Promise.all([bus('C'), olderRail].map((pin) => store.changeHomePin({ type: 'pin', pin })));
-      assert.deepEqual(results, ['limit', 'limit']);
+      assert.deepEqual(results, ['ok', 'limit']);
+      await store.changeHomePin({ type: 'unpin', pin: bus('C') });
       assert.deepEqual(await store.readHomePins(), order, 'A fourth pin cannot replace an existing pin');
       await store.changeHomePin({ type: 'move', pin: lightRail, step: -1 });
       await store.changeHomePin({ type: 'move', pin: bus('B'), step: 1 });
@@ -1781,7 +1788,7 @@ async function testMinibusV11Migration() {
       assert.deepEqual(await store.readHomePins(), valid);
       const database = await app.load('database').getDatabase();
       const check = new DatabaseSync(file);
-      assert.equal(version(check), 11);
+      assert.equal(version(check), 12);
       assert.deepEqual(readOriginal(check), original);
       check.close();
       assert.deepEqual((await database.getAllAsync('SELECT position FROM home_transport_pins ORDER BY position')).map(({ position }) => position), [1, 2]);
@@ -1830,9 +1837,11 @@ async function testMinibusV11Migration() {
         store.changeHomePin({ type: 'pin', pin }),
         store.changeHomePin({ type: 'pin', pin }),
         store.changeHomePin({ type: 'pin', pin: favorites[1] }),
-      ]), ['ok', 'ok', 'limit'], 'Rapid duplicate taps cannot take another slot or replace a pin');
-      assert.equal(await store.changeHomePin({ type: 'pin', pin: bus }), valid.some(({ mode }) => mode === 'bus') ? 'ok' : 'limit');
-      await assert.rejects(database.runAsync("INSERT INTO home_transport_pins (position, mode, gmb_id) VALUES (4, 'gmb', ?)", favorites[1].id));
+      ]), ['ok', 'ok', 'ok'], 'Rapid duplicate taps cannot take another slot or replace a pin');
+      await store.changeHomePin({ type: 'unpin', pin: favorites[1] });
+      assert.equal(await store.changeHomePin({ type: 'pin', pin: bus }), 'ok');
+      if (!valid.some(({ mode }) => mode === 'bus')) await store.changeHomePin({ type: 'unpin', pin: bus });
+      await assert.rejects(database.runAsync("INSERT INTO home_transport_pins (position, mode, gmb_id) VALUES (5, 'gmb', ?)", favorites[1].id));
       await store.changeHomePin({ type: 'move', pin, step: -1 });
       assert.deepEqual(await store.readHomePins(), [valid[0], { mode: 'gmb', id: pin.id }, valid[1]]);
       await store.changeHomePin({ type: 'unpin', pin });
@@ -1921,7 +1930,7 @@ async function testPublishedV8Upgrade() {
       assert.equal((await app.load('bus-favorites').readBusFavorites()).length, 3);
       assert.deepEqual(await app.load('gmb-favorites').listGmbFavorites(), []);
       const after = new DatabaseSync(file);
-      assert.equal(version(after), 11);
+      assert.equal(version(after), 12);
       assert.deepEqual(select(after), before);
       assert.equal(after.prepare('PRAGMA integrity_check').get().integrity_check, 'ok');
       after.close();
@@ -1931,7 +1940,73 @@ async function testPublishedV8Upgrade() {
   console.log('PASS: exact v1.1.0 tagged v8 SQL fixture, v8 → v11, rollback, clean retry, repeat reopen and closed backup restore');
 }
 
+async function testV12FourPins() {
+  const file = join(scratch, 'release-v11.db');
+  const published = execFileSync('git', ['show', '675470d:src/database.ts'], { cwd: root, encoding: 'utf8' });
+  const schema = [...published.matchAll(/transaction\.execAsync\(`([^\x60]+)`\)/g)].map((match) => match[1]);
+  assert.equal(schema.length, 11);
+  assert.deepEqual(sqlFromSource.slice(0, 11), schema, 'Historical release migrations remain unchanged');
+  const seed = new DatabaseSync(file);
+  seed.exec(schema.join('\n'));
+  seed.exec(`
+    INSERT INTO bus_favorites (id, source, route_number, direction, stop_id, stop_seq, repeated_stop,
+      station_zh, station_en, destination_zh, destination_en, created_at, updated_at)
+      VALUES ('bus', 'citybus', '1', 'outbound', '000001', 1, 0, '站', 'Stop', '總站', 'Terminus', 1, 1),
+             ('extra', 'citybus', '2', 'outbound', '000002', 1, 0, '站', 'Stop', '總站', 'Terminus', 1, 1);
+    INSERT INTO railway_favorites VALUES
+      ('mtr', 'ISL', 'ADM', '港島綫', 'Island Line', '金鐘', 'Admiralty', 1, 1),
+      ('light_rail', '610', '380', '610', '610', '洪水橋', 'Hung Shui Kiu', 1, 1);
+    INSERT INTO gmb_favorites VALUES ( '2009246:2:3:10', 2009246, 2, 3, 10, 'KLN', '2', '站', 'Stop', '總站', 'Terminus', 1);
+    INSERT INTO home_transport_pins (position, mode, bus_id) VALUES (1, 'bus', 'bus');
+    INSERT INTO home_transport_pins (position, mode, line_id, station_id)
+      VALUES (2, 'mtr', 'ISL', 'ADM'), (3, 'light_rail', '610', '380');
+  `);
+  const tables = seed.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name").all().map(({ name }) => name);
+  const contents = (db) => tables.map((table) => db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all());
+  const before = contents(seed);
+  const pins = [{ mode: 'bus', id: 'bus' }, { mode: 'mtr', lineId: 'ISL', stationId: 'ADM' },
+    { mode: 'light_rail', lineId: '610', stationId: '380' }, { mode: 'gmb', id: '2009246:2:3:10' }];
+  seed.close();
+  const failing = loadApp(file, { failAfterV12: true });
+  await assert.rejects(failing.load('database').getDatabase(), /v12 DDL/);
+  const rollback = new DatabaseSync(file);
+  assert.equal(version(rollback), 11);
+  assert.deepEqual(contents(rollback), before);
+  rollback.close();
+  const upgraded = loadApp(file);
+  const database = await upgraded.load('database').getDatabase();
+  const check = new DatabaseSync(file);
+  assert.equal(version(check), 12);
+  assert.deepEqual(contents(check), before);
+  check.close();
+  const store = upgraded.load('home-transport-pins');
+  assert.equal(store.homeTransportLimit, 4);
+  assert.equal(await store.changeHomePin({ type: 'pin', pin: pins[3] }), 'ok');
+  assert.deepEqual(await store.readHomePins(), pins);
+  assert.equal(await store.changeHomePin({ type: 'pin', pin: { mode: 'bus', id: 'extra' } }), 'limit');
+  await assert.rejects(database.runAsync("INSERT INTO home_transport_pins (position, mode, bus_id) VALUES (5, 'bus', 'extra')"), /CHECK/);
+  await assert.rejects(database.runAsync("UPDATE home_transport_pins SET position = 5 WHERE position = 4"), /Replace home pins/);
+  await store.changeHomePin({ type: 'move', pin: pins[3], step: -1 });
+  const ordered = [pins[0], pins[1], pins[3], pins[2]];
+  assert.deepEqual(await store.readHomePins(), ordered);
+  upgraded.close();
+  const restarted = loadApp(file);
+  const restartStore = restarted.load('home-transport-pins');
+  assert.deepEqual(await restartStore.readHomePins(), ordered);
+  const gmb = restarted.load('gmb-favorites');
+  const [savedMinibus] = await gmb.listGmbFavorites();
+  assert.equal(await gmb.setGmbFavorite(savedMinibus, false), 'ok');
+  assert.deepEqual(await restartStore.readHomePins(), pins.slice(0, 3));
+  assert.equal(await restartStore.changeHomePin({ type: 'pin', pin: { mode: 'bus', id: 'extra' } }), 'ok');
+  const final = new DatabaseSync(file);
+  assert.equal(final.prepare('PRAGMA integrity_check').get().integrity_check, 'ok');
+  final.close();
+  restarted.close();
+  console.log('PASS: exact released v11 → v12, rollback, four mixed pins, fifth rejected, reorder, restart and delete release');
+}
+
 test().then(testNearbyFavoriteButtons).then(testSavedFacilityIntegration).then(testRouteStopQuickFavorite).then(testRailwayFavorites).then(testHomePinMigration).then(testMinibusV11Migration)
+  .then(testV12FourPins)
   .then(testPublishedV8Upgrade)
   .then(() => console.log('PASS: registry, SQLite v11, facility favorites, nearby bilingual filters, bus and railway favorites and shared Home pins'))
   .catch((error) => { console.error(error); process.exitCode = 1; })

@@ -2,7 +2,7 @@ import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 
 import { type LanguagePreference } from '@/i18n';
 
-const schemaVersion = 11;
+const schemaVersion = 12;
 let databasePromise: Promise<SQLiteDatabase> | undefined;
 
 async function openAppDatabase() {
@@ -307,6 +307,74 @@ async function openAppDatabase() {
             WHERE position NOT IN (SELECT previous_position FROM home_pin_v11_orphans);
           DROP TABLE home_transport_pins_v10;
           PRAGMA user_version = 11;
+        `);
+      }
+      if (version.user_version < 12) {
+        await transaction.execAsync(`
+          DROP TRIGGER require_home_pin_target;
+          DROP TRIGGER require_home_pin_reinsert;
+          DROP TRIGGER remove_home_bus_pin;
+          DROP TRIGGER remove_home_railway_pin;
+          DROP TRIGGER remove_home_gmb_pin;
+          DROP TRIGGER preserve_pinned_bus_id;
+          DROP TRIGGER preserve_pinned_railway_identity;
+          DROP TRIGGER preserve_pinned_gmb_id;
+          ALTER TABLE home_transport_pins RENAME TO home_transport_pins_v11;
+          CREATE TABLE home_transport_pins (
+            position INTEGER PRIMARY KEY CHECK (position BETWEEN 1 AND 4),
+            mode TEXT NOT NULL CHECK (mode IN ('bus', 'mtr', 'light_rail', 'gmb')),
+            bus_id TEXT UNIQUE,
+            line_id TEXT,
+            station_id TEXT,
+            gmb_id TEXT UNIQUE,
+            CHECK (
+              (mode = 'bus' AND bus_id IS NOT NULL AND line_id IS NULL AND station_id IS NULL AND gmb_id IS NULL)
+              OR (mode IN ('mtr', 'light_rail') AND bus_id IS NULL AND line_id IS NOT NULL AND station_id IS NOT NULL AND gmb_id IS NULL)
+              OR (mode = 'gmb' AND bus_id IS NULL AND line_id IS NULL AND station_id IS NULL AND gmb_id IS NOT NULL)
+            ),
+            UNIQUE (mode, line_id, station_id)
+          );
+          CREATE TRIGGER require_home_pin_target BEFORE INSERT ON home_transport_pins
+          WHEN (NEW.mode = 'bus' AND NOT EXISTS (SELECT 1 FROM bus_favorites WHERE id = NEW.bus_id))
+            OR (NEW.mode = 'gmb' AND NOT EXISTS (SELECT 1 FROM gmb_favorites WHERE id = NEW.gmb_id))
+            OR (NEW.mode IN ('mtr', 'light_rail') AND NOT EXISTS (
+              SELECT 1 FROM railway_favorites WHERE mode = NEW.mode AND line_id = NEW.line_id AND station_id = NEW.station_id
+            ))
+          BEGIN
+            SELECT RAISE(ABORT, 'Missing home pin target');
+          END;
+          -- Reordering replaces the bounded set of rows so each write goes through INSERT validation.
+          CREATE TRIGGER require_home_pin_reinsert BEFORE UPDATE ON home_transport_pins BEGIN
+            SELECT RAISE(ABORT, 'Replace home pins to change them');
+          END;
+          CREATE TRIGGER remove_home_bus_pin AFTER DELETE ON bus_favorites BEGIN
+            DELETE FROM home_transport_pins WHERE bus_id = OLD.id;
+          END;
+          CREATE TRIGGER remove_home_railway_pin AFTER DELETE ON railway_favorites BEGIN
+            DELETE FROM home_transport_pins WHERE mode = OLD.mode AND line_id = OLD.line_id AND station_id = OLD.station_id;
+          END;
+          CREATE TRIGGER remove_home_gmb_pin AFTER DELETE ON gmb_favorites BEGIN
+            DELETE FROM home_transport_pins WHERE gmb_id = OLD.id;
+          END;
+          CREATE TRIGGER preserve_pinned_bus_id BEFORE UPDATE OF id ON bus_favorites
+          WHEN NEW.id <> OLD.id AND EXISTS (SELECT 1 FROM home_transport_pins WHERE bus_id = OLD.id) BEGIN
+            SELECT RAISE(ABORT, 'Cannot change a pinned bus identity');
+          END;
+          CREATE TRIGGER preserve_pinned_railway_identity BEFORE UPDATE OF mode, line_id, station_id ON railway_favorites
+          WHEN (NEW.mode <> OLD.mode OR NEW.line_id <> OLD.line_id OR NEW.station_id <> OLD.station_id)
+            AND EXISTS (SELECT 1 FROM home_transport_pins WHERE mode = OLD.mode AND line_id = OLD.line_id AND station_id = OLD.station_id) BEGIN
+            SELECT RAISE(ABORT, 'Cannot change a pinned railway identity');
+          END;
+          CREATE TRIGGER preserve_pinned_gmb_id BEFORE UPDATE OF id ON gmb_favorites
+          WHEN NEW.id <> OLD.id AND EXISTS (SELECT 1 FROM home_transport_pins WHERE gmb_id = OLD.id) BEGIN
+            SELECT RAISE(ABORT, 'Cannot change a pinned minibus identity');
+          END;
+
+          INSERT INTO home_transport_pins (position, mode, bus_id, line_id, station_id, gmb_id)
+            SELECT position, mode, bus_id, line_id, station_id, gmb_id
+            FROM home_transport_pins_v11 ORDER BY position;
+          DROP TABLE home_transport_pins_v11;
+          PRAGMA user_version = 12;
         `);
       }
     });

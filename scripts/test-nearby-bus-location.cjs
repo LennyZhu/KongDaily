@@ -31,7 +31,7 @@ const blocked = { granted: false, canAskAgain: false };
 
 function mount(t, {
   permission = granted, servicesEnabled = true, appState = 'active', locale = 'zh-HK', transport = false,
-  intent, delayCatalogue = false, offlineCatalogue = false, failBusNearby = false, mtrDetail, lightRailDetail, gmbDetail,
+  initialRadius = 500, intent, delayCatalogue = false, offlineCatalogue = false, failBusNearby = false, mtrDetail, lightRailDetail, gmbDetail,
   ferryPreview = false, development = ferryPreview, ferryDetail, ferryNow = Date.parse('2026-11-23T00:01:00+08:00'), ferryResponse, tramDetail, tramEnabled = false, unavailableTram = false, tramStatuses,
 } = {}) {
   const events = new EventEmitter();
@@ -46,6 +46,8 @@ function mount(t, {
   let focused = true;
   let mounted = true;
   let dirty = true;
+  let fixtureRadiusSelected = false;
+  let fixtureRadiusApplied = false;
   let cursor = 0;
   let effects = [];
   let screenTree;
@@ -354,6 +356,20 @@ function mount(t, {
           mtrServicesTree = mtrServices && mtrServices.type(mtrServices.props);
         }
         effects.forEach((run) => run());
+        // Legacy scenarios explicitly select their 500m fixture after a reference exists.
+        if (!fixtureRadiusSelected && tree && initialRadius !== 300) {
+          const format = (r) => r < 1000 ? labels.metres(r) : labels.kilometres(r / 1000);
+          const controlLabel = transport ? copy.transport.straightLineRadius(format(300)) : labels.radius(format(300));
+          const control = visibleElements().find(({ type, props }) => type === 'Pressable'
+            && (props.accessibilityLabel === controlLabel || elements(props.children).some(({ props }) => props.children === controlLabel)));
+          if (control) { fixtureRadiusSelected = true; control.props.onPress(); }
+        }
+        if (fixtureRadiusSelected && !fixtureRadiusApplied) {
+          const chosen = visibleElements().find(({ type, props }) => type === 'Pressable'
+            && props.accessibilityState?.selected === false
+            && elements(props.children).some(({ props }) => props.children === (initialRadius < 1000 ? labels.metres(initialRadius) : labels.kilometres(initialRadius / 1000))));
+          if (chosen) { fixtureRadiusApplied = true; chosen.props.onPress(); }
+        }
       }
       await new Promise(setImmediate);
       if (!dirty) return;
@@ -459,6 +475,7 @@ function mount(t, {
     geo: () => source('railway-station-geo'),
     nearbyRail: () => source('nearby-railway'),
     nearbyGmb: () => source('nearby-gmb'),
+    nearbyBus: () => source('nearby-bus-data'),
     nearbyFerry: () => source('nearby-hkkf'),
     ferryNearbyCopy: () => source('hkkf-nearby-copy').hkkfNearbyCopy[locale],
     async waitStopSearch() { await stopSearchTask; await settle(); },
@@ -496,6 +513,76 @@ function mount(t, {
   };
 }
 
+for (const locale of ['zh-HK', 'en']) {
+  test(`300m default aggregates every open mode and preserves an explicitly selected radius (${locale})`, async (t) => {
+    const page = mount(t, { transport: true, initialRadius: 300, locale });
+    const { labels, transportCopy: copy } = page;
+    await page.settle();
+    const point = page.geo().getLightRailStopPositions('430')[0].coordinate;
+    page.fix(0, point);
+    await page.settle();
+    assert.ok(page.findAction(copy.straightLineRadius(labels.metres(300))));
+    const distance = (row) => row.kind === 'nearby-railway' ? row.location.distance
+      : 'route' in row ? row.stop.distance : 'stops' in row ? row.stops[0].distance : row.distance;
+    for (const radius of [300, 500, 1000, 2000]) {
+      if (radius > 300) {
+        const previous = radius === 500 ? labels.metres(300) : radius === 1000 ? labels.metres(500) : labels.kilometres(1);
+        page.press(copy.straightLineRadius(previous)); await page.settle();
+        for (const label of [labels.metres(300), labels.metres(500), labels.kilometres(1), labels.kilometres(2)]) assert.ok(page.findAction(label));
+        page.press(radius < 1000 ? labels.metres(radius) : labels.kilometres(radius / 1000)); await page.settle();
+      }
+      for (const [view, action] of [['routes', labels.byRoute], ['stops', labels.byStop]]) {
+        page.press(action); await page.settle();
+        const all = page.rows();
+        assert.ok(all.length);
+        assert.ok(all.every((row, i) => distance(row) <= radius && (!i || distance(row) >= distance(all[i - 1]))));
+        for (const mode of ['bus', 'mtr', 'lightRail', 'minibus']) {
+          page.press(copy.modes[mode]); await page.settle();
+          page.press(action); await page.settle();
+          const keys = new Set(all.map(page.list().props.keyExtractor));
+          for (const row of page.rows()) assert.ok(keys.has(page.list().props.keyExtractor(row)));
+        }
+        page.press(copy.modes.all); await page.settle();
+        assert.deepEqual(page.rows(), all);
+      }
+    }
+    page.press(copy.changeReference); await page.settle();
+    page.press(labels.landmarks.yuenLong); await page.settle();
+    assert.ok(page.findAction(copy.straightLineRadius(labels.kilometres(2))));
+    page.focus(false); page.focus(true); await page.settle();
+    assert.ok(page.findAction(copy.straightLineRadius(labels.kilometres(2))));
+  });
+}
+
+test('300m empty nearby results offer each larger radius once without changing the reference', async (t) => {
+  const page = mount(t, { transport: true, initialRadius: 300 });
+  await page.settle();
+  page.fix(0, { latitude: 22.15, longitude: 114.30 }); await page.settle();
+  for (const radius of [500, 1000, 2000]) {
+    assert.equal(page.rows().length, 0);
+    page.press(page.labels.expand(radius < 1000 ? page.labels.metres(radius) : page.labels.kilometres(radius / 1000)));
+    await page.settle();
+  }
+  assert.equal(page.rows().length, 0);
+  assert.ok(!page.visibleElements().some(({ props }) => props.accessibilityLabel?.includes('擴大')));
+  assert.equal(page.requests.length, 1);
+});
+
+test('bus 300m filtering uses exact straight-line distances on either side of the boundary', async (t) => {
+  const { readNearbyBusStops } = mount(t, { initialRadius: 300 }).nearbyBus();
+  const point = { latitude: 22.31, longitude: 114.17 };
+  const latitude = (meters) => point.latitude + meters / 6_371_008.8 * 180 / Math.PI;
+  try {
+    insert.run('citybus', 'phase5-inside', '站', 'Stop', latitude(299.999), point.longitude, '', '');
+    insert.run('citybus', 'phase5-outside', '站', 'Stop', latitude(300.001), point.longitude, '', '');
+    const rows = await readNearbyBusStops(point, 300);
+    assert.ok(rows.some(({ stop_id }) => stop_id === 'phase5-inside'));
+    assert.ok(!rows.some(({ stop_id }) => stop_id === 'phase5-outside'));
+  } finally {
+    db.prepare("DELETE FROM nearby_bus_stops WHERE stop_id IN ('phase5-inside', 'phase5-outside')").run();
+  }
+});
+
 test('authorized focus uses real stop and route data, preserves mode and radius, and refreshes on refocus', async (t) => {
   const page = mount(t);
   const { labels, landmarks } = page;
@@ -527,7 +614,7 @@ test('authorized focus uses real stop and route data, preserves mode and radius,
   assert.deepEqual(page.routes[1], { pathname: '/bus/nearby/stop', params: {
     source: stop.source, stopId: stop.stop_id, distance: String(stop.distance),
   } });
-  assert.equal(page.queries.length, 1);
+  assert.equal(page.queries.length, 2);
   assert.equal(page.requests.length, 1);
 
   page.press(labels.radius(labels.metres(500)));
@@ -558,7 +645,7 @@ test('a manual landmark wins over a late GPS fix and remains selected until expl
   page.fix(0, landmarks.shaTin);
   await page.settle();
   assert.ok(page.shows(labels.landmarkReference(labels.landmarks.central)));
-  assert.equal(page.queries.length, 1);
+  assert.equal(page.queries.length, 2);
   page.focus(false);
   page.focus(true);
   page.appState('background');
@@ -598,7 +685,7 @@ test('blur and background discard late fixes; each genuine resume requests only 
   page.fix(2, page.landmarks.shaTin);
   await page.settle();
   assert.ok(page.shows(page.labels.currentLocation));
-  assert.equal(page.queries.length, 1);
+  assert.equal(page.queries.length, 2);
 });
 
 test('the legacy bus screen never prompts automatically for denied access; explicit permission and a later retry work', async (t) => {
@@ -715,7 +802,7 @@ test('a hung native fix times out and its late result cannot replace a retry', a
   page.unmount();
   page.fix(2, page.landmarks.central);
   await page.settle();
-  assert.equal(page.queries.length, 1);
+  assert.equal(page.queries.length, 2);
 });
 
 for (const locale of ['zh-HK', 'en']) {
@@ -750,7 +837,7 @@ for (const locale of ['zh-HK', 'en']) {
     await page.settle();
     assert.deepEqual(page.rows().map((route) => route.number), ['B2', 'B2P']);
     assert.equal(page.requests.length, 1);
-    assert.equal(page.queries.length, 1);
+    assert.equal(page.queries.length, 2);
     page.press(page.busCopy.clearInput);
     await page.settle();
     assert.deepEqual(page.rows(), allRoutes);
@@ -797,7 +884,7 @@ for (const locale of ['zh-HK', 'en']) {
     assert.ok(!page.shows(labels.currentLocation));
     assert.ok(!page.locateButton());
     assert.equal(page.requests.length, 4);
-    assert.equal(page.queries.length, 1);
+    assert.equal(page.queries.length, 2);
   });
 
   test(`transport puts search first and discloses distance and location controls on demand (${locale})`, async (t) => {
@@ -867,7 +954,7 @@ for (const locale of ['zh-HK', 'en']) {
     await page.settle();
     assert.ok(page.findAction(range1000));
     assert.ok(!page.shows(range500));
-    assert.equal(page.queries.length, 2);
+    assert.equal(page.queries.length, 3);
     assert.equal(page.requests.length, 1);
     page.press(labels.byStop);
     await page.settle();
@@ -1338,7 +1425,7 @@ test('a transport filter change does not let a pending GPS fix replace a selecte
   await page.settle();
   assert.ok(page.shows(labels.landmarkReference(labels.landmarks.central)));
   assert.equal(page.requests.length, 1);
-  assert.equal(page.queries.length, 1);
+  assert.equal(page.queries.length, 2);
 });
 
 for (const [railMode, busMode] of [['mtr', 'bus'], ['lightRail', 'all']]) {
@@ -2263,6 +2350,9 @@ test('nearby minibus respects all radius boundaries, distinct collocated stop ID
     stop(7, 1999.9, [visit(7, 7, true)]),
     stop(8, 2000.1, [visit(8, 8, true)]),
   ];
+  const boundary = [stop(1, 299.999, [visit(1, 1, true)]), stop(2, 300.001, [visit(2, 1, true)])];
+  assert.deepEqual(nearbyGmbRows(center, 300, 'stops', boundary).map(({ id }) => id), ['1']);
+  assert.deepEqual(nearbyGmbRows(center, 300, 'routes', boundary).map(({ visit }) => visit.stopId), [1]);
   assert.deepEqual(nearbyGmbRows(center, 500, 'stops', stops).map(({ id }) => id), ['1', '2', '3']);
   assert.deepEqual(nearbyGmbRows(center, 1000, 'stops', stops).map(({ id }) => id), ['1', '2', '3', '4', '5']);
   assert.deepEqual(nearbyGmbRows(center, 2000, 'stops', stops).map(({ id }) => id), ['1', '2', '3', '4', '5', '6', '7']);

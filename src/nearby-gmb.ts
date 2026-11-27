@@ -80,7 +80,7 @@ export function gmbNearbySnapshotDate() {
 export function nearbyGmbRows(
   center: Coordinates, radius: BusSearchRadius, view: 'routes' | 'stops', stops?: readonly GmbNearbyStop[],
 ): GmbNearbyResultRow[] {
-  if (!isNearHongKong(center) || ![500, 1000, 2000].includes(radius)) return [];
+  if (!isNearHongKong(center) || ![300, 500, 1000, 2000].includes(radius)) return [];
   const nearby = (stops ?? index().stops).flatMap((stop) => {
     const distance = distanceBetween(center, stop.coordinate);
     return distance <= radius && stop.visits.some(({ boarding }) => boarding) ? [{ stop, distance }] : [];

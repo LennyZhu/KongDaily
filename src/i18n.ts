@@ -39,7 +39,7 @@ const zhHK = {
     loadError: '未能載入常用交通',
     refreshEta: '更新常用交通預報',
     empty: '尚未置頂常用交通',
-    emptyDetail: '在「收藏」選擇最多三項交通服務置頂，方便在首頁查看預報。',
+    emptyDetail: '在「收藏」選擇最多四項交通服務置頂，方便在首頁查看預報。',
     limitTitle: '首頁置頂已滿',
   },
   weather: {
@@ -910,7 +910,7 @@ const en: typeof zhHK = {
     loadError: 'Couldn’t load frequent transport',
     refreshEta: 'Refresh frequent transport predictions',
     empty: 'No transport pinned to Home',
-    emptyDetail: 'Pin up to three services from Saved to see their predictions on Home.',
+    emptyDetail: 'Pin up to four services from Saved to see their predictions on Home.',
     limitTitle: 'Home pins are full',
   },
   weather: {

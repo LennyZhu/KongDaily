@@ -98,7 +98,7 @@ export function findNearbyRailwayStations(
   center: Coordinates, radius: BusSearchRadius, mode?: RailwayGeoMode,
   stations: readonly RailwayStationGeo[] = railwayStationGeographies,
 ): NearbyRailwayStation[] {
-  if (!usablePoint(center) || (radius !== 500 && radius !== 1000 && radius !== 2000)) return [];
+  if (!usablePoint(center) || (radius !== 300 && radius !== 500 && radius !== 1000 && radius !== 2000)) return [];
   return stations.flatMap((station) => {
     if (mode && station.mode !== mode) return [];
     const nearest = nearestRailwayPosition(center, station);

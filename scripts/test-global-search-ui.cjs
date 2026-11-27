@@ -349,10 +349,12 @@ async function verify() {
     tapText(emptyFrequent, labels().homeRailway.viewSaved);
     assert.equal(pushed.pop(), '/saved?category=all');
     assertPinVisibility(busPins.slice(0, 2), 'ready', 2, true);
-    const fullFrequent = assertPinVisibility(busPins.slice(0, 3), 'ready', 3, false);
+    assertPinVisibility(busPins.slice(0, 3), 'ready', 3, true);
+    const fullFrequent = assertPinVisibility(busPins.slice(0, 4), 'ready', 4, false);
     tapText(fullFrequent, labels().homeRailway.viewSaved);
     assert.equal(pushed.pop(), '/saved?category=all');
     // Returning from Saved uses the latest shared pin snapshot.
+    assertPinVisibility(busPins.slice(0, 3), 'ready', 3, true);
     assertPinVisibility(busPins.slice(0, 2), 'ready', 2, true);
     assertPinVisibility([...busPins.slice(0, 2), { mode: 'bus', id: 'missing' }], 'ready', 2, true);
   }
@@ -368,10 +370,10 @@ async function verify() {
   await renderHomeRefresh().onRefresh();
   assert.equal(renderHomeRefresh().refreshing, false);
 
-  pinState = { pins: busPins.slice(0, 3), status: 'ready' };
+  pinState = { pins: busPins.slice(0, 4), status: 'ready' };
   hookIndex = 0;
   const registeredCards = nodes(HomeScreen()).filter(({ type }) => type === 'HomeFavoriteBus');
-  for (const count of [1, 2, 3]) {
+  for (const count of [1, 2, 3, 4]) {
     const calls = [];
     const resolvers = [];
     const unregister = registeredCards.slice(0, count).map(({ props }, index) =>
@@ -393,7 +395,7 @@ async function verify() {
   }
   railwayItems = [{ mode: 'mtr', lineId: 'ISL', stationId: 'ADM' }, { mode: 'light_rail', lineId: '610', stationId: '380' }];
   gmbItems = [{ mode: 'gmb', id: 'minibus-visit' }];
-  for (const pins of [[busPins[0], railwayItems[0], railwayItems[1]], [railwayItems[1], gmbItems[0], busPins[0]]]) {
+  for (const pins of [[busPins[0], railwayItems[0], railwayItems[1], gmbItems[0]], [railwayItems[1], gmbItems[0], busPins[0]]]) {
     pinState = { pins, status: 'ready' };
     const homeCards = () => {
       hookIndex = 0;

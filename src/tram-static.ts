@@ -179,7 +179,7 @@ export function createTramServiceIndex(overrides: readonly TramStatusOverride[])
   }
 
   function findNearbyTramStops(center: Coordinates, radius: BusSearchRadius): readonly NearbyTramStop[] {
-    if (!isNearHongKong(center) || ![500, 1000, 2000].includes(radius)) return empty;
+    if (!isNearHongKong(center) || ![300, 500, 1000, 2000].includes(radius)) return empty;
 
     const nearby = stops.flatMap((stop): NearbyTramStop[] => {
       const serviceStatus = statuses.get(stop.stopId) ?? unknownStatus;

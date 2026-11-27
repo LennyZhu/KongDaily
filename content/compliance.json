@@ -108,7 +108,7 @@
         "intro": "查閱公共交通預報、天氣、定位及離線功能的常見問題。",
         "contactSection": "contact",
         "sections": [
-          { "id": "bus", "title": "公共交通預報為何沒有更新？", "paragraphs": ["預報來自相關營辦商或香港運輸署。請確認網絡、路線方向和所選站點，再試重新整理。資料過期、服務中斷或沒有班次時，App 會顯示相應狀態。你可收藏乘車服務，並在首頁共用最多三個置頂位置。"] },
+          { "id": "bus", "title": "公共交通預報為何沒有更新？", "paragraphs": ["預報來自相關營辦商或香港運輸署。請確認網絡、路線方向和所選站點，再試重新整理。資料過期、服務中斷或沒有班次時，App 會顯示相應狀態。你可收藏乘車服務，並在首頁共用最多四個置頂位置。"] },
           { "id": "weather", "title": "天氣及警告如何更新？", "paragraphs": ["天氣觀測、預報和警告來自香港天文台。檢查資料時間及過期提示；如需最新官方消息，請查閱天文台。"] },
           { "id": "location", "title": "定位不可用時怎樣瀏覽附近？", "paragraphs": ["首次進入需要定位的附近畫面時，如尚未作出選擇，iOS 會要求前台定位授權。你可在 iOS 設定管理位置權限。你也可手動選擇地標、搜尋地點，或在設施地圖選用地圖中心。"] },
           { "id": "offline", "title": "沒有網絡時可以使用甚麼？", "paragraphs": ["隨 App 提供的探索內容、設施、巴士站點、港鐵與輕鐵路線及站點、專線小巴附近索引和本機收藏可離線使用。按編號查詢最新小巴路線、載入部分交通詳情、即時預報、最新天氣及警告，以及線上地點搜尋需要網絡。地圖底圖更新及外部導航一般也需要網絡。"] },
@@ -204,7 +204,7 @@
         "intro": "Answers about transport predictions, weather, location and offline access.",
         "contactSection": "contact",
         "sections": [
-          { "id": "bus", "title": "Why are transport predictions not updating?", "paragraphs": ["Predictions come from the relevant operators or the Hong Kong Transport Department. Check your connection, direction and stop, then try refreshing. The app indicates stale data, service problems or when no arrivals are available. You can save a transport service and pin up to three services to Home."] },
+          { "id": "bus", "title": "Why are transport predictions not updating?", "paragraphs": ["Predictions come from the relevant operators or the Hong Kong Transport Department. Check your connection, direction and stop, then try refreshing. The app indicates stale data, service problems or when no arrivals are available. You can save a transport service and pin up to four services to Home."] },
           { "id": "weather", "title": "How are weather and warnings updated?", "paragraphs": ["Observations, forecasts and warnings come from the Hong Kong Observatory. Check the timestamp and any stale-data notice. Consult the Observatory for the latest official information."] },
           { "id": "location", "title": "How can I browse Nearby without location?", "paragraphs": ["If you have not made a choice, iOS asks for foreground location permission when you first open a Nearby screen that needs it. You can manage access in iOS Settings. You can also choose a landmark, search for a place, or use the centre of the facilities map."] },
           { "id": "offline", "title": "What works offline?", "paragraphs": ["Bundled Explore guides, facilities, bus stops, MTR and Light Rail routes and stops, the green minibus nearby index, and local favourites are available offline. Current minibus route-number lookups, some transport details, live predictions, current weather and warnings, and online place search need a connection. Refreshed map tiles and external directions generally do too."] },
