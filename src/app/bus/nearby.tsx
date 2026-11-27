@@ -33,7 +33,7 @@ import {
 } from '@/nearby-bus-data';
 import { formatAdultBusFare, readAdultBusFare } from '@/nearby-bus-fares';
 import { nearbyBusLandmarks, type NearbyLandmark } from '@/nearby-bus-landmarks';
-import { gmbNearbySnapshotDate, nearbyGmbRows, searchGmbStopNames, type GmbNearbyRouteRow, type GmbNearbyStopRow } from '@/nearby-gmb';
+import { gmbNearbySnapshotDate, nearbyGmbRows, searchGmbStopNames, type GmbNearbyResultRow, type GmbNearbyRouteRow, type GmbNearbyStopRow } from '@/nearby-gmb';
 import type { FerryNearbyRow } from '@/nearby-hkkf';
 import { locateNearbyBusStops, type NearbyLocationIssue } from '@/nearby-bus-location';
 import { nearbyTramRows, type TramNearbyRow } from '@/nearby-tram';
@@ -55,7 +55,6 @@ type ListItem = NearbyItem | BusRoute | MtrEntry | LightRailEntry | NearbyRailwa
 const emptyRoutes: NearbyRoute[] = [];
 const emptyStops: NearbyBusStop[] = [];
 const emptySearchResults: BusRoute[] = [];
-const emptyGmbNearby: (GmbNearbyRouteRow | GmbNearbyStopRow)[] = [];
 const viewability = { itemVisiblePercentThreshold: 35, minimumViewTime: 250 };
 const radii = [500, 1000, 2000] as const;
 // Keep the 4B3 UI and coordinate snapshot out of the production dependency graph.
@@ -73,8 +72,9 @@ function browseKey(item: ListItem) {
   return 'route' in item ? routeStopKey(item.route.target) : item.id;
 }
 
-function nearbyDistance(item: NearbyItem | NearbyRailwayRow) {
-  return 'kind' in item ? item.location.distance : 'route' in item ? item.stop.distance : item.stops[0].distance;
+function nearbyDistance(item: NearbyItem | NearbyRailwayRow | GmbNearbyResultRow) {
+  if ('kind' in item) return item.kind === 'nearby-railway' ? item.location.distance : item.distance;
+  return 'route' in item ? item.stop.distance : item.stops[0].distance;
 }
 
 export default function NearbyBusScreen({ transport = false, addFrequentRoute = false }: {
@@ -199,20 +199,22 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   const routeResult = resultForRadius?.routes;
   const routeRows = showBuses && !searching && mode === 'routes' && Array.isArray(routeResult) ? routeResult : emptyRoutes;
   const view = tramMode ? tramView : ferryMode ? ferryView : minibusMode ? minibusView : mtrMode ? mtrView : lightRailMode ? lightRailView : mode;
-  // During a passive refresh, All keeps rail and the still-visible bus results on the same reference point.
+  // During a passive refresh, All keeps offline results and the still-visible buses on one reference point.
   const nearbyReference = showBuses && resultForRadius ? resultForRadius.reference : reference;
   const railRows = useMemo(() => transport && !searching && nearbyReference
     && (transportMode === 'all' || mtrMode || lightRailMode)
     ? nearbyRailwayRows(nearbyReference.point, radiusMeters, view, mtrMode ? 'mtr' : lightRailMode ? 'lightRail' : undefined) : [],
   [transport, searching, nearbyReference, transportMode, mtrMode, lightRailMode, radiusMeters, view]);
-  const gmbNearbyRows = useMemo(() => minibusMode && !searching && reference
-    ? nearbyGmbRows(reference.point, radiusMeters, minibusView) : emptyGmbNearby, [minibusMode, searching, reference, radiusMeters, minibusView]);
+  const showMinibuses = transport && (transportMode === 'all' || minibusMode);
+  const gmbNearbyRows = useMemo(() => showMinibuses && !searching && nearbyReference
+    ? nearbyGmbRows(nearbyReference.point, radiusMeters, view) : [], [showMinibuses, searching, nearbyReference, radiusMeters, view]);
   const nearbyRows = useMemo(() => {
     if (minibusMode) return gmbNearbyRows;
     const buses = mode === 'routes' ? routeRows : stopGroups;
     if (!transport || transportMode === 'bus') return buses;
     if (transportMode !== 'all') return railRows;
-    return [...buses, ...railRows].sort((a, b) => nearbyDistance(a) - nearbyDistance(b) || browseKey(a).localeCompare(browseKey(b)));
+    return [...buses, ...railRows, ...gmbNearbyRows]
+      .sort((a, b) => nearbyDistance(a) - nearbyDistance(b) || browseKey(a).localeCompare(browseKey(b)));
   }, [transport, transportMode, mode, routeRows, stopGroups, railRows, minibusMode, gmbNearbyRows]);
   const ferryRows = useMemo(() => {
     if (!ferryMode || !ferryNearby) return [];

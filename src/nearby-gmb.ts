@@ -20,6 +20,7 @@ export type GmbNearbyVisit = GmbVisit & { direction: GmbNearbyDirection; boardin
 export type GmbNearbyStop = { stopId: number; coordinate: Coordinates; name: GmbText; visits: readonly GmbNearbyVisit[] };
 export type GmbNearbyRouteRow = { kind: 'nearby-gmb-route'; id: string; visit: GmbNearbyVisit; distance: number };
 export type GmbNearbyStopRow = { kind: 'nearby-gmb-stop'; id: string; stop: GmbNearbyStop; distance?: number };
+export type GmbNearbyResultRow = GmbNearbyRouteRow | (GmbNearbyStopRow & { distance: number });
 
 function snapshot(): Snapshot {
   return require('../assets/data/gmb-nearby.json') as Snapshot;
@@ -48,7 +49,7 @@ function bilingual(tc: string, en: string): GmbText {
 
 function index() {
   if (loaded) return loaded;
-  // Delay decoding the packaged catalogue until entering the Minibus mode.
+  // Delay decoding the packaged catalogue until the first nearby or stop-name lookup.
   const data = snapshot();
   const variants = new Map<string, Set<number>>();
   for (const [routeId, , region, code] of data.directions) {
@@ -78,7 +79,7 @@ export function gmbNearbySnapshotDate() {
 
 export function nearbyGmbRows(
   center: Coordinates, radius: BusSearchRadius, view: 'routes' | 'stops', stops?: readonly GmbNearbyStop[],
-): (GmbNearbyRouteRow | GmbNearbyStopRow)[] {
+): GmbNearbyResultRow[] {
   if (!isNearHongKong(center) || ![500, 1000, 2000].includes(radius)) return [];
   const nearby = (stops ?? index().stops).flatMap((stop) => {
     const distance = distanceBetween(center, stop.coordinate);

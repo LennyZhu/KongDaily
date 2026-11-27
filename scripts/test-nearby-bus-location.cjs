@@ -31,7 +31,7 @@ const blocked = { granted: false, canAskAgain: false };
 
 function mount(t, {
   permission = granted, servicesEnabled = true, appState = 'active', locale = 'zh-HK', transport = false,
-  intent, delayCatalogue = false, offlineCatalogue = false, mtrDetail, lightRailDetail, gmbDetail,
+  intent, delayCatalogue = false, offlineCatalogue = false, failBusNearby = false, mtrDetail, lightRailDetail, gmbDetail,
   ferryPreview = false, development = ferryPreview, ferryDetail, ferryNow = Date.parse('2026-11-23T00:01:00+08:00'), ferryResponse, tramDetail, tramEnabled = false, unavailableTram = false, tramStatuses,
 } = {}) {
   const events = new EventEmitter();
@@ -166,6 +166,7 @@ function mount(t, {
       async getAllAsync(sql, ...params) {
         if (sql.includes('latitude BETWEEN')) queries.push(params);
         if (holdNearby && sql.includes('latitude BETWEEN')) await new Promise((resolve) => pendingNearby.push(resolve));
+        if (failBusNearby && sql.includes('latitude BETWEEN')) throw new Error('Bus stop index unavailable');
         return db.prepare(sql).all(...params);
       },
     }) },
@@ -1238,25 +1239,27 @@ test('a changed GPS ranking keeps a visible station nearby with one layout fallb
   await page.settle();
   const listKey = page.list().key;
   const scrolls = page.attachList({ failIndex: true });
-  const originalVisible = page.rows().slice(12, 15);
-  page.showRows([12, 13, 14], 1400);
+  const anchorStart = 14;
+  const rowKey = page.list().props.keyExtractor;
+  const originalVisible = page.rows().slice(anchorStart, anchorStart + 3).map(rowKey);
+  page.showRows([anchorStart, anchorStart + 1, anchorStart + 2], 1400);
   page.focus(false);
   page.focus(true);
   await page.settle();
   page.fix(1, { latitude: landmarks.central.latitude + 0.00035, longitude: landmarks.central.longitude + 0.00055 });
   await page.settle();
-  const ids = page.rows().map(({ id }) => id);
-  const surviving = originalVisible.find(({ id }) => ids.includes(id));
+  const keys = page.rows().map(rowKey);
+  const surviving = originalVisible.find((key) => keys.includes(key));
   assert.ok(surviving, 'A station in the original viewport still exists at the nearby position');
-  const index = ids.indexOf(surviving.id);
-  assert.notEqual(index, 12);
+  const index = keys.indexOf(surviving);
+  assert.notEqual(index, anchorStart);
   assert.equal(page.list().key, listKey);
   assert.deepEqual(scrolls, []);
   page.paint();
   page.paint();
   assert.deepEqual(scrolls, [
     { method: 'index', index, animated: false },
-    { method: 'offset', offset: Math.max(0, 1400 + (index - 12) * 100), animated: false },
+    { method: 'offset', offset: Math.max(0, 1400 + (index - anchorStart) * 100), animated: false },
   ]);
 });
 
@@ -1901,28 +1904,65 @@ for (const locale of ['zh-HK', 'en']) {
   }
 }
 
-test('All merges three actual transport types with one point/radius, stable IDs and ascending distances', async (t) => {
+test('All merges four actual transport types with one point/radius, stable IDs and ascending distances', async (t) => {
   const page = mount(t, { transport: true });
   const { labels, transportCopy: copy } = page;
   await page.settle();
   const point = page.geo().getLightRailStopPositions('430')[0].coordinate;
   page.fix(0, point);
   await page.settle();
-  for (const view of ['routes', 'stops']) {
-    if (view === 'stops') { page.press(labels.byStop); await page.settle(); }
-    const rows = page.rows();
-    assert(rows.some((row) => view === 'routes' ? 'route' in row : 'stops' in row));
-    for (const railMode of ['mtr', 'lightRail']) assert(rows.some((row) => row.kind === 'nearby-railway' && row.location.station.mode === railMode));
-    const distances = rows.map((row) => row.kind === 'nearby-railway' ? row.location.distance
-      : 'route' in row ? row.stop.distance : row.stops[0].distance);
-    assert(distances.every((distance, index) => distance <= 500 && (!index || distance >= distances[index - 1])));
-    assert.equal(new Set(rows.map(page.list().props.keyExtractor)).size, rows.length);
-    const railRows = rows.filter(({ kind }) => kind === 'nearby-railway');
-    assert.deepEqual(railRows, page.nearbyRail().nearbyRailwayRows(point, 500, view));
-    const busIndex = rows.findIndex((row) => view === 'routes' ? 'route' in row : 'stops' in row);
-    assert.equal(page.renderRow(busIndex).props.modeLabel, copy.modes.bus);
-    assert.equal(page.etaRoutes().length, view === 'routes' ? rows.filter((row) => 'route' in row).length : 0);
+  const minibuses = (rows) => rows.filter(({ kind }) => kind === 'nearby-gmb-route' || kind === 'nearby-gmb-stop');
+  const byId = (rows) => new Map(rows.map((row) => [row.id, row]));
+  let distanceLabel = labels.metres(500);
+  for (const radius of [500, 1000, 2000]) {
+    if (radius > 500) {
+      page.press(copy.straightLineRadius(distanceLabel)); await page.settle();
+      distanceLabel = labels.kilometres(radius / 1000);
+      page.press(distanceLabel); await page.settle();
+    }
+    for (const [view, switchLabel] of [['routes', labels.byRoute], ['stops', labels.byStop]]) {
+      page.press(switchLabel); await page.settle();
+      const rows = page.rows();
+      assert(rows.some((row) => view === 'routes' ? 'route' in row : 'stops' in row));
+      for (const railMode of ['mtr', 'lightRail']) assert(rows.some((row) => row.kind === 'nearby-railway' && row.location.station.mode === railMode));
+      const eligibleMinibuses = page.nearbyGmb().nearbyGmbRows(point, radius, view);
+      assert.ok(eligibleMinibuses.length > 0);
+      assert.deepEqual(byId(minibuses(rows)), byId(eligibleMinibuses));
+      const distances = rows.map((row) => row.kind === 'nearby-railway' ? row.location.distance
+        : 'route' in row ? row.stop.distance : 'stops' in row ? row.stops[0].distance : row.distance);
+      assert(distances.every((distance, index) => distance <= radius && (!index || distance >= distances[index - 1])));
+      assert.equal(new Set(rows.map(page.list().props.keyExtractor)).size, rows.length);
+      assert.equal(page.list().props.onEndReached, undefined, 'The full sorted data goes to the virtualized list');
+      assert.ok(!rows.some(({ kind }) => /tram|ferry/.test(kind)), 'All cannot expose gated traffic');
+      assert.deepEqual(rows.filter(({ kind }) => kind === 'nearby-railway'), page.nearbyRail().nearbyRailwayRows(point, radius, view));
+      const busIndex = rows.findIndex((row) => view === 'routes' ? 'route' in row : 'stops' in row);
+      assert.equal(page.renderRow(busIndex).props.modeLabel, copy.modes.bus);
+      assert.equal(page.etaRoutes().length, view === 'routes' ? rows.filter((row) => 'route' in row).length : 0);
+
+      const firstMinibus = minibuses(rows)[0];
+      const minibusIndex = rows.indexOf(firstMinibus);
+      if (radius === 500 && view === 'routes') {
+        page.openResult(minibusIndex);
+        const { routeId, routeSeq } = firstMinibus.visit;
+        assert.deepEqual(page.routes.at(-1), { pathname: '/minibus/[id]', params: { id: String(routeId), routeSeq: String(routeSeq) } });
+      }
+      if (radius === 500 && view === 'stops') {
+        page.openResult(minibusIndex); await page.settle();
+        const visit = firstMinibus.stop.visits.find(({ boarding }) => boarding);
+        page.rowElements(minibusIndex).find(({ props }) => props.accessibilityState?.disabled === false).props.onPress();
+        assert.deepEqual(page.routes.at(-1), { pathname: '/minibus/[id]', params: {
+          id: String(visit.routeId), routeSeq: String(visit.routeSeq), stopSeq: String(visit.stopSeq), stopId: String(visit.stopId),
+        } });
+      }
+
+      page.press(copy.modes.minibus); await page.settle();
+      page.press(switchLabel); await page.settle();
+      assert.deepEqual(byId(page.rows()), byId(minibuses(rows)));
+      page.press(copy.modes.all); await page.settle();
+      assert.deepEqual(page.rows(), rows);
+    }
   }
+  assert.deepEqual(page.gmbPaths, [], 'The offline merge never calls live minibus ETA');
   assert.equal(page.requests.length, 1);
 });
 
@@ -2014,19 +2054,46 @@ test('rail text search cancels nearby GPS and stays idle on refocus/foreground a
   assert.equal(page.requests.length, 2);
 });
 
-test('All holds a common bus/rail reference during delayed bus refresh and stale async bus results cannot replace a rail category', async (t) => {
+test('All retains a shared reference during delayed bus refresh and cannot overwrite a rapidly selected category', async (t) => {
   const page = mount(t, { transport: true });
   await page.settle(); page.fix(0, page.landmarks.central); await page.settle();
   const old = page.rows();
   page.holdNearby(); page.focus(false); page.focus(true); await page.settle();
   page.fix(1, page.landmarks.yuenLong); await page.settle();
-  assert.equal(page.rows(), old, 'Bus and rail retain the same old point until the next bus query completes');
+  assert.equal(page.rows(), old, 'All sources retain the same old point until the next bus query completes');
+  page.press(page.transportCopy.modes.minibus); await page.settle();
+  assert.deepEqual(page.rows(), page.nearbyGmb().nearbyGmbRows(page.landmarks.yuenLong, 500, 'routes'));
   page.press(page.transportCopy.modes.lightRail); await page.settle();
   const rail = page.rows();
   assert(rail.length > 0);
   page.releaseNearby(); await page.settle();
   assert.equal(page.rows(), rail);
   assert(rail.every(({ location }) => location.station.mode === 'lightRail'));
+  page.press(page.transportCopy.modes.all); await page.settle();
+  assert.deepEqual(new Map(page.rows().filter(({ kind }) => kind === 'nearby-gmb-route').map((row) => [row.id, row])),
+    new Map(page.nearbyGmb().nearbyGmbRows(page.landmarks.yuenLong, 500, 'routes').map((row) => [row.id, row])));
+  assert.ok(page.rows().some((row) => 'route' in row));
+});
+
+test('All keeps offline rail and minibus routes and stops when the bus provider fails at a manual landmark', async (t) => {
+  const page = mount(t, { transport: true, permission: blocked, failBusNearby: true, locale: 'en' });
+  const { labels, landmarks, transportCopy: copy } = page;
+  await page.settle();
+  page.press(copy.chooseLandmark); await page.settle();
+  page.press(labels.landmarks.yuenLong); await page.settle();
+  for (const view of ['routes', 'stops']) {
+    if (view === 'stops') { page.press(labels.byStop); await page.settle(); }
+    const rows = page.rows();
+    assert.ok(page.shows(labels.indexError));
+    assert.ok(rows.every((row) => 'kind' in row));
+    assert.deepEqual(rows.filter(({ kind }) => kind === 'nearby-railway'), page.nearbyRail().nearbyRailwayRows(landmarks.yuenLong, 500, view));
+    const minibusRows = rows.filter(({ kind }) => kind === 'nearby-gmb-route' || kind === 'nearby-gmb-stop');
+    const expected = page.nearbyGmb().nearbyGmbRows(landmarks.yuenLong, 500, view);
+    assert.ok(expected.length > 0);
+    assert.deepEqual(new Map(minibusRows.map((row) => [row.id, row])), new Map(expected.map((row) => [row.id, row])));
+  }
+  assert.equal(page.requests.length, 0);
+  assert.deepEqual(page.gmbPaths, []);
 });
 
 test('transport reuses the existing offline bus-stop search adapter and existing detail route without a nearby radius', async (t) => {
