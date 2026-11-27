@@ -64,6 +64,7 @@ const stubs = {
   'react-native-maps': { __esModule: true, default: 'MapView', Marker: 'Marker', Polyline: 'Polyline' },
   'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ bottom: 0 }) },
   'expo-router': {
+    useLocalSearchParams: () => ({}),
     useRouter: () => ({ push: (href) => actions.push(href), canGoBack: () => true }),
     useFocusEffect: (fn) => { focusedEffect = fn; },
   },
@@ -71,6 +72,7 @@ const stubs = {
   '@/components/ui': { AppText: 'AppText', EmptyState: 'EmptyState', Icon: 'Icon', Screen: 'Screen' },
   '@/components/home-ui': { HarbourBackdrop: 'HarbourBackdrop' },
   '@/components/saved-bus-ui': { FavoriteBusRow: 'FavoriteBusRow' },
+  '@/components/home-transit-save': { HomeTransitPinAction: () => null, useHomeTransitSave: () => ({ enabled: false, busy: false }) },
   '@/bus-favorite-hooks': { useBusFavorites: () => ({ items: [], status: 'ready' }) },
   '@/bus-hooks': {
     useBusCatalogue: () => ({ feeds: {}, failed: {} }),

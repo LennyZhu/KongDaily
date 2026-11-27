@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useHomeTransitRouter } from '@/home-transit-intent';
 import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Icon } from '@/components/ui';
@@ -11,7 +11,7 @@ export function MtrEntryRow({ entry, sequence, lineCode, nearby }: {
   nearby?: { boarding: MtrStation; distance: string };
 }) {
   const { copy, locale } = useLanguage();
-  const router = useRouter();
+  const router = useHomeTransitRouter();
   const isLine = entry.kind === 'mtr-line';
   const alternateName = mtrName(entry, locale === 'en' ? 'zh-HK' : 'en');
   const lines = isLine ? [] : entry.memberships.flatMap(({ lineCode }) => {

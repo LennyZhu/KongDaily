@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
+import { HomeTransitPinAction, useHomeTransitSave } from '@/components/home-transit-save';
 import { AppText, Icon, PageHeading } from '@/components/ui';
 import { useLanguage } from '@/language';
 import { useRailwayFavorite } from '@/railway-favorite-hooks';
@@ -30,6 +31,7 @@ export function RailwayStationHeading({ title, description, identity, onChooseSe
 export function RailwayFavoriteAction({ identity }: { identity: RailwayFavoriteIdentity }) {
   const { copy, locale } = useLanguage();
   const { saved, busy, issue, onPress } = useRailwayFavorite(identity);
+  const homeSave = useHomeTransitSave(identity, saved);
   const service = resolveRailwayService(identity);
   if (!service) return null;
   const labels = copy.railwayFavorites;
@@ -41,7 +43,10 @@ export function RailwayFavoriteAction({ identity }: { identity: RailwayFavoriteI
         selected={issue === 'read' ? undefined : saved}
         accessibilityLabel={`${service.station[locale === 'en' ? 'en' : 'zh']} · ${line} · ${busy ? labels.loading
           : issue === 'read' ? copy.bus.retry : saved ? copy.busFavorites.remove : copy.busFavorites.save}`}
-        busy={busy} onPress={() => void onPress()} />
+        busy={busy || homeSave.busy} onPress={() => {
+          if (homeSave.enabled && !saved && !issue) void homeSave.save(); else void onPress();
+        }} />
+      <HomeTransitPinAction action={homeSave} saved={saved} />
       {issue && <AppText variant="detail" tone="error" accessibilityRole="alert">{labels[issue]}</AppText>}
     </View>
   );

@@ -15,6 +15,7 @@ import { getExplorePlace, homeFeaturedPlaceIds } from '@/explore-places';
 import type { Messages } from '@/i18n';
 import { useLanguage } from '@/language';
 import { useHomeEtaRefresh } from '@/home-eta-refresh';
+import { addHomeTransitHref } from '@/home-transit-intent';
 import { homePinKey, homeTransportLimit, loadHomePins, useHomePins } from '@/home-transport-pins';
 import { loadGmbFavorites, useGmbFavorites } from '@/gmb-favorites';
 import { loadRailwayFavorites, useRailwayFavorites } from '@/railway-favorite-hooks';
@@ -100,7 +101,7 @@ export default function HomeScreen() {
             <EmptyState icon="pin" title={copy.homePins.empty} detail={copy.homePins.emptyDetail} />
           )}
           {canAddTransport && (
-            <HomeLink href="/transport" label={home.addFrequentRoute} style={styles.addBus}>
+            <HomeLink href={addHomeTransitHref} label={home.addFrequentRoute} style={styles.addBus}>
               <Icon name="plus" size={16} />
               <AppText variant="detail" tone="primary" style={styles.buttonLabel}>{home.addFrequentRoute}</AppText>
             </HomeLink>

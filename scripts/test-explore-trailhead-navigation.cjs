@@ -55,6 +55,7 @@ const modules = {
   '@/components/home-favorite-railway': { HomeFavoriteRailway: 'HomeFavoriteRailway' },
   '@/railway-favorite-hooks': { useRailwayFavorites: () => ({ items: [], status: 'ready' }) },
   '@/home-transport-pins': { useHomePins: () => ({ pins: [], status: 'ready' }) },
+  '@/home-transit-intent': { addHomeTransitHref: { pathname: '/transport', params: { intent: 'add-home-transit' } } },
   '@/home-eta-refresh': { useHomeEtaRefresh: () => ({ refreshing: false }) },
   '@/weather': {},
   '@/weather-hooks': {},

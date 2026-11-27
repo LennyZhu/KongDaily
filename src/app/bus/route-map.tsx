@@ -1,4 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useHomeTransitRouter } from '@/home-transit-intent';
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -36,7 +37,7 @@ function RouteMapLoader({ routeId, direction, stopId, stopSeq }: {
   stopId: unknown;
   stopSeq: unknown;
 }) {
-  const router = useRouter();
+  const router = useHomeTransitRouter();
   const { copy } = useLanguage();
   const [choice, setChoice] = useState<RouteSequenceChoice | null>();
 
@@ -77,7 +78,7 @@ function RouteMap({ choice, initialStopId, initialStopSeq }: {
   initialStopId: unknown;
   initialStopSeq: unknown;
 }) {
-  const router = useRouter();
+  const router = useHomeTransitRouter();
   const { copy, locale } = useLanguage();
   const labels = copy.busMap;
   const detail = copy.busDetail;

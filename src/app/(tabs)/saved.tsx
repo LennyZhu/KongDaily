@@ -214,7 +214,7 @@ function HomePinPosition({ pin }: { pin: HomePin }) {
 
 function TransportFavoriteActions({ pin, onRemove, busy = false, canPin = true, retryRemoval = false }: {
   pin: HomePin;
-  onRemove: () => Promise<'ok' | 'failed' | void>;
+  onRemove: () => Promise<'ok' | 'limit' | 'failed' | void>;
   busy?: boolean;
   canPin?: boolean;
   retryRemoval?: boolean;

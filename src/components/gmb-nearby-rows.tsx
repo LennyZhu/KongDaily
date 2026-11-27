@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useHomeTransitRouter } from '@/home-transit-intent';
 import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Icon } from '@/components/ui';
@@ -15,7 +15,7 @@ function description(visit: GmbNearbyVisit, locale: 'zh-HK' | 'en') {
 
 export function GmbNearbyRouteCard({ row, distance }: { row: GmbNearbyRouteRow; distance: string }) {
   const { copy, locale } = useLanguage();
-  const router = useRouter();
+  const router = useHomeTransitRouter();
   const { visit } = row;
   const { region, routeCode, hasVariants } = visit.direction;
   const title = copy.minibus.routeTitle(routeCode);
@@ -43,7 +43,7 @@ export function GmbNearbyStopCard({ row, distance, expanded, onToggle }: {
   row: GmbNearbyStopRow; distance?: string; expanded: boolean; onToggle: () => void;
 }) {
   const { copy, locale } = useLanguage();
-  const router = useRouter();
+  const router = useHomeTransitRouter();
   const routes = [...new Set(row.stop.visits.filter(({ boarding }) => boarding).map(({ direction }) => direction.routeCode))];
   const name = gmbText(row.stop.name, locale);
   const routeList = routes.join(' · ');

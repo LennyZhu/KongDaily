@@ -1,5 +1,6 @@
+import type { SQLiteDatabase } from 'expo-sqlite';
 import { getDatabase } from '@/database';
-import { forgetDeletedHomePin, queueTransportFavoriteWrite, waitForTransportFavoriteWrites } from '@/home-transport-pins';
+import { forgetDeletedHomePin, pinSavedHomeService, publishHomePins, queueTransportFavoriteWrite, waitForTransportFavoriteWrites } from '@/home-transport-pins';
 import { findLightRailRoute, findLightRailStop } from '@/light-rail-static';
 import { findMtrLine, findMtrStation } from '@/mtr-static';
 
@@ -47,7 +48,7 @@ export function railwayFavoriteHref(identity: RailwayFavoriteIdentity) {
     : { pathname: '/light-rail/[kind]' as const, params: { kind: 'stop', id: identity.stationId, route: identity.lineId } };
 }
 
-export function setRailwayFavorite(identity: RailwayFavoriteIdentity, saved: boolean) {
+export function setRailwayFavorite(identity: RailwayFavoriteIdentity, saved: boolean, pinToHome = false) {
   return queueTransportFavoriteWrite(async () => {
     const database = await getDatabase();
     const { mode, lineId, stationId } = identity;
@@ -60,16 +61,24 @@ export function setRailwayFavorite(identity: RailwayFavoriteIdentity, saved: boo
     const service = resolveRailwayService(identity);
     if (!service) throw new Error('Unavailable railway service');
     const now = Date.now();
-    await database.runAsync(`INSERT INTO railway_favorites (
-      mode, line_id, station_id, line_zh_snapshot, line_en_snapshot, station_zh_snapshot, station_en_snapshot, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(mode, line_id, station_id) DO NOTHING`,
-    mode, lineId, stationId, service.line.zh, service.line.en, service.station.zh, service.station.en, now, now);
+    let home: Awaited<ReturnType<typeof pinSavedHomeService>> | undefined;
+    let items: RailwayFavorite[] = [];
+    await database.withExclusiveTransactionAsync(async (transaction) => {
+      await transaction.runAsync(`INSERT INTO railway_favorites (
+        mode, line_id, station_id, line_zh_snapshot, line_en_snapshot, station_zh_snapshot, station_en_snapshot, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(mode, line_id, station_id) DO NOTHING`,
+      mode, lineId, stationId, service.line.zh, service.line.en, service.station.zh, service.station.en, now, now);
+      if (pinToHome) home = await pinSavedHomeService(transaction, identity);
+      items = await listRailwayFavorites(transaction);
+    });
+    if (home) publishHomePins(home.pins);
+    return { outcome: home?.outcome ?? 'ok' as const, items };
   });
 }
 
-export async function listRailwayFavorites(): Promise<RailwayFavorite[]> {
-  await waitForTransportFavoriteWrites();
-  const database = await getDatabase();
+export async function listRailwayFavorites(db?: SQLiteDatabase): Promise<RailwayFavorite[]> {
+  if (!db) await waitForTransportFavoriteWrites();
+  const database = db ?? await getDatabase();
   const rows = await database.getAllAsync<FavoriteRow>('SELECT * FROM railway_favorites ORDER BY created_at DESC, mode, line_id, station_id');
   return rows.map((row) => {
     const identity = { mode: row.mode, lineId: row.line_id, stationId: row.station_id };

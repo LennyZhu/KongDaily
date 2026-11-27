@@ -191,6 +191,27 @@ function navigate(result, name, expectedParams) {
 }
 
 async function main() {
+  const { homeTransitHref, homeTransitIntent, useHomeTransitRouter } = load('home-transit-intent');
+  const nextTargets = [
+    { pathname: '/bus/route', params: { routeId: 'NLB:37', stopId: '152', stopSeq: '3' } },
+    { pathname: '/bus/eta', params: { source: 'nlb', number: 'B2', routeId: '37', stopId: '152', stopSeq: '3' } },
+    { pathname: '/mtr/[kind]', params: { kind: 'station', code: 'ADM', line: 'ISL' } },
+    { pathname: '/light-rail/[kind]', params: { kind: 'stop', id: '380', route: '610' } },
+    { pathname: '/minibus/[id]', params: { id: '2009246', routeSeq: '2', stopId: '10', stopSeq: '3' } },
+  ];
+  for (const href of nextTargets) {
+    assert.equal(homeTransitHref(href, false), href);
+    assert.deepEqual(homeTransitHref(href, true), { ...href, params: { ...href.params, intent: homeTransitIntent } });
+  }
+  for (const href of ['/search', '/saved', '/settings', '/ferry/1', '/tram/route']) assert.equal(homeTransitHref(href, true), href);
+  params = { intent: homeTransitIntent };
+  safeRouter.push = (href) => openings.push(href);
+  const scopedRouter = render(useHomeTransitRouter).tree;
+  scopedRouter.push(nextTargets[0]);
+  assert.equal(openings.pop().params.intent, homeTransitIntent);
+  params = {};
+  render(useHomeTransitRouter).tree.push(nextTargets[0]);
+  assert.deepEqual(openings.pop(), nextTargets[0], 'A later ordinary route has no inherited intent');
   await testTabSwipes();
   const { railwayFavoriteHref } = load('railway-favorites');
   for (const identity of [

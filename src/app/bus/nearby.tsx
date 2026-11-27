@@ -1,4 +1,5 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useHomeTransitRouter } from '@/home-transit-intent';
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, FlatList, Keyboard, Linking, Pressable, StyleSheet, View, type ViewToken } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -81,7 +82,7 @@ export default function NearbyBusScreen({ transport = false, addFrequentRoute = 
   transport?: boolean; addFrequentRoute?: boolean;
 } = {}) {
   const { copy, locale } = useLanguage();
-  const router = useRouter();
+  const router = useHomeTransitRouter();
   const labels = copy.nearbyBus;
   const { bottom } = useSafeAreaInsets();
   const [reference, setReference] = useState<Reference>();

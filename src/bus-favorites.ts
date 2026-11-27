@@ -6,7 +6,7 @@ import type { RouteName } from '@/bus-routes';
 import { isStopDataFresh, readRouteStops, routeStopMaxAge } from '@/bus-stop-data';
 import { routeStopKey, stopVisitKey, type RouteStop, type RouteStopIdentity } from '@/bus-stops';
 import { getDatabase } from '@/database';
-import { forgetDeletedHomePin, queueTransportFavoriteWrite } from '@/home-transport-pins';
+import { forgetDeletedHomePin, pinSavedHomeService, publishHomePins, queueTransportFavoriteWrite } from '@/home-transport-pins';
 
 export type BusVisitSummary = {
   target: EtaTarget;
@@ -40,7 +40,7 @@ type FavoriteRow = {
   updated_at: number;
 };
 
-export type FavoriteChange = { type: 'save'; visit: BusVisitSummary } | { type: 'remove'; id: string };
+export type FavoriteChange = { type: 'save'; visit: BusVisitSummary; pinToHome?: boolean } | { type: 'remove'; id: string };
 
 export function busFavoriteId(target: EtaTarget) {
   return stopVisitKey(target, { seq: target.stopSeq, id: target.stopId });
@@ -150,12 +150,15 @@ export function writeBusFavorites(change: FavoriteChange) {
   return queueTransportFavoriteWrite(async () => {
     const database = await getDatabase();
     let items: BusFavorite[] = [];
+    let home: Awaited<ReturnType<typeof pinSavedHomeService>> | undefined;
     await database.withExclusiveTransactionAsync(async (transaction) => {
       await applyFavoriteChange(transaction, change);
+      if (change.type === 'save' && change.pinToHome) home = await pinSavedHomeService(transaction, { mode: 'bus', id: busFavoriteId(change.visit.target) });
       items = await readRows(transaction);
     });
     if (change.type === 'remove') forgetDeletedHomePin({ mode: 'bus', id: change.id });
-    return { items, outcome: 'ok' as const };
+    if (home) publishHomePins(home.pins);
+    return { items, outcome: home?.outcome ?? 'ok' as const };
   });
 }
 

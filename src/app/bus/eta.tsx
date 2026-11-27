@@ -1,5 +1,7 @@
+import { HomeTransitPinAction, useHomeTransitSave } from '@/components/home-transit-save';
+import { useHomeTransitRouter } from '@/home-transit-intent';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
@@ -19,7 +21,7 @@ const hongKong = 'Asia/Hong_Kong';
 export default function BusEtaScreen() {
   const params = useLocalSearchParams();
   const { copy } = useLanguage();
-  const router = useRouter();
+  const router = useHomeTransitRouter();
   const target = readEtaTarget(params);
   if (!target) {
     return (
@@ -87,10 +89,12 @@ function EtaDetails({ initialTarget, station, destination, destinationStopId }: 
     .filter(Boolean).join(' · ');
 
   const notices = unavailable ? [] : view.notices;
-  const favoriteDisabled = favoritesStatus !== 'ready' || saving;
+  const homeSave = useHomeTransitSave({ mode: 'bus', visit: { target, station: stationName, destination: destinationName, destinationStopId } }, !!saved);
+  const favoriteDisabled = favoritesStatus !== 'ready' || saving || homeSave.busy;
 
   async function toggleFavorite() {
-    if (changePending.current || favoritesStatus !== 'ready') return;
+    if (changePending.current || favoritesStatus !== 'ready' || homeSave.busy) return;
+    if (homeSave.enabled && !saved) { await homeSave.save(); return; }
     changePending.current = true;
     setSaving(true);
     setSaveFailed(false);
@@ -129,6 +133,7 @@ function EtaDetails({ initialTarget, station, destination, destinationStopId }: 
         </Pressable>
       </View>
 
+      <HomeTransitPinAction action={homeSave} saved={!!saved} />
       {(saveFailed || favoritesStatus === 'error') && (
         <View style={styles.notice} accessibilityRole="alert">
           <AppText variant="detail" tone="error">{saveFailed ? favorites.saveError : favorites.loadError}</AppText>

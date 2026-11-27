@@ -34,6 +34,11 @@ const zhHK = {
     },
     morePredictions: '其他月台預報見詳情',
   },
+  homeAddTransit: {
+    savedAndPinned: '已收藏並置頂首頁',
+    pinned: '已置頂首頁',
+    full: '已收藏，首頁置頂已滿（最多四項）',
+  },
   homePins: {
     loading: '正在載入首頁置頂…',
     loadError: '未能載入常用交通',
@@ -904,6 +909,11 @@ const en: typeof zhHK = {
       providerUnavailable: 'Predictions unavailable from MTR',
     },
     morePredictions: 'More platforms in details',
+  },
+  homeAddTransit: {
+    savedAndPinned: 'Saved and pinned to Home',
+    pinned: 'Pinned to Home',
+    full: 'Saved. Home pins are full (maximum 4).',
   },
   homePins: {
     loading: 'Loading Home pins…',

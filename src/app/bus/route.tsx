@@ -1,4 +1,6 @@
-import { useLocalSearchParams, useNavigation, useRoute, useRouter } from 'expo-router';
+import { HomeTransitPinAction, useHomeTransitSave } from '@/components/home-transit-save';
+import { useHomeTransitRouter } from '@/home-transit-intent';
+import { useLocalSearchParams, useNavigation, useRoute } from 'expo-router';
 import { useEffect, useMemo, useRef, useState, type Ref, type RefObject } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -43,7 +45,7 @@ export default function RouteDetailsScreen() {
 
 function RouteLoader({ id, boarding, fromSearch }: { id: string; boarding: BoardingParams; fromSearch: boolean }) {
   const { copy } = useLanguage();
-  const router = useRouter();
+  const router = useHomeTransitRouter();
   const [family, setFamily] = useState<RouteFamily | null>();
   const fromNearby = typeof boarding.stopId === 'string' && typeof boarding.stopSeq === 'string';
 
@@ -75,7 +77,7 @@ function RouteLoader({ id, boarding, fromSearch }: { id: string; boarding: Board
 
 function RouteDetails({ family, boarding, fromSearch }: { family: RouteFamily; boarding: BoardingParams; fromSearch: boolean }) {
   const { copy, locale } = useLanguage();
-  const router = useRouter();
+  const router = useHomeTransitRouter();
   const detail = copy.busDetail;
   const bus = copy.bus;
   const base = family.selected;
@@ -455,10 +457,11 @@ function SelectedStopCard({ visit, name, direction, cooldowns }: {
   const [target] = useState(visit.target);
   const [ready, setReady] = useState(false);
   const { copy, locale } = useLanguage();
-  const router = useRouter();
+  const router = useHomeTransitRouter();
   const eta = copy.busEta;
   const labels = copy.busFavorites;
   const favorite = useBusStopFavorite(visit);
+  const homeSave = useHomeTransitSave({ mode: 'bus', visit }, favorite.saved === true);
   const favoriteAction = favorite.loading ? labels.loading : favorite.loadFailed ? `${labels.loadError} · ${copy.bus.retry}`
     : favorite.saved ? `${labels.saved} · ${labels.remove}` : `${labels.stopNotSaved} · ${labels.saveStop}`;
   useEffect(() => {
@@ -483,8 +486,8 @@ function SelectedStopCard({ visit, name, direction, cooldowns }: {
           <AppText variant="detail" tone="muted">{target.number} · {direction}</AppText>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel={`${name} · ${favoriteAction}`}
-          accessibilityState={{ selected: favorite.saved, busy: favorite.loading || favorite.saving, disabled: !favorite.onPress }}
-          disabled={!favorite.onPress} onPress={favorite.onPress}
+          accessibilityState={{ selected: favorite.saved, busy: favorite.loading || favorite.saving, disabled: !favorite.onPress || homeSave.busy }}
+          disabled={!favorite.onPress || homeSave.busy} onPress={homeSave.enabled && favorite.saved === false ? () => void homeSave.save() : favorite.onPress}
           style={({ pressed }) => [styles.stopFavorite, pressed && styles.pressed]}>
           <View aria-hidden>
             {favorite.loading || favorite.saving ? <ActivityIndicator color={colors.primary} size="small" />
@@ -492,6 +495,7 @@ function SelectedStopCard({ visit, name, direction, cooldowns }: {
           </View>
         </Pressable>
       </View>
+      <HomeTransitPinAction action={homeSave} saved={favorite.saved === true} />
       {(favorite.loadFailed || favorite.saveFailed) && (
         <AppText variant="caption" tone="error" accessibilityRole="alert">
           {favorite.loadFailed ? labels.loadError : labels.saveError}

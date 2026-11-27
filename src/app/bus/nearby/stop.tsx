@@ -1,4 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useHomeTransitRouter } from '@/home-transit-intent';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View, type FlatListProps } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -151,7 +152,7 @@ function RouteArrivals({ route, stationName, record, fallbackError, now }: {
   now: number;
 }) {
   const { copy, locale } = useLanguage();
-  const router = useRouter();
+  const router = useHomeTransitRouter();
   const { target, destination, destinationStopId } = route;
   const eta = copy.busEta;
   const snapshot = record?.snapshot;

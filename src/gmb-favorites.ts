@@ -5,7 +5,7 @@ import { getDatabase } from '@/database';
 import { gmbIsDirection, gmbIsRegion, gmbIsRouteCode, gmbPositiveId,
   type GmbDirection, type GmbRegion, type GmbRoute, type GmbVisit, type GmbVisitKey } from '@/gmb-data';
 import { gmbText, gmbVisitKey } from '@/gmb-search';
-import { forgetDeletedHomePin, queueTransportFavoriteWrite } from '@/home-transport-pins';
+import { forgetDeletedHomePin, pinSavedHomeService, publishHomePins, queueTransportFavoriteWrite } from '@/home-transport-pins';
 
 export type GmbFavorite = GmbVisitKey & {
   mode: 'gmb'; id: string; region: GmbRegion; routeCode: string;
@@ -67,7 +67,7 @@ export function useGmbFavorites() {
   return state;
 }
 
-export function setGmbFavorite(favorite: GmbFavorite, saved: boolean) {
+export function setGmbFavorite(favorite: GmbFavorite, saved: boolean, pinToHome = false) {
   return queueTransportFavoriteWrite(async () => {
     try {
       if (favorite.mode !== 'gmb' || favorite.id !== gmbVisitKey(favorite) ||
@@ -76,6 +76,7 @@ export function setGmbFavorite(favorite: GmbFavorite, saved: boolean) {
           !gmbIsRegion(favorite.region) || !gmbIsRouteCode(favorite.routeCode)) return 'failed';
       const db = await getDatabase();
       let items: GmbFavorite[] = [];
+      let home: Awaited<ReturnType<typeof pinSavedHomeService>> | undefined;
       await db.withExclusiveTransactionAsync(async (transaction) => {
         if (saved) {
           await transaction.runAsync(`
@@ -87,11 +88,13 @@ export function setGmbFavorite(favorite: GmbFavorite, saved: boolean) {
         } else {
           await transaction.runAsync('DELETE FROM gmb_favorites WHERE id = ?', favorite.id);
         }
+        if (saved && pinToHome) home = await pinSavedHomeService(transaction, favorite);
         items = await listGmbFavorites(transaction);
       });
       if (!saved) forgetDeletedHomePin(favorite);
       publish({ items, status: 'ready' });
+      if (home) publishHomePins(home.pins);
+      return home?.outcome ?? 'ok';
     } catch { return 'failed'; }
-    return 'ok';
   });
 }

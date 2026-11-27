@@ -159,6 +159,7 @@ function mount(t, {
     './link/useLoadedNavigation': { useOptionalNavigation: () => navigation },
     './useNavigation': { useNavigation: () => navigation },
     '@/language': { useLanguage: () => ({ locale, copy: source('i18n').messages[locale] }) },
+    '@/components/home-transit-save': { HomeTransitPinAction: () => null, useHomeTransitSave: () => ({ enabled: false, busy: false }) },
     '@/components/railway-favorite-action': { RailwayStationHeading: ({ title, description }) => ({ type: 'PageHeading', props: { title, description } }) },
     '@/components/ui': {
       AppText: 'AppText', EmptyState: 'EmptyState', Icon: 'Icon', Filters: 'Filters',
@@ -553,6 +554,19 @@ for (const locale of ['zh-HK', 'en']) {
     assert.ok(page.findAction(copy.straightLineRadius(labels.kilometres(2))));
   });
 }
+
+test('Home add intent travels from nearby results into each open transport detail', async (t) => {
+  const page = mount(t, { transport: true, initialRadius: 300, intent: 'add-home-transit' });
+  await page.settle();
+  page.fix(0, page.landmarks.yuenLong); await page.settle();
+  for (const mode of ['bus', 'mtr', 'lightRail', 'minibus']) {
+    page.press(page.transportCopy.modes[mode]); await page.settle();
+    assert.ok(page.rows().length);
+    if (mode === 'bus') page.renderRow(0).props.onPress();
+    else page.openResult(0);
+    assert.equal(page.routes.at(-1).params.intent, 'add-home-transit');
+  }
+});
 
 test('300m empty nearby results offer each larger radius once without changing the reference', async (t) => {
   const page = mount(t, { transport: true, initialRadius: 300 });

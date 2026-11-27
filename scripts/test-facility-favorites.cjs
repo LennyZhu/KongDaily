@@ -101,6 +101,7 @@ function loadApp(file, { failAfterV8 = false, failAfterV9 = false, failAfterV10 
     }).outputText;
     new Function('module', 'exports', 'require', script)(module, module.exports, (id) => {
       if (id === 'expo-sqlite') return { openDatabaseAsync };
+      if (id === '@/components/home-transit-save') return { HomeTransitPinAction: () => null, useHomeTransitSave: () => ({ enabled: false, busy: false }) };
       if (id === registryRelPath && registry) return registry;
       if (id === '@/components/tab-swipe') return { TabSwipeRegion: 'TabSwipeRegion' };
       if (Object.hasOwn(stubs, id)) return stubs[id];
@@ -948,7 +949,7 @@ async function testRouteStopQuickFavorite() {
       useMemo: (fn) => fn(),
       useSyncExternalStore: (_subscribe, read) => read(),
     },
-    'expo-router': { useFocusEffect: () => {}, useRouter: () => ({ push: (href) => { opened = href; } }) },
+    'expo-router': { useLocalSearchParams: () => ({}), useFocusEffect: () => {}, useRouter: () => ({ push: (href) => { opened = href; } }) },
     'expo-linear-gradient': { LinearGradient: 'LinearGradient' },
     'react-native': {
       Pressable: 'Pressable', View: 'View', ActivityIndicator: 'ActivityIndicator',
@@ -1413,7 +1414,7 @@ async function testRailwayFavorites() {
     await gmbStore.setGmbFavorite(minibus, true);
     const HomeScreen = reopened.load('app/(tabs)/index').default;
     const hasAddTransport = (tree) => tree.some(({ type, props }) =>
-      type === 'HomeLink' && props.href === '/transport' && props.label === copy().home.addFrequentRoute);
+      type === 'HomeLink' && props.href?.pathname === '/transport' && props.href.params?.intent === 'add-home-transit' && props.label === copy().home.addFrequentRoute);
     const { FavoriteBusRow: RealFavoriteBusRow } = reopened.load('components/saved-bus-ui');
     for (const language of ['zh-HK', 'en']) {
       locale = language;
@@ -2005,7 +2006,154 @@ async function testV12FourPins() {
   console.log('PASS: exact released v11 → v12, rollback, four mixed pins, fifth rejected, reorder, restart and delete release');
 }
 
+async function testHomeAddTransit() {
+  const file = join(scratch, 'home-add-transit.db');
+  let failPins = false;
+  let failRead = false;
+  let intent;
+  let locale = 'zh-HK';
+  let cursor = 0;
+  let slots = [];
+  const announcements = [];
+  let app;
+  const stubs = {
+    react: {
+      useRef(initial) { return slots[cursor++] ??= { current: initial }; },
+      useState(initial) {
+        const i = cursor++;
+        if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial;
+        return [slots[i], (value) => { slots[i] = value; }];
+      },
+      useEffect() {},
+      useSyncExternalStore: (_subscribe, read) => read(),
+    },
+    'expo-router': { useLocalSearchParams: () => ({ intent }) },
+    'react-native': { StyleSheet: { create: (value) => value }, View: 'View', Pressable: 'Pressable',
+      AccessibilityInfo: { announceForAccessibility: (text) => announcements.push(text) } },
+    '@/language': { useLanguage: () => ({ locale, copy: app.load('i18n').messages[locale] }) },
+    '@/components/ui': { AppText: 'AppText', Icon: 'Icon' },
+  };
+  app = loadApp(file, { stubs, beforeQuery(sql) {
+    if (failPins && sql.includes('INSERT INTO home_transport_pins')) throw Error('Pin failure');
+    if (failRead && sql.includes('SELECT * FROM gmb_favorites')) throw Error('Readback failure');
+  } });
+  try {
+    const bus = app.load('bus-favorite-hooks');
+    const rail = app.load('railway-favorite-hooks');
+    const gmb = app.load('gmb-favorites');
+    const pins = app.load('home-transport-pins');
+    const ui = app.load('components/home-transit-save');
+    const busVisit = (stopSeq) => ({ target: { source: 'nlb', number: 'B2', routeId: '37', stopId: String(150 + stopSeq), stopSeq },
+      station: { zh: '站', en: 'Stop' }, destination: { zh: '總站', en: 'Terminus' } });
+    const services = [
+      { mode: 'bus', visit: busVisit(1) },
+      { mode: 'mtr', lineId: 'ISL', stationId: 'ADM' },
+      { mode: 'light_rail', lineId: '610', stationId: '380' },
+      { mode: 'gmb', id: '2009246:2:3:10', routeId: 2009246, routeSeq: 2, stopSeq: 3, stopId: 10,
+        region: 'KLN', routeCode: '2', stopName: { 'zh-HK': '站', en: 'Stop' }, destination: { 'zh-HK': '總站', en: 'Terminus' } },
+    ];
+    const busId = app.load('bus-favorites').busFavoriteId;
+    const identity = (service) => service.mode === 'bus' ? { mode: 'bus', id: busId(service.visit.target) }
+      : service.mode === 'gmb' ? { mode: 'gmb', id: service.id } : service;
+    const render = (service, saved) => { cursor = 0; return ui.useHomeTransitSave(service, saved); };
+
+    for (const service of services) {
+      slots = [];
+      assert.equal(render(service, false).enabled, false);
+      await render(service, false).save();
+    }
+    assert.deepEqual(await pins.readHomePins(), []);
+    assert.deepEqual(await app.load('bus-favorites').readBusFavorites(), []);
+    // Ordinary saves use the existing API and leave all Home slots empty.
+    await bus.changeBusFavorites({ type: 'save', visit: services[0].visit });
+    await app.load('railway-favorites').setRailwayFavorite(services[1], true);
+    await app.load('railway-favorites').setRailwayFavorite(services[2], true);
+    await gmb.setGmbFavorite(services[3], true);
+    assert.deepEqual(await pins.readHomePins(), []);
+    intent = 'add-home-transit';
+    for (const [index, service] of services.entries()) {
+      slots = [];
+      if (index === 0) {
+        const action = render(service, true);
+        const shortcut = ui.HomeTransitPinAction({ action, saved: true });
+        assert.equal(elements(shortcut).find(({ type }) => type === 'Pressable').props.accessibilityLabel,
+          app.load('i18n').messages[locale].busFavorites.pin);
+      }
+      const action = render(service, true);
+      await Promise.all([action.save(), action.save()]);
+      assert.deepEqual(await pins.readHomePins(), services.slice(0, index + 1).map(identity));
+      assert.equal(render(service, true).message, app.load('i18n').messages[locale].homeAddTransit.pinned);
+    }
+    for (const service of services) {
+      if (service.mode === 'bus') await bus.changeBusFavorites({ type: 'remove', id: identity(service).id });
+      else if (service.mode === 'gmb') await gmb.setGmbFavorite(service, false);
+      else await app.load('railway-favorites').setRailwayFavorite(service, false);
+    }
+    assert.deepEqual(await pins.readHomePins(), []);
+    for (const [index, service] of services.entries()) {
+      slots = [];
+      await render(service, false).save();
+      assert.deepEqual(await pins.readHomePins(), services.slice(0, index + 1).map(identity));
+      assert.equal(render(service, true).message, app.load('i18n').messages[locale].homeAddTransit.savedAndPinned);
+    }
+    const ordered = await pins.readHomePins();
+    slots = [];
+    await render(services[1], true).save();
+    assert.deepEqual(await pins.readHomePins(), ordered);
+    // A fifth save is successful while the bounded Home set remains intact.
+    const fifth = { mode: 'bus', visit: busVisit(2) };
+    slots = [];
+    locale = 'en';
+    await render(fifth, false).save();
+    assert.equal(render(fifth, true).message, app.load('i18n').messages.en.homeAddTransit.full);
+    assert.ok(bus.useBusFavorites().items.some(({ id }) => id === identity(fifth).id));
+    assert.deepEqual(await pins.readHomePins(), ordered);
+    await pins.changeHomePin({ type: 'unpin', pin: identity(services[3]) });
+    // Two different concurrent adds contend for the fourth slot.
+    const sixth = { mode: 'bus', visit: busVisit(3) };
+    const results = await Promise.all([fifth, sixth].map(({ visit }) =>
+      bus.changeBusFavorites({ type: 'save', visit, pinToHome: true })));
+    assert.deepEqual(results, ['ok', 'limit']);
+    assert.equal((await pins.readHomePins()).length, 4);
+    await pins.changeHomePin({ type: 'unpin', pin: identity(fifth) });
+    const beforePins = await pins.readHomePins();
+    const failure = { mode: 'bus', visit: busVisit(4) };
+    failPins = true;
+    slots = [];
+    await render(failure, false).save();
+    failPins = false;
+    assert.equal(render(failure, false).message, app.load('i18n').messages.en.busFavorites.saveError);
+    assert.ok(!bus.useBusFavorites().items.some(({ id }) => id === identity(failure).id));
+    assert.deepEqual(await pins.readHomePins(), beforePins);
+    failPins = true;
+    assert.equal(await rail.saveRailwayToHome({ mode: 'mtr', lineId: 'EAL', stationId: 'ADM' }), 'failed');
+    failPins = false;
+    assert.ok(!(await app.load('railway-favorites').listRailwayFavorites()).some(({ lineId }) => lineId === 'EAL'));
+    assert.deepEqual(await pins.readHomePins(), beforePins);
+    failRead = true;
+    assert.equal(await gmb.setGmbFavorite(services[3], true, true), 'failed');
+    failRead = false;
+    assert.deepEqual(await pins.readHomePins(), beforePins, 'Readback failure rolls back the pin');
+    assert.equal(gmb.useGmbFavorites().items.length, 1);
+    await rail.saveRailwayToHome(services[1]);
+    assert.ok(rail.useRailwayFavorites().items.some(({ lineId }) => lineId === 'ISL'));
+    intent = undefined;
+    slots = [];
+    assert.equal(render(failure, false).enabled, false);
+    await render(failure, false).save();
+    assert.deepEqual(await pins.readHomePins(), beforePins);
+    assert.ok(announcements.includes(app.load('i18n').messages.en.homeAddTransit.full));
+    app.close();
+    const restarted = loadApp(file);
+    assert.deepEqual(await restarted.load('home-transport-pins').readHomePins(), beforePins);
+    assert.equal((await restarted.load('bus-favorites').readBusFavorites()).length, 3);
+    restarted.close();
+    console.log('PASS: scoped four-mode save/pin, normal isolation, fourth/fifth, duplicate/concurrent adds, rollback, feedback and restart');
+  } finally { app.close(); }
+}
+
 test().then(testNearbyFavoriteButtons).then(testSavedFacilityIntegration).then(testRouteStopQuickFavorite).then(testRailwayFavorites).then(testHomePinMigration).then(testMinibusV11Migration)
+  .then(testHomeAddTransit)
   .then(testV12FourPins)
   .then(testPublishedV8Upgrade)
   .then(() => console.log('PASS: registry, SQLite v11, facility favorites, nearby bilingual filters, bus and railway favorites and shared Home pins'))

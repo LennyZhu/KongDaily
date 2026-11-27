@@ -76,3 +76,12 @@ export function useRailwayFavorite(identity: RailwayFavoriteIdentity) {
 }
 
 export function removeSavedRailway(identity: RailwayFavoriteIdentity) { return changeFavorite(identity, true); }
+
+export async function saveRailwayToHome(identity: RailwayFavoriteIdentity) {
+  try {
+    const result = await setRailwayFavorite(identity, true, true);
+    if (!result) return 'failed' as const;
+    publish({ ...state, items: result.items, status: 'ready' });
+    return result.outcome;
+  } catch { return 'failed' as const; }
+}

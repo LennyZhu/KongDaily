@@ -286,7 +286,7 @@ async function verify() {
   };
   stubs['@/components/weather-warning-ui'] = { WeatherWarningLink: 'WeatherWarningLink' };
   const HomeScreen = load('app/(tabs)/index').default;
-  const addFrequentHref = '/transport';
+  const addFrequentHref = { pathname: '/transport', params: { intent: 'add-home-transit' } };
   for (locale of ['zh-HK', 'en']) {
     const { empty: emptyTitle, emptyDetail } = labels().homePins;
     const addLabel = locale === 'en' ? 'Add frequent transport' : '新增常用交通';

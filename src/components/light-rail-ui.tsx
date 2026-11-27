@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useHomeTransitRouter } from '@/home-transit-intent';
 import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 
 import { AppText, Icon } from '@/components/ui';
@@ -16,7 +16,7 @@ export function LightRailEntryRow({ entry, sequence, nearby, routeId }: {
   entry: LightRailEntry; sequence?: number; nearby?: { boarding: LightRailStop; distance: string }; routeId?: string;
 }) {
   const { copy, locale } = useLanguage();
-  const router = useRouter();
+  const router = useHomeTransitRouter();
   const labels = copy.lightRail;
   const isRoute = entry.kind === 'light-rail-route';
   const title = isRoute ? labels.route(entry.id) : locale === 'en' ? entry.en : entry.zh;

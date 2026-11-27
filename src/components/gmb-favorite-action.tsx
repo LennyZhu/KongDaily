@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { HomeTransitPinAction, useHomeTransitSave } from '@/components/home-transit-save';
 import { AppText, Icon } from '@/components/ui';
 import { loadGmbFavorites, setGmbFavorite, useGmbFavorites, type GmbFavorite } from '@/gmb-favorites';
 import { useLanguage } from '@/language';
@@ -13,12 +14,14 @@ export function GmbFavoriteAction({ favorite }: { favorite: GmbFavorite }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const saved = items.some(({ id }) => id === favorite.id);
+  const homeSave = useHomeTransitSave(favorite, saved);
   const labels = copy.railwayFavorites;
   const service = copy.gmbFavorites.service(copy.minibus.stopLabel(favorite.stopSeq, favorite.stopName[locale]), favorite.destination[locale]);
   const label = status === 'error' ? copy.bus.retry : saved ? copy.busFavorites.remove : labels.save;
 
   async function press() {
-    if (pending.current) return;
+    if (pending.current || homeSave.busy) return;
+    if (homeSave.enabled && !saved && status === 'ready') { await homeSave.save(); return; }
     pending.current = true;
     setBusy(true);
     setFailed(false);
@@ -31,7 +34,7 @@ export function GmbFavoriteAction({ favorite }: { favorite: GmbFavorite }) {
     }
   }
 
-  const disabled = busy || status === 'loading';
+  const disabled = busy || homeSave.busy || status === 'loading';
   return <>
     <Pressable accessibilityRole="button" accessibilityLabel={`${label} · ${service}`}
       accessibilityState={{ selected: saved, busy: disabled, disabled }} disabled={disabled}
@@ -43,6 +46,7 @@ export function GmbFavoriteAction({ favorite }: { favorite: GmbFavorite }) {
         {status === 'error' ? label : saved ? labels.saved : label}
       </AppText>
     </Pressable>
+    <HomeTransitPinAction action={homeSave} saved={saved} />
     {(failed || status === 'error') && <AppText variant="caption" tone="error" accessibilityRole="alert" style={styles.error}>
       {status === 'error' ? labels.read : labels.write}
     </AppText>}

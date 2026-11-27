@@ -40,6 +40,32 @@ function publish(state: PinState) {
   snapshot = state;
   for (const listener of listeners) listener();
 }
+export function publishHomePins(pins: HomePin[]) {
+  publish({ pins, status: 'ready' });
+}
+
+// The caller saves the favorite and pins it within the same transaction and write queue.
+export async function pinSavedHomeService(database: SQLiteDatabase, pin: HomePin) {
+  const pins = await readHomePins(database);
+  if (pins.some((item) => homePinKey(item) === homePinKey(pin))) return { pins, outcome: 'ok' as const };
+  if (pins.length >= homeTransportLimit) return { pins, outcome: 'limit' as const };
+  if (!await favoriteExists(database, pin)) throw new Error('Missing home pin target');
+  pins.push(pin);
+  await replaceHomePins(database, pins);
+  return { pins, outcome: 'ok' as const };
+}
+
+async function replaceHomePins(database: SQLiteDatabase, pins: HomePin[]) {
+  await database.runAsync('DELETE FROM home_transport_pins');
+  for (const [offset, pin] of pins.entries()) {
+    const railway = pin.mode === 'bus' || pin.mode === 'gmb' ? undefined : pin;
+    await database.runAsync(
+      'INSERT INTO home_transport_pins (position, mode, bus_id, line_id, station_id, gmb_id) VALUES (?, ?, ?, ?, ?, ?)',
+      offset + 1, pin.mode, pin.mode === 'bus' ? pin.id : null,
+      railway?.lineId ?? null, railway?.stationId ?? null, pin.mode === 'gmb' ? pin.id : null,
+    );
+  }
+}
 const subscribe = (listener: () => void) => {
   listeners.add(listener);
   return () => { listeners.delete(listener); };
@@ -102,15 +128,7 @@ export function changeHomePin(change: PinChange) {
           if (next < 0 || next >= pins.length) return;
           [pins[index], pins[next]] = [pins[next], pins[index]];
         }
-        await transaction.runAsync('DELETE FROM home_transport_pins');
-        for (const [offset, pin] of pins.entries()) {
-          const railway = pin.mode === 'bus' || pin.mode === 'gmb' ? undefined : pin;
-          await transaction.runAsync(
-            'INSERT INTO home_transport_pins (position, mode, bus_id, line_id, station_id, gmb_id) VALUES (?, ?, ?, ?, ?, ?)',
-            offset + 1, pin.mode, pin.mode === 'bus' ? pin.id : null,
-            railway?.lineId ?? null, railway?.stationId ?? null, pin.mode === 'gmb' ? pin.id : null,
-          );
-        }
+        await replaceHomePins(transaction, pins);
       });
       publish({ pins, status: 'ready' });
       return outcome;
