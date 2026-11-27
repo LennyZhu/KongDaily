@@ -7,6 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { FacilityDetails, FacilitySelectionCard, FacilityServiceNotice, PetGardenTypeBadge, SharedPetRules, facilityDistance, facilityPlace } from '@/components/facility-selection-card';
 import { facilityVisuals, NearbyFacilitiesMap, type NearbyFacilitiesMapHandle } from '@/components/nearby-facilities-map';
 import { NearbySearchSheet } from '@/components/nearby-search-sheet';
+import { TabSwipeRegion } from '@/components/tab-swipe';
 import { AppText, Icon } from '@/components/ui';
 import { loadFacilityFavorites } from '@/facility-favorite-hooks';
 import { resolveStableFacilityIdentity } from '@/facility-identity';
@@ -301,14 +302,16 @@ export default function NearbyScreen() {
               router.setParams({ view: 'list' });
             }} />
         ) : (
-          <NearbyFacilitiesList key={`${category}:${listRevision}`} items={items} category={category} selectedId={selected?.id}
-            initialOffset={currentOffsets[category] ?? 0} centerName={centerName}
-            onScroll={(offset) => { currentOffsets[category] = offset; }}
-            onSelect={(item) => {
-              cancelLocation();
-              setSelectedFacilityKey((current) => current === item.id ? undefined : item.id);
-              if (selected?.id !== item.id) moveCamera(item.facility.coordinate);
-            }} />
+          <TabSwipeRegion enabled={!picking} style={styles.listSwipeRegion}>
+            <NearbyFacilitiesList key={`${category}:${listRevision}`} items={items} category={category} selectedId={selected?.id}
+              initialOffset={currentOffsets[category] ?? 0} centerName={centerName}
+              onScroll={(offset) => { currentOffsets[category] = offset; }}
+              onSelect={(item) => {
+                cancelLocation();
+                setSelectedFacilityKey((current) => current === item.id ? undefined : item.id);
+                if (selected?.id !== item.id) moveCamera(item.facility.coordinate);
+              }} />
+          </TabSwipeRegion>
         )}
 
         {mode === 'map' && areaPending && (
@@ -525,6 +528,7 @@ const styles = StyleSheet.create({
   },
   activeSegment: { backgroundColor: colors.tint },
   body: { flex: 1, minHeight: 0, borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+  listSwipeRegion: { flex: 1 },
   areaStatus: { marginHorizontal: homeLayout.gutter, marginTop: space.xs },
   list: { paddingHorizontal: homeLayout.gutter, paddingTop: space.xs, paddingBottom: space.md, gap: space.sm },
   centerSummary: {

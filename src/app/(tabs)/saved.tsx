@@ -6,6 +6,7 @@ import { changeBusFavorites, loadBusFavorites, useBusFavorites, useUnavailableFa
 import { BusAction } from '@/components/bus-ui';
 import { facilityVisuals } from '@/components/nearby-facilities-map';
 import { FavoriteBusRow, savedBusStyles } from '@/components/saved-bus-ui';
+import { TabSwipeRegion } from '@/components/tab-swipe';
 import { AppText, EmptyState, Filters, Icon, PageHeading, Screen } from '@/components/ui';
 import { loadFacilityFavorites, removeSavedFacility, useFacilityFavorites } from '@/facility-favorite-hooks';
 import { resolveFacilityFavorite } from '@/facility-favorites';
@@ -28,7 +29,7 @@ export default function SavedScreen() {
 
   return (
     <Screen>
-      <View style={styles.heading}>
+      <TabSwipeRegion style={styles.heading}>
         <PageHeading title={copy.tabs.saved} />
         <Link href="/settings" asChild>
           <Pressable
@@ -39,19 +40,21 @@ export default function SavedScreen() {
             <AppText variant="detail" tone="primary">{copy.settings.title}</AppText>
           </Pressable>
         </Link>
-      </View>
+      </TabSwipeRegion>
       <Filters horizontal
         options={categories.map((key) => [key, copy.saved.categories[key]])}
         selected={category}
         onSelect={(key) => router.setParams({ category: key })}
       />
-      {category !== 'places' && <HomePinSummary />}
-      {(category === 'all' || category === 'buses') && <SavedBuses emptyTitle={copy.saved.empty.buses} />}
-      {(category === 'all' || category === 'mtr' || category === 'lightRail') && (
-        <SavedRailways mode={category === 'all' ? undefined : category === 'mtr' ? 'mtr' : 'light_rail'} />
-      )}
-      {(category === 'all' || category === 'minibus') && <SavedMinibuses />}
-      {(category === 'all' || category === 'places') && <SavedFacilities />}
+      <TabSwipeRegion style={styles.swipeContent}>
+        {category !== 'places' && <HomePinSummary />}
+        {(category === 'all' || category === 'buses') && <SavedBuses emptyTitle={copy.saved.empty.buses} />}
+        {(category === 'all' || category === 'mtr' || category === 'lightRail') && (
+          <SavedRailways mode={category === 'all' ? undefined : category === 'mtr' ? 'mtr' : 'light_rail'} />
+        )}
+        {(category === 'all' || category === 'minibus') && <SavedMinibuses />}
+        {(category === 'all' || category === 'places') && <SavedFacilities />}
+      </TabSwipeRegion>
     </Screen>
   );
 }
@@ -378,6 +381,7 @@ function SavedFacilities() {
 
 const styles = StyleSheet.create({
   heading: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, alignItems: 'center', justifyContent: 'space-between' },
+  swipeContent: { gap: space.xxl },
   settings: {
     minHeight: touchTarget,
     maxWidth: '100%',

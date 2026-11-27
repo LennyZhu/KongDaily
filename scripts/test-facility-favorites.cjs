@@ -98,6 +98,7 @@ function loadApp(file, { failAfterV8 = false, failAfterV9 = false, failAfterV10 
     new Function('module', 'exports', 'require', script)(module, module.exports, (id) => {
       if (id === 'expo-sqlite') return { openDatabaseAsync };
       if (id === registryRelPath && registry) return registry;
+      if (id === '@/components/tab-swipe') return { TabSwipeRegion: 'TabSwipeRegion' };
       if (Object.hasOwn(stubs, id)) return stubs[id];
       if (id.startsWith('@/')) return load(id.slice(2));
       if (id.startsWith('.')) return json(resolve(dirname(filename), id));
@@ -761,6 +762,7 @@ async function testSavedFacilityIntegration() {
         tapLabel(tree, copy().nearby.categories[category]);
         tree = nearby();
         const filtered = map(tree).items;
+        assert.ok(!tree.some(({ type }) => type === 'TabSwipeRegion'), 'Map and its controls stay outside the swipe detector');
         assert.ok(filtered.length > 0);
         assert.ok(filtered.every(({ facility }) => category === 'all' || facility.category === category));
         assert.equal(filters(tree).filter(({ props }) => props.accessibilityState.selected).length, 1);
@@ -768,6 +770,9 @@ async function testSavedFacilityIntegration() {
         tree = nearby();
         assert.equal(map(tree), undefined);
         assert.equal(list(tree).category, category);
+        const swipeRegion = tree.find(({ type }) => type === 'TabSwipeRegion');
+        assert.equal(swipeRegion.props.children.type.name, 'NearbyFacilitiesList');
+        assert.ok(!elements(swipeRegion).some(({ props }) => props.horizontal));
         assert.deepEqual(list(tree).items, filtered, 'Map and List use the same filtered facilities and distances');
         tapLabel(tree, copy().nearby.map);
         tree = nearby();
@@ -1566,6 +1571,9 @@ async function testRailwayFavorites() {
         params = { category };
         const rootTree = render(SavedScreen);
         assert.equal(rootTree.find(({ type }) => type === 'Filters').props.horizontal, true);
+        for (const region of rootTree.filter(({ type }) => type === 'TabSwipeRegion')) {
+          assert.ok(!elements(region).some(({ type }) => type === 'Filters'));
+        }
         assert.deepEqual(rootTree.find(({ type }) => type === 'Filters').props.options.map(([key]) => key),
           ['all', 'buses', 'mtr', 'lightRail', 'minibus', 'places']);
         assert.equal(rootTree.some(({ type }) => type === SavedBuses), ['all', 'buses'].includes(category));

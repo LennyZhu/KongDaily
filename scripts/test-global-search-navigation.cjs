@@ -7,6 +7,7 @@ const { resolveHref } = require('expo-router/build/link/href');
 const { getStateFromPath } = require('expo-router/build/react-navigation/core/getStateFromPath');
 const { getActionFromState } = require('expo-router/build/react-navigation/core/getActionFromState');
 const { StackRouter } = require('expo-router/build/react-navigation/routers/StackRouter');
+const { TabRouter } = require('expo-router/build/react-navigation/routers/TabRouter');
 const ts = require('typescript');
 
 const root = join(__dirname, '..');
@@ -64,10 +65,14 @@ const nativeViews = Object.fromEntries(['FlatList', 'ScrollView', 'Pressable', '
   .map((name) => [name, name]));
 const sharedMap = 'NearbyFacilitiesMap';
 const selectionCard = 'FacilitySelectionCard';
+let keyboardVisible = false;
+let motionListener;
+const panMethods = ['enabled', 'runOnJS', 'maxPointers', 'activeOffsetX', 'failOffsetY', 'onBegin', 'onEnd', 'hitSlop'];
 const stubs = {
   react,
   'expo-router': {
     Stack: { Screen: 'StackScreen' },
+    Tabs: { Screen: 'TabScreen' },
     useLocalSearchParams: () => params,
     useRouter: () => safeRouter,
     useNavigation: () => ({ getState: () => destinationStack }),
@@ -77,7 +82,24 @@ const stubs = {
   'expo-sqlite': {},
   'react-native': {
     ...nativeViews, StyleSheet: { create: (value) => value, hairlineWidth: 1 },
+    Keyboard: { isVisible: () => keyboardVisible },
+    AccessibilityInfo: {
+      isReduceMotionEnabled: async () => false,
+      addEventListener(event, listener) {
+        assert.equal(event, 'reduceMotionChanged');
+        motionListener = listener;
+        return { remove: () => { motionListener = undefined; } };
+      },
+    },
     useWindowDimensions: () => ({ height: 780, width: 320, fontScale: 1.8 }),
+  },
+  'react-native-gesture-handler': {
+    GestureDetector: 'GestureDetector', GestureHandlerRootView: 'GestureHandlerRootView',
+    Gesture: { Pan() {
+      const gesture = { config: {} };
+      for (const key of panMethods) gesture[key] = (value) => { gesture.config[key] = value; return gesture; };
+      return gesture;
+    } },
   },
   'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ bottom: 30 }) },
   'react-native-maps': { __esModule: true, default: 'MapView', Marker: 'Marker' },
@@ -169,6 +191,7 @@ function navigate(result, name, expectedParams) {
 }
 
 async function main() {
+  await testTabSwipes();
   const { railwayFavoriteHref } = load('railway-favorites');
   for (const identity of [
     { mode: 'mtr', lineId: 'ISL', stationId: 'ADM' }, { mode: 'mtr', lineId: 'EAL', stationId: 'ADM' },
@@ -248,6 +271,96 @@ async function main() {
   assert.deepEqual(searchResultDestination({ ...tramStop, key: 'td:tram:stop:99313' }), { issue: 'resultUnavailable' });
 
   console.log('PASS: C3 exact identities, root Stack push/pop, isolated map and safe bus direction/stop handling');
+}
+
+async function testTabSwipes() {
+  const layout = load('app/(tabs)/_layout').default;
+  const { useTabSwipe, TabSwipeRegion } = load('components/tab-swipe');
+  const names = ['index', 'nearby', 'explore', 'saved'];
+  const routeOptions = { routeNames: names, routeParamList: {}, routeGetIdList: {} };
+  const tabs = TabRouter({});
+  let state = tabs.getInitialState(routeOptions);
+  let focused = true;
+  let navigations = 0;
+  const navigation = {
+    getState: () => state,
+    isFocused: () => focused,
+    navigate(name, params) {
+      navigations++;
+      state = tabs.getStateForAction(state, { type: 'NAVIGATE', payload: { name, params } }, routeOptions);
+    },
+    emit: () => ({ defaultPrevented: false }),
+  };
+  navigation.navigate('nearby', { category: 'pets', view: 'list' });
+  navigation.navigate('index');
+  const nearbyKey = state.routes[1].key;
+  const pan = render(() => useTabSwipe(navigation)).tree.config;
+  assert.deepEqual(pan.activeOffsetX, [-20, 20]);
+  assert.deepEqual(pan.failOffsetY, [-12, 12]);
+  assert.deepEqual(pan.hitSlop, { left: -24, right: -24 });
+  const end = (translationX, translationY = 0, success = true) => pan.onEnd({ translationX, translationY }, success);
+  const swipe = (...args) => { pan.onBegin(); end(...args); };
+  swipe(100);
+  swipe(-63);
+  swipe(-70, 60);
+  swipe(4, 100);
+  swipe(-100, 0, false);
+  assert.equal(state.index, 0);
+  for (const index of [1, 2, 3, 3]) { swipe(-100); assert.equal(state.index, index); }
+  for (const index of [2, 1, 0, 0]) { swipe(100); assert.equal(state.index, index); }
+  assert.equal(state.routes[1].key, nearbyKey);
+  assert.deepEqual(state.routes[1].params, { category: 'pets', view: 'list' });
+  pan.onBegin();
+  navigation.navigate('explore');
+  end(-100);
+  assert.equal(state.index, 2, 'A gesture started before navigation cannot advance the new tab');
+  swipe(-100);
+  const once = navigations;
+  end(100);
+  assert.equal(navigations, once);
+  focused = false;
+  swipe(100);
+  focused = true;
+  keyboardVisible = true;
+  swipe(100);
+  keyboardVisible = false;
+  assert.equal(state.index, 3);
+
+  for (locale of ['zh-HK', 'en']) {
+    const mounted = render(layout);
+    const tabLayout = mounted.tree.props.children;
+    const child = 'page-content';
+    assert.deepEqual(tabLayout.props.children.map(({ props }) => props.name), names);
+    for (const name of names) {
+      const wrapped = tabLayout.props.screenLayout({ route: { name }, children: child });
+      assert.equal(['index', 'explore'].includes(name) ? wrapped.type : wrapped,
+        ['index', 'explore'].includes(name) ? TabSwipeRegion : child);
+    }
+    assert.equal(tabLayout.props.screenOptions.animation, 'none');
+    const stopMotion = mounted.effects[0]();
+    await Promise.resolve();
+    assert.equal(render(layout, {}, mounted.state).tree.props.children.props.screenOptions.animation, 'fade');
+    motionListener(true);
+    assert.equal(render(layout, {}, mounted.state).tree.props.children.props.screenOptions.animation, 'none');
+    stopMotion();
+    const descriptors = Object.fromEntries(state.routes.map(({ key }, index) =>
+      [key, tabLayout.props.children[index].props]));
+    const bar = () => {
+      const element = tabLayout.props.tabBar({ navigation, state, descriptors });
+      return render(element.type, element.props).tree;
+    };
+    const buttons = () => nodes(bar()).filter(({ props }) => props.accessibilityRole === 'tab');
+    assert.deepEqual(buttons().map(({ props }) => props.accessibilityLabel), Object.values(messages[locale].tabs));
+    buttons()[0].props.onPress();
+    assert.equal(buttons().findIndex(({ props }) => props.accessibilityState.selected), 0);
+    const barPan = bar().props.gesture.config;
+    assert.equal(barPan.hitSlop, undefined);
+    barPan.onBegin();
+    barPan.onEnd({ translationX: -100, translationY: 0 }, true);
+    assert.equal(buttons().findIndex(({ props }) => props.accessibilityState.selected), 1);
+  }
+  locale = 'zh-HK';
+  console.log('PASS: four tabs, swipe boundaries, stale gesture rejection, state preservation, Reduce Motion and bilingual tab buttons');
 }
 
 function testFacilityMap() {
